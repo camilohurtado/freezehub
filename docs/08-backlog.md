@@ -40,7 +40,7 @@ Acceptance:
 - backend development commands are documented.
 
 ### FZ-003 — Frontend Bootstrap
-**Status:** TODO
+**Status:** DONE
 
 Initialize React + TypeScript frontend.
 

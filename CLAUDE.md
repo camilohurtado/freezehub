@@ -159,7 +159,21 @@ cd backend
 curl http://localhost:8080/actuator/health
 ```
 
-Frontend commands are not yet available (`FZ-003`). Complete local startup instructions will be added once the frontend and local Postgres (`FZ-004`) are in place.
+### Frontend (`frontend/`)
+
+Requires Node 20+.
+
+```bash
+cd frontend
+npm install
+
+npm run dev      # dev server, http://localhost:5173
+npm run build    # type-check (tsc -b) + production build
+npm run lint      # oxlint
+npm run test      # vitest run
+```
+
+Complete local startup instructions (backend + frontend + Postgres together) will be added once local Postgres (`FZ-004`) is in place.
 
 ## 9. Git discipline
 
