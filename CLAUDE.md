@@ -139,6 +139,28 @@ Once backend/frontend are initialized, document the exact commands here for:
 - frontend run/test/build/lint;
 - complete local startup.
 
+### Backend (`backend/`)
+
+Requires Java 21 (`backend/.java-version` pins this via jenv; otherwise ensure `JAVA_HOME` points to a Java 21 JDK).
+
+```bash
+cd backend
+
+# build + run tests
+./mvnw clean verify
+
+# run tests only
+./mvnw test
+
+# run the app locally (default port 8080)
+./mvnw spring-boot:run
+
+# health check
+curl http://localhost:8080/actuator/health
+```
+
+Frontend commands are not yet available (`FZ-003`). Complete local startup instructions will be added once the frontend and local Postgres (`FZ-004`) are in place.
+
 ## 9. Git discipline
 
 Development follows a **one backlog item = one feature branch** strategy.

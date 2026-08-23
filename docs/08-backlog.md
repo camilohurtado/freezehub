@@ -27,7 +27,7 @@ Acceptance:
 - no unnecessary application framework code is generated.
 
 ### FZ-002 — Backend Bootstrap
-**Status:** TODO
+**Status:** DONE
 
 Initialize the Java/Spring Boot backend.
 
