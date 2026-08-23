@@ -1,0 +1,7 @@
+databaseChangeLog:
+  - changeSet:
+      id: 001-baseline
+      author: freezehub
+      changes:
+        - tagDatabase:
+            tag: baseline

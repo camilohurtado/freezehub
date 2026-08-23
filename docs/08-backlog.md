@@ -52,7 +52,7 @@ Acceptance:
 - frontend development commands are documented.
 
 ### FZ-004 — Local PostgreSQL + Liquibase
-**Status:** TODO
+**Status:** DONE
 
 Introduce PostgreSQL local development and migration infrastructure.
 

@@ -20,6 +20,7 @@ Read, in order:
 freezehub/
 ├── CLAUDE.md
 ├── README.md
+├── docker-compose.yml   # local PostgreSQL
 ├── docs/       # product, domain, architecture, and backlog specs
 ├── backend/    # Java + Spring Boot modular monolith
 ├── frontend/   # React + TypeScript
@@ -29,8 +30,8 @@ freezehub/
 
 ## Status
 
-Milestone 0 (Foundation) is in progress. See `docs/08-backlog.md` for the current backlog item statuses, starting with `FZ-001`.
+Milestone 0 (Foundation) is in progress. See `docs/08-backlog.md` for the current backlog item statuses. `FZ-001`–`FZ-004` are done.
 
 ## Commands
 
-Not yet available. Commands will be documented here (per `CLAUDE.md` §8) once the backend (`FZ-002`) and frontend (`FZ-003`) are bootstrapped.
+See `CLAUDE.md` §8 for backend, frontend, and local Postgres commands.

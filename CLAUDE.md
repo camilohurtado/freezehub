@@ -139,20 +139,34 @@ Once backend/frontend are initialized, document the exact commands here for:
 - frontend run/test/build/lint;
 - complete local startup.
 
+### Local dependencies
+
+```bash
+# start local PostgreSQL (repo root)
+docker compose up -d postgres
+
+# stop it
+docker compose down
+```
+
 ### Backend (`backend/`)
 
 Requires Java 21 (`backend/.java-version` pins this via jenv; otherwise ensure `JAVA_HOME` points to a Java 21 JDK).
 
+`./mvnw clean verify` requires Docker running (integration tests use Testcontainers to start a real PostgreSQL and run Liquibase against it) — it does not require `docker compose up` first.
+
+`./mvnw spring-boot:run` connects to PostgreSQL via `spring.datasource.*`, overridable with `SPRING_DATASOURCE_URL` / `SPRING_DATASOURCE_USERNAME` / `SPRING_DATASOURCE_PASSWORD` (defaults match `docker-compose.yml`) — start `docker compose up -d postgres` first.
+
 ```bash
 cd backend
 
-# build + run tests
+# build + run tests (spins up Postgres via Testcontainers)
 ./mvnw clean verify
 
 # run tests only
 ./mvnw test
 
-# run the app locally (default port 8080)
+# run the app locally (default port 8080); requires `docker compose up -d postgres` first
 ./mvnw spring-boot:run
 
 # health check
@@ -173,7 +187,13 @@ npm run lint      # oxlint
 npm run test      # vitest run
 ```
 
-Complete local startup instructions (backend + frontend + Postgres together) will be added once local Postgres (`FZ-004`) is in place.
+### Complete local startup
+
+```bash
+docker compose up -d postgres
+(cd backend && ./mvnw spring-boot:run)   # separate terminal
+(cd frontend && npm run dev)             # separate terminal
+```
 
 ## 9. Git discipline
 

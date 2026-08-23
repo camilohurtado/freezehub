@@ -1,6 +1,12 @@
 spring:
   application:
     name: freezehub-backend
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/freezehub}
+    username: ${SPRING_DATASOURCE_USERNAME:freezehub}
+    password: ${SPRING_DATASOURCE_PASSWORD:freezehub}
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.yaml
 
 management:
   endpoints:
