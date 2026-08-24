@@ -7,4 +7,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     Optional<User> findByCognitoSubject(String cognitoSubject);
 
+    boolean existsByOrganizationIdAndEmail(Long organizationId, String email);
+
 }

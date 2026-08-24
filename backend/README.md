@@ -2,7 +2,7 @@
 
 Java 21 + Spring Boot modular monolith.
 
-Bootstrapped in `FZ-002`; PostgreSQL + Liquibase added in `FZ-004`; `organization` module (tenant boundary persistence) added in `FZ-011`; human authentication added in `FZ-012`. See `../docs/02-architecture.md` for the target module structure and stack, `../docs/03-data-model.md` for the schema, `../docs/06-security.md` for the auth approach, and `../CLAUDE.md` §8 for commands.
+Bootstrapped in `FZ-002`; PostgreSQL + Liquibase added in `FZ-004`; `organization` module (tenant boundary persistence) added in `FZ-011`; human authentication added in `FZ-012`; invite endpoint added in `FZ-016`. See `../docs/02-architecture.md` for the target module structure and stack, `../docs/03-data-model.md` for the schema, `../docs/06-security.md` for the auth approach, and `../CLAUDE.md` §8 for commands.
 
 ## Quick start
 
@@ -32,7 +32,7 @@ Every endpoint except `/actuator/health` requires a Cognito-issued JWT (`Authori
 - Any real/deployed environment must set `SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI` to the real Cognito user pool's issuer URI and must **not** activate the `local` profile.
 - Minting a test token: use `com.freezhub.shared.security.TestTokens.forSubject(jwtEncoder, subject)` (test-only helper); see `MeControllerTest` for a full example.
 
-### Provisioning a user (no signup flow exists yet — see `06-security.md`)
+### Provisioning a user
 
 An organization's first (`ADMINISTRATOR`) user is provisioned out-of-band, manually:
 
@@ -40,4 +40,16 @@ An organization's first (`ADMINISTRATOR`) user is provisioned out-of-band, manua
 2. Note the returned `sub` (or look it up via `aws cognito-idp admin-get-user`).
 3. Insert the matching row: `INSERT INTO users (organization_id, cognito_subject, email, role) VALUES (<org-id>, '<sub>', '<email>', 'ADMINISTRATOR');`
 
-Every subsequent user is added in-product by an Administrator — see `FZ-016` in `../docs/08-backlog.md` (not yet implemented).
+Every subsequent user is added in-product by an Administrator:
+
+```
+POST /api/invites
+Authorization: Bearer <token for an ADMINISTRATOR>
+Content-Type: application/json
+
+{ "email": "teammate@acme.test", "role": "MEMBER" }
+```
+
+`role` is optional (defaults to `MEMBER`). Non-administrators get `403`; re-inviting an email already in the org gets `409`.
+
+**Known gap:** the identity-creation step behind this endpoint (`com.freezhub.shared.security.IdentityProvider`) only has a local fake (`LocalIdentityProvider`, generates a random subject, `local` profile). There is no real Cognito `AdminCreateUser` implementation yet — no Cognito user pool exists to call (that's `FZ-063`). Running without the `local` profile fails to start (no `IdentityProvider` bean), same fail-fast behavior as the JWT decoder above. A real `CognitoIdentityProvider` must be added before this endpoint is used against a deployed environment.

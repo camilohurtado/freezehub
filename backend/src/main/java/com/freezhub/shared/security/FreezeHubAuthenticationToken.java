@@ -2,6 +2,7 @@ package com.freezhub.shared.security;
 
 import java.util.List;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.Jwt;
 
 public class FreezeHubAuthenticationToken extends AbstractAuthenticationToken {
@@ -10,7 +11,7 @@ public class FreezeHubAuthenticationToken extends AbstractAuthenticationToken {
     private final Jwt jwt;
 
     public FreezeHubAuthenticationToken(AuthenticatedUser principal, Jwt jwt) {
-        super(List.of());
+        super(List.of(new SimpleGrantedAuthority("ROLE_" + principal.role().name())));
         this.principal = principal;
         this.jwt = jwt;
         setAuthenticated(true);

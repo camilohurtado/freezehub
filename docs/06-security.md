@@ -32,6 +32,8 @@ Restated from `CLAUDE.md` and `02-architecture.md` — this document must not co
 - Every subsequent user is added via an **in-product invite**, restricted to Administrators. This is a separate backlog item (invite endpoint), not part of `FZ-012` itself — `FZ-012` delivers the authentication mechanism (JWT validation, identity resolution) that the invite feature and everything else builds on.
 - Rationale: `00-product.md` names three actors per organization (Administrator, Manager, Engineer), so multi-user orgs are required — but no backlog item anywhere describes a self-service signup/onboarding flow, so building one isn't MVP scope. See that item for exact invite mechanics.
 
+**Implemented by `FZ-016`:** `POST /api/invites`, Administrator-only. The Cognito `AdminCreateUser` call is behind an `IdentityProvider` port — same local/real split as JWT validation below, since no real Cognito user pool exists yet. Only the local fake ships now; a real Cognito-backed implementation is required before this endpoint runs against a deployed environment (see `FZ-016`'s known gap in `08-backlog.md`).
+
 **Resolved by `FZ-012`:** minimal role model — `users.role` is one of `ADMINISTRATOR` or `MEMBER`. This is not "advanced RBAC" (`00-product.md`'s exclusion): it gates exactly one action so far (inviting a user), not general resource permissions. `Team`/`Application`/`Environment`/restriction management remain open to any authenticated org member unless a future requirement says otherwise.
 
 ### Local development and automated tests
