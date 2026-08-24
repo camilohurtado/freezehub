@@ -157,19 +157,21 @@ Requires Java 21 (`backend/.java-version` pins this via jenv; otherwise ensure `
 
 `./mvnw spring-boot:run` connects to PostgreSQL via `spring.datasource.*`, overridable with `SPRING_DATASOURCE_URL` / `SPRING_DATASOURCE_USERNAME` / `SPRING_DATASOURCE_PASSWORD` (defaults match `docker-compose.yml`) — start `docker compose up -d postgres` first.
 
+Every endpoint except `/actuator/health` requires a Cognito-issued JWT (`06-security.md`). **Local runs need the `local` Spring profile active** — without it there's no `JwtDecoder` bean and the app won't start (see `backend/README.md` § Authentication).
+
 ```bash
 cd backend
 
-# build + run tests (spins up Postgres via Testcontainers)
+# build + run tests (spins up Postgres via Testcontainers; tests activate the local profile themselves)
 ./mvnw clean verify
 
 # run tests only
 ./mvnw test
 
 # run the app locally (default port 8080); requires `docker compose up -d postgres` first
-./mvnw spring-boot:run
+./mvnw spring-boot:run -Dspring-boot.run.profiles=local
 
-# health check
+# health check (no auth required)
 curl http://localhost:8080/actuator/health
 ```
 
@@ -191,8 +193,8 @@ npm run test      # vitest run
 
 ```bash
 docker compose up -d postgres
-(cd backend && ./mvnw spring-boot:run)   # separate terminal
-(cd frontend && npm run dev)             # separate terminal
+(cd backend && ./mvnw spring-boot:run -Dspring-boot.run.profiles=local)   # separate terminal
+(cd frontend && npm run dev)                                             # separate terminal
 ```
 
 ## 9. Git discipline

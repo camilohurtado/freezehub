@@ -26,9 +26,13 @@ Restated from `CLAUDE.md` and `02-architecture.md` — this document must not co
   - This resolves `03-data-model.md`'s open item on the `users` table: add `cognito_subject VARCHAR NOT NULL UNIQUE`. (Updated in that document as part of this change.)
 - Organization resolution: on every authenticated request, `organization_id` comes from the resolved `users` row — never from client input.
 
-**Open question, deferred to `FZ-012`:** how a `users` row is provisioned (self-signup vs. invite-only vs. admin-created) is not decided by any existing document and is not invented here. `FZ-012` must decide it.
+**Resolved by `FZ-012`:** user provisioning is **admin-provisioned bootstrap + in-product invite**:
 
-**Open question, deferred to `FZ-011`/`FZ-012`:** whether any role distinction (e.g., Administrator vs. Engineer, per `00-product.md`'s actor list) gates specific actions. `00-product.md` excludes "advanced RBAC" from MVP scope, but says nothing about a minimal role check — not decided here.
+- An organization's first user (its Administrator) is provisioned out-of-band — no self-service signup. Concretely: create the Cognito identity via `AdminCreateUser` (Cognito emails a temporary password), then insert the matching `users` row with `role = ADMINISTRATOR`. This is a manual/ops step for each new pilot organization, not a product feature.
+- Every subsequent user is added via an **in-product invite**, restricted to Administrators. This is a separate backlog item (invite endpoint), not part of `FZ-012` itself — `FZ-012` delivers the authentication mechanism (JWT validation, identity resolution) that the invite feature and everything else builds on.
+- Rationale: `00-product.md` names three actors per organization (Administrator, Manager, Engineer), so multi-user orgs are required — but no backlog item anywhere describes a self-service signup/onboarding flow, so building one isn't MVP scope. See that item for exact invite mechanics.
+
+**Resolved by `FZ-012`:** minimal role model — `users.role` is one of `ADMINISTRATOR` or `MEMBER`. This is not "advanced RBAC" (`00-product.md`'s exclusion): it gates exactly one action so far (inviting a user), not general resource permissions. `Team`/`Application`/`Environment`/restriction management remain open to any authenticated org member unless a future requirement says otherwise.
 
 ### Local development and automated tests
 
@@ -54,7 +58,7 @@ A separate header (rather than reusing `Authorization`) keeps human (JWT) and ma
 
 ## Authorization
 
-MVP does not implement advanced RBAC (`00-product.md`, Out of Scope). Beyond organization membership, no further authorization rule is specified by existing documentation. Do not invent a role model here; `FZ-011`/`FZ-012` must either confirm "any authenticated org member can act" or raise a product decision if finer-grained rules turn out to be required.
+MVP does not implement advanced RBAC (`00-product.md`, Out of Scope). The only role check is: inviting a new user requires `role = ADMINISTRATOR` (see Human Authentication, above). Every other authenticated action is available to any user within their own organization — no further authorization rule is specified by existing documentation.
 
 ## Tenant Isolation Enforcement
 

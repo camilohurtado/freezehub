@@ -87,7 +87,7 @@ Create `docs/06-security.md` and finalize MVP human/machine authentication appro
 Implement the Organization tenant boundary.
 
 ### FZ-012 — User Authentication
-**Status:** TODO
+**Status:** DONE
 
 Implement human authentication according to `06-security.md`.
 
@@ -105,6 +105,19 @@ Implement tenant-isolated application management and team association.
 **Status:** TODO
 
 Implement tenant-isolated environment management.
+
+### FZ-016 — Invite User
+**Status:** TODO
+
+Added during `FZ-012` (see `06-security.md`, Human Authentication): an organization's first user is admin-provisioned out-of-band; every subsequent user must be added in-product. Runs immediately after `FZ-012` in execution order, ahead of `FZ-013`.
+
+Implement an invite endpoint restricted to `ADMINISTRATOR` users:
+
+- Caller must be authenticated and have `role = ADMINISTRATOR` in their organization; otherwise `403`.
+- Request: target email (and initial `role`, defaulting to `MEMBER`).
+- Backend creates the Cognito identity (`AdminCreateUser` — Cognito emails a temporary password) and, using the returned Cognito `sub`, creates the matching `users` row scoped to the caller's `organization_id`.
+- Duplicate invite (existing `users` row for that org + email) is rejected, not silently duplicated.
+- Invited user's `organization_id` is always the caller's own organization — never client-supplied beyond that.
 
 ## Milestone 2 — Freeze Core
 
@@ -312,7 +325,13 @@ FZ-005
   ↓
 FZ-010
   ↓
-FZ-011...
+FZ-011
+  ↓
+FZ-012
+  ↓
+FZ-016   (added during FZ-012; out of numeric order, runs here — see FZ-016)
+  ↓
+FZ-013...
 ```
 
 Parallel work is allowed only when dependencies are clear and the changes do not create conflicting architectural decisions.

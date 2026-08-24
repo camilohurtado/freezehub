@@ -1,0 +1,57 @@
+databaseChangeLog:
+  - changeSet:
+      id: 003-users
+      author: freezehub
+      changes:
+        - createTable:
+            tableName: users
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: organization_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+                    references: organization(id)
+                    foreignKeyName: fk_users_organization
+              - column:
+                  name: cognito_subject
+                  type: varchar(255)
+                  constraints:
+                    nullable: false
+                    unique: true
+              - column:
+                  name: email
+                  type: varchar(320)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: role
+                  type: varchar(20)
+                  defaultValue: MEMBER
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamptz
+                  defaultValueComputed: now()
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamptz
+                  defaultValueComputed: now()
+                  constraints:
+                    nullable: false
+        - addUniqueConstraint:
+            tableName: users
+            columnNames: organization_id, email
+            constraintName: uq_users_organization_email
+        - sql:
+            sql: ALTER TABLE users ADD CONSTRAINT chk_users_role CHECK (role IN ('ADMINISTRATOR', 'MEMBER'))
