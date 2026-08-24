@@ -26,7 +26,7 @@ Deliberately deferred, added just-in-time before their own backlog items:
 
 These are already conceptually defined in `01-domain.md`, but committing to their physical schema now would be speculative ahead of the stories that actually implement them.
 
-**Open item — `users` table:** `FZ-010` (Security Specification) has not run yet and is the next item after this one in the execution order. Authentication-related columns (identity provider subject, credential/session fields, etc.) are intentionally **not** specified here to avoid guessing ahead of that decision. Only the tenant-membership shape of `users` is defined below; expect a follow-up migration before `FZ-012`.
+**Resolved by `FZ-010`:** the `users` table below includes `cognito_subject`, per `06-security.md`'s choice of Amazon Cognito for human authentication.
 
 ## Conventions
 
@@ -55,12 +55,15 @@ Tenant-owned. Minimal shape — see "Open item" above.
 ```text
 id               UUID PRIMARY KEY DEFAULT gen_random_uuid()
 organization_id  UUID NOT NULL REFERENCES organization(id)
+cognito_subject  VARCHAR(255) NOT NULL UNIQUE
 email            VARCHAR(320) NOT NULL
 created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
 updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
 
 UNIQUE (organization_id, email)
 ```
+
+Provisioning flow (self-signup vs. invite vs. admin-created) is not decided by `06-security.md` and is deferred to `FZ-012`.
 
 ### `team`
 

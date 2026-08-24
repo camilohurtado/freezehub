@@ -77,7 +77,7 @@ Acceptance:
 ## Milestone 1 — Organization and Catalog
 
 ### FZ-010 — Security Specification
-**Status:** TODO
+**Status:** DONE
 
 Create `docs/06-security.md` and finalize MVP human/machine authentication approach before sensitive implementation.
 
