@@ -7,6 +7,8 @@ spring:
     password: ${SPRING_DATASOURCE_PASSWORD:freezehub}
   liquibase:
     change-log: classpath:db/changelog/db.changelog-master.yaml
+  jpa:
+    open-in-view: false
 
 management:
   endpoints:

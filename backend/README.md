@@ -2,7 +2,7 @@
 
 Java 21 + Spring Boot modular monolith.
 
-Bootstrapped in `FZ-002`; PostgreSQL + Liquibase added in `FZ-004`. See `../docs/02-architecture.md` for the target module structure and stack, and `../CLAUDE.md` §8 for commands.
+Bootstrapped in `FZ-002`; PostgreSQL + Liquibase added in `FZ-004`; `organization` module (tenant boundary persistence) added in `FZ-011`. See `../docs/02-architecture.md` for the target module structure and stack, `../docs/03-data-model.md` for the schema, and `../CLAUDE.md` §8 for commands.
 
 ## Quick start
 

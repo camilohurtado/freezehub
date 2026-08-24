@@ -82,7 +82,7 @@ Acceptance:
 Create `docs/06-security.md` and finalize MVP human/machine authentication approach before sensitive implementation.
 
 ### FZ-011 — Organization Foundation
-**Status:** TODO
+**Status:** DONE
 
 Implement the Organization tenant boundary.
 
