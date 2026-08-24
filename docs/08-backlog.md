@@ -92,7 +92,7 @@ Implement the Organization tenant boundary.
 Implement human authentication according to `06-security.md`.
 
 ### FZ-013 — Teams
-**Status:** TODO
+**Status:** DONE
 
 Implement tenant-isolated team management.
 

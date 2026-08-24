@@ -2,7 +2,11 @@
 
 Java 21 + Spring Boot modular monolith.
 
-Bootstrapped in `FZ-002`; PostgreSQL + Liquibase added in `FZ-004`; `organization` module (tenant boundary persistence) added in `FZ-011`; human authentication added in `FZ-012`; invite endpoint added in `FZ-016`. See `../docs/02-architecture.md` for the target module structure and stack, `../docs/03-data-model.md` for the schema, `../docs/06-security.md` for the auth approach, and `../CLAUDE.md` §8 for commands.
+Bootstrapped in `FZ-002`; PostgreSQL + Liquibase added in `FZ-004`; `organization` module (tenant boundary persistence) added in `FZ-011`; human authentication added in `FZ-012`; invite endpoint added in `FZ-016`; `catalog` module (Teams) added in `FZ-013`. See `../docs/02-architecture.md` for the target module structure and stack, `../docs/03-data-model.md` for the schema, `../docs/06-security.md` for the auth approach, and `../CLAUDE.md` §8 for commands.
+
+## API
+
+- `POST /api/teams`, `GET /api/teams`, `GET /api/teams/{id}`, `PATCH /api/teams/{id}`, `DELETE /api/teams/{id}` — tenant-scoped team management, any authenticated org member (no role restriction, per `06-security.md`). A team belonging to another organization returns `404`, not `403` — existence isn't revealed cross-tenant. Duplicate name within an org returns `409`.
 
 ## Quick start
 
