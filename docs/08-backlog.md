@@ -64,7 +64,7 @@ Acceptance:
 - Testcontainers strategy is available for integration tests.
 
 ### FZ-005 — Domain Persistence Specification
-**Status:** TODO
+**Status:** DONE
 
 Create `docs/03-data-model.md` before implementing tenant/catalog persistence.
 
