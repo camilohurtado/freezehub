@@ -25,6 +25,7 @@ POST /api/restrictions
 }
 ```
 
+- `GET /api/restrictions/{id}` — one restriction with its full scope (`FZ-022`). Unused scope dimensions come back as empty arrays. `404` for both unknown ids and ids owned by another organization.
 - `GET /api/restrictions` — list the caller's organization's restrictions (`FZ-021`), soonest-start-first. `?status=` is optional and repeatable: `?status=SCHEDULED&status=ACTIVE` narrows to those states, omitting it returns all, and an unrecognised value is `400`. Returns a **summary without scope** — scope belongs to the detail representation (`FZ-022`), which also keeps listing to a single query.
 
 Scope matching semantics — OR within a dimension, AND across dimensions, an empty dimension acting as a wildcard — are specified in `../docs/01-domain.md`. `FZ-020` only persists scope; evaluation is `FZ-051`.

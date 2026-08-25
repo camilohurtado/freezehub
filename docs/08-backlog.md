@@ -153,9 +153,13 @@ The list returns a **summary without scope**: `FZ-022` owns "retrieve a restrict
 The three scope collections on `ChangeRestriction` were switched from `EAGER` to `LAZY` as part of this story: `EAGER` would have made every list call issue 3N+1 queries. Verified — listing three restrictions issues one query and none against the scope tables.
 
 ### FZ-022 — Restriction Details
-**Status:** TODO
+**Status:** DONE
 
 Retrieve a restriction and its scope.
+
+Implemented as `GET /api/restrictions/{id}`, returning the full representation including all three scope dimensions (unused dimensions come back as empty arrays, not null). Unknown ids and ids owned by another organization are both `404`, so cross-tenant existence is never revealed.
+
+The scope collections are `LAZY` (see `FZ-021`) and `spring.jpa.open-in-view` is disabled, so the service initialises them explicitly inside its read-only transaction — otherwise mapping the response in the controller would fail with `LazyInitializationException`. The detail test covers this: removing the initialisation makes it fail, so the guard is real rather than incidental.
 
 ### FZ-023 — Update Scheduled Restriction
 **Status:** TODO

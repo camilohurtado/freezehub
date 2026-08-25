@@ -2,9 +2,13 @@ package com.freezhub.restriction;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface ChangeRestrictionRepository extends JpaRepository<ChangeRestriction, Long> {
+
+    /** Tenant-scoped lookup: a restriction owned by another organization is simply absent. */
+    Optional<ChangeRestriction> findByIdAndOrganizationId(Long id, Long organizationId);
 
     /**
      * Ordered soonest-first, tie-broken by id so the ordering is total and the result is

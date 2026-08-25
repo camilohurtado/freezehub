@@ -8,6 +8,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.function.BiFunction;
+import org.hibernate.Hibernate;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,6 +42,29 @@ public class ChangeRestrictionService {
         }
         return changeRestrictionRepository
                 .findAllByOrganizationIdAndStatusInOrderByStartsAtAscIdAsc(organizationId, statuses);
+    }
+
+    /**
+     * One restriction with its scope, or 404 if it is unknown or belongs to another
+     * organization - the two are indistinguishable on purpose, so cross-tenant existence
+     * is never revealed.
+     *
+     * <p>Transactional and initialising the scope collections explicitly: they are LAZY
+     * (so that listing stays a single query) and {@code spring.jpa.open-in-view} is
+     * disabled, so anything left uninitialised here would fail when the controller maps
+     * the response outside this transaction.
+     */
+    @Transactional(readOnly = true)
+    public ChangeRestriction get(Long organizationId, Long restrictionId) {
+        ChangeRestriction restriction = changeRestrictionRepository
+                .findByIdAndOrganizationId(restrictionId, organizationId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Restriction not found"));
+
+        Hibernate.initialize(restriction.getTeamIds());
+        Hibernate.initialize(restriction.getApplicationIds());
+        Hibernate.initialize(restriction.getEnvironmentIds());
+
+        return restriction;
     }
 
     @Transactional
