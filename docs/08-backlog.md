@@ -97,7 +97,7 @@ Implement human authentication according to `06-security.md`.
 Implement tenant-isolated team management.
 
 ### FZ-014 — Applications
-**Status:** TODO
+**Status:** DONE
 
 Implement tenant-isolated application management and team association.
 

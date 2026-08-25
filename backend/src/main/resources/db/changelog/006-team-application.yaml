@@ -1,0 +1,28 @@
+databaseChangeLog:
+  - changeSet:
+      id: 006-team-application
+      author: freezehub
+      changes:
+        - createTable:
+            tableName: team_application
+            columns:
+              - column:
+                  name: team_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+                    references: team(id)
+                    foreignKeyName: fk_team_application_team
+                    deleteCascade: true
+              - column:
+                  name: application_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+                    references: application(id)
+                    foreignKeyName: fk_team_application_application
+                    deleteCascade: true
+        - addPrimaryKey:
+            tableName: team_application
+            columnNames: team_id, application_id
+            constraintName: pk_team_application

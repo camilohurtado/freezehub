@@ -7,3 +7,7 @@ databaseChangeLog:
       file: db/changelog/003-users.yaml
   - include:
       file: db/changelog/004-team.yaml
+  - include:
+      file: db/changelog/005-application.yaml
+  - include:
+      file: db/changelog/006-team-application.yaml
