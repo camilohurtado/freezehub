@@ -142,9 +142,15 @@ Required rules:
 - initial status is `SCHEDULED`.
 
 ### FZ-021 — List Change Restrictions
-**Status:** TODO
+**Status:** DONE
 
 List restrictions for the authenticated organization with useful status filtering.
+
+Implemented as `GET /api/restrictions`, ordered soonest-start-first (tie-broken by id, so ordering is total and results are deterministic). `?status=` may be repeated to select several states at once — `?status=SCHEDULED&status=ACTIVE` answers the product's "what is active or upcoming?" question directly. Omitting it returns every status; an unrecognised value is a `400`.
+
+The list returns a **summary without scope**: `FZ-022` owns "retrieve a restriction and its scope". Keeping scope out of the list also keeps it to a single query regardless of row count. Adding fields later is additive and non-breaking, so `FZ-031` (dashboard) can revisit this if it needs scope inline.
+
+The three scope collections on `ChangeRestriction` were switched from `EAGER` to `LAZY` as part of this story: `EAGER` would have made every list call issue 3N+1 queries. Verified — listing three restrictions issues one query and none against the scope tables.
 
 ### FZ-022 — Restriction Details
 **Status:** TODO

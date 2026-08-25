@@ -74,17 +74,17 @@ public class ChangeRestriction {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
-    @ElementCollection(fetch = FetchType.EAGER)
+    @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(name = "change_restriction_team", joinColumns = @JoinColumn(name = "restriction_id"))
     @Column(name = "team_id")
     private Set<Long> teamIds = new LinkedHashSet<>();
 
-    @ElementCollection(fetch = FetchType.EAGER)
+    @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(name = "change_restriction_application", joinColumns = @JoinColumn(name = "restriction_id"))
     @Column(name = "application_id")
     private Set<Long> applicationIds = new LinkedHashSet<>();
 
-    @ElementCollection(fetch = FetchType.EAGER)
+    @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(name = "change_restriction_environment", joinColumns = @JoinColumn(name = "restriction_id"))
     @Column(name = "environment_id")
     private Set<Long> environmentIds = new LinkedHashSet<>();

@@ -25,6 +25,8 @@ POST /api/restrictions
 }
 ```
 
+- `GET /api/restrictions` — list the caller's organization's restrictions (`FZ-021`), soonest-start-first. `?status=` is optional and repeatable: `?status=SCHEDULED&status=ACTIVE` narrows to those states, omitting it returns all, and an unrecognised value is `400`. Returns a **summary without scope** — scope belongs to the detail representation (`FZ-022`), which also keeps listing to a single query.
+
 Scope matching semantics — OR within a dimension, AND across dimensions, an empty dimension acting as a wildcard — are specified in `../docs/01-domain.md`. `FZ-020` only persists scope; evaluation is `FZ-051`.
 
 **Known gap:** the scope tables reference catalog rows with non-cascading foreign keys, so the database refuses to delete a team/application/environment that a restriction references — deliberately, since cascading would silently shrink a restriction's scope. That refusal isn't yet translated to HTTP, so deleting a **referenced** catalog resource currently returns `500` instead of `409`. The delete is genuinely refused and the data stays correct; only the status code is wrong. See `FZ-020` in `../docs/08-backlog.md`.

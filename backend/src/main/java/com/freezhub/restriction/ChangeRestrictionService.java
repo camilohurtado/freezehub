@@ -5,6 +5,7 @@ import com.freezhub.catalog.EnvironmentRepository;
 import com.freezhub.catalog.TeamRepository;
 import java.time.Instant;
 import java.util.Collection;
+import java.util.List;
 import java.util.Set;
 import java.util.function.BiFunction;
 import org.springframework.http.HttpStatus;
@@ -28,6 +29,18 @@ public class ChangeRestrictionService {
         this.teamRepository = teamRepository;
         this.applicationRepository = applicationRepository;
         this.environmentRepository = environmentRepository;
+    }
+
+    /**
+     * Restrictions for one organization, optionally narrowed to the given statuses.
+     * An empty/absent status filter means "no status filter", not "match nothing".
+     */
+    public List<ChangeRestriction> list(Long organizationId, Collection<RestrictionStatus> statuses) {
+        if (statuses == null || statuses.isEmpty()) {
+            return changeRestrictionRepository.findAllByOrganizationIdOrderByStartsAtAscIdAsc(organizationId);
+        }
+        return changeRestrictionRepository
+                .findAllByOrganizationIdAndStatusInOrderByStartsAtAscIdAsc(organizationId, statuses);
     }
 
     @Transactional
