@@ -11,3 +11,5 @@ databaseChangeLog:
       file: db/changelog/005-application.yaml
   - include:
       file: db/changelog/006-team-application.yaml
+  - include:
+      file: db/changelog/007-environment.yaml

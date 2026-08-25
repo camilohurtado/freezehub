@@ -102,7 +102,7 @@ Implement tenant-isolated team management.
 Implement tenant-isolated application management and team association.
 
 ### FZ-015 — Environments
-**Status:** TODO
+**Status:** DONE
 
 Implement tenant-isolated environment management.
 
