@@ -13,3 +13,7 @@ databaseChangeLog:
       file: db/changelog/006-team-application.yaml
   - include:
       file: db/changelog/007-environment.yaml
+  - include:
+      file: db/changelog/008-change-restriction.yaml
+  - include:
+      file: db/changelog/009-change-restriction-scope.yaml

@@ -1,0 +1,94 @@
+databaseChangeLog:
+  - changeSet:
+      id: 008-change-restriction
+      author: freezehub
+      changes:
+        - createTable:
+            tableName: change_restriction
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: organization_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+                    references: organization(id)
+                    foreignKeyName: fk_change_restriction_organization
+              - column:
+                  name: name
+                  type: varchar(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: description
+                  type: text
+              - column:
+                  name: reason
+                  type: text
+                  constraints:
+                    nullable: false
+              - column:
+                  name: type
+                  type: varchar(40)
+                  defaultValue: DEPLOYMENT_FREEZE
+                  constraints:
+                    nullable: false
+              - column:
+                  name: level
+                  type: varchar(20)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: status
+                  type: varchar(20)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: starts_at
+                  type: timestamptz
+                  constraints:
+                    nullable: false
+              - column:
+                  name: ends_at
+                  type: timestamptz
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_by
+                  type: bigint
+                  constraints:
+                    nullable: false
+                    references: users(id)
+                    foreignKeyName: fk_change_restriction_created_by
+              - column:
+                  name: created_at
+                  type: timestamptz
+                  defaultValueComputed: now()
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamptz
+                  defaultValueComputed: now()
+                  constraints:
+                    nullable: false
+        - sql:
+            sql: ALTER TABLE change_restriction ADD CONSTRAINT chk_change_restriction_type CHECK (type IN ('DEPLOYMENT_FREEZE'))
+        - sql:
+            sql: ALTER TABLE change_restriction ADD CONSTRAINT chk_change_restriction_level CHECK (level IN ('ADVISORY', 'HARD_FREEZE'))
+        - sql:
+            sql: ALTER TABLE change_restriction ADD CONSTRAINT chk_change_restriction_status CHECK (status IN ('SCHEDULED', 'ACTIVE', 'COMPLETED', 'CANCELLED'))
+        - sql:
+            sql: ALTER TABLE change_restriction ADD CONSTRAINT chk_change_restriction_period CHECK (starts_at < ends_at)
+        - createIndex:
+            tableName: change_restriction
+            indexName: idx_change_restriction_organization
+            columns:
+              - column:
+                  name: organization_id

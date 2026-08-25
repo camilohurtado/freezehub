@@ -1,0 +1,95 @@
+databaseChangeLog:
+  - changeSet:
+      id: 009-change-restriction-scope
+      author: freezehub
+      changes:
+        # Scope rows belong to the restriction aggregate: restriction_id cascades.
+        # The resource foreign keys deliberately do NOT cascade - deleting a catalog
+        # resource referenced by a restriction must be refused, not silently shrink
+        # the restriction's scope. See docs/03-data-model.md.
+        - createTable:
+            tableName: change_restriction_team
+            columns:
+              - column:
+                  name: restriction_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+                    references: change_restriction(id)
+                    foreignKeyName: fk_change_restriction_team_restriction
+                    deleteCascade: true
+              - column:
+                  name: team_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+                    references: team(id)
+                    foreignKeyName: fk_change_restriction_team_team
+        - addPrimaryKey:
+            tableName: change_restriction_team
+            columnNames: restriction_id, team_id
+            constraintName: pk_change_restriction_team
+        - createIndex:
+            tableName: change_restriction_team
+            indexName: idx_change_restriction_team_team
+            columns:
+              - column:
+                  name: team_id
+
+        - createTable:
+            tableName: change_restriction_application
+            columns:
+              - column:
+                  name: restriction_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+                    references: change_restriction(id)
+                    foreignKeyName: fk_change_restriction_application_restriction
+                    deleteCascade: true
+              - column:
+                  name: application_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+                    references: application(id)
+                    foreignKeyName: fk_change_restriction_application_application
+        - addPrimaryKey:
+            tableName: change_restriction_application
+            columnNames: restriction_id, application_id
+            constraintName: pk_change_restriction_application
+        - createIndex:
+            tableName: change_restriction_application
+            indexName: idx_change_restriction_application_application
+            columns:
+              - column:
+                  name: application_id
+
+        - createTable:
+            tableName: change_restriction_environment
+            columns:
+              - column:
+                  name: restriction_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+                    references: change_restriction(id)
+                    foreignKeyName: fk_change_restriction_environment_restriction
+                    deleteCascade: true
+              - column:
+                  name: environment_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+                    references: environment(id)
+                    foreignKeyName: fk_change_restriction_environment_environment
+        - addPrimaryKey:
+            tableName: change_restriction_environment
+            columnNames: restriction_id, environment_id
+            constraintName: pk_change_restriction_environment
+        - createIndex:
+            tableName: change_restriction_environment
+            indexName: idx_change_restriction_environment_environment
+            columns:
+              - column:
+                  name: environment_id

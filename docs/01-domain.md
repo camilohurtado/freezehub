@@ -124,6 +124,34 @@ MVP scope targets:
 
 A restriction may contain multiple scope targets.
 
+#### Scope matching semantics
+
+Specified by `FZ-020`. This is the contract `FZ-051` (policy evaluation) implements; `FZ-020` only persists scope, it does not evaluate it.
+
+Each scope target type is an independent **dimension**. Within a dimension the listed resources are OR'd; the dimensions are AND'd together:
+
+```text
+matches(application, environment) =
+      (teams        is empty OR application belongs to one of teams)
+  AND (applications is empty OR application is one of applications)
+  AND (environments is empty OR environment is one of environments)
+```
+
+An **empty dimension is a wildcard**, not an empty set — it places no constraint. This is what allows "freeze every deployment to production" to be expressed by naming only an environment. It does not weaken invariant 3 below: a restriction with *no* targets in any dimension is still rejected, so a restriction can never mean "freeze everything, everywhere".
+
+Teams and applications are separate dimensions, so naming both narrows rather than widens: it means "this application, and only when it belongs to this team".
+
+A consequence: a scope naming a team and an application that does not belong to that team matches nothing. This is accepted and deliberately **not** rejected at creation time, because team/application membership is mutable — a scope that matches nothing today may match tomorrow.
+
+Example:
+
+```text
+applications = [payments-api, checkout-api]
+environments = [production]
+
+=> (payments-api OR checkout-api) AND production
+```
+
 ### PolicyEvaluation
 
 A request asking FreezeHub whether an action is currently allowed.

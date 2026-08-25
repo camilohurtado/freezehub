@@ -124,7 +124,11 @@ Implement an invite endpoint restricted to `ADMINISTRATOR` users:
 ## Milestone 2 — Freeze Core
 
 ### FZ-020 — Create Change Restriction
-**Status:** TODO
+**Status:** DONE
+
+**Known gap (deliberately deferred out of this story):** the scope association tables reference `team`/`application`/`environment` with non-cascading foreign keys, so the database *refuses* to delete a catalog resource that a restriction references. That refusal is not yet translated into an HTTP response, so `DELETE /api/teams/{id}` (and the application/environment equivalents) on a **referenced** resource returns `500` instead of `409`. Data stays correct — the delete is genuinely refused — only the status code is wrong. Translating it to `409` needs its own story.
+
+Scope matching semantics (OR within a dimension, AND across dimensions, empty dimension = wildcard) were specified by this story and are recorded in `01-domain.md` § Scope matching semantics. They are the contract `FZ-051` implements; no evaluation logic exists yet.
 
 Implement creation of a scheduled deployment restriction.
 

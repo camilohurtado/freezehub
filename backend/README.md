@@ -2,7 +2,7 @@
 
 Java 21 + Spring Boot modular monolith.
 
-Bootstrapped in `FZ-002`; PostgreSQL + Liquibase added in `FZ-004`; `organization` module (tenant boundary persistence) added in `FZ-011`; human authentication added in `FZ-012`; invite endpoint added in `FZ-016`; `catalog` module (Teams) added in `FZ-013`; Applications + team association added in `FZ-014`; Environments added in `FZ-015` — completing Milestone 1. See `../docs/02-architecture.md` for the target module structure and stack, `../docs/03-data-model.md` for the schema, `../docs/06-security.md` for the auth approach, and `../CLAUDE.md` §8 for commands.
+Bootstrapped in `FZ-002`; PostgreSQL + Liquibase added in `FZ-004`; `organization` module (tenant boundary persistence) added in `FZ-011`; human authentication added in `FZ-012`; invite endpoint added in `FZ-016`; `catalog` module (Teams) added in `FZ-013`; Applications + team association added in `FZ-014`; Environments added in `FZ-015` — completing Milestone 1; `restriction` module (create change restriction) added in `FZ-020`. See `../docs/02-architecture.md` for the target module structure and stack, `../docs/03-data-model.md` for the schema, `../docs/06-security.md` for the auth approach, and `../CLAUDE.md` §8 for commands.
 
 ## API
 
@@ -10,6 +10,24 @@ Bootstrapped in `FZ-002`; PostgreSQL + Liquibase added in `FZ-004`; `organizatio
 - `POST /api/applications`, `GET /api/applications`, `GET /api/applications/{id}`, `PATCH /api/applications/{id}`, `DELETE /api/applications/{id}` — same tenant-isolation/authorization rules as Teams. Response includes `teamIds` (currently associated teams).
 - `PUT /api/applications/{id}/teams/{teamId}` / `DELETE /api/applications/{id}/teams/{teamId}` — associate/disassociate a team, both idempotent. `404` if either the application or the team doesn't exist in the caller's organization. Deleting a Team or Application cascades the association at the DB level (`ON DELETE CASCADE` on `team_application`) — no manual cleanup needed, and no FK-violation error on delete.
 - `POST /api/environments`, `GET /api/environments`, `GET /api/environments/{id}`, `PATCH /api/environments/{id}`, `DELETE /api/environments/{id}` — same tenant-isolation/authorization rules as Teams. No associations (unlike Applications).
+- `POST /api/restrictions` — create a deployment restriction (`FZ-020`). Always created as `status=SCHEDULED`, `type=DEPLOYMENT_FREEZE`; both are server-controlled and not accepted from the client. `name`, `reason`, `level`, `startsAt`, `endsAt` are required (`description` optional). Scope is three optional dimensions (`teamIds`, `applicationIds`, `environmentIds`) of which at least one must be non-empty; ids not owned by the caller's organization return `404`. Reading, updating, cancelling and lifecycle transitions are `FZ-021`–`FZ-025`.
+
+```jsonc
+POST /api/restrictions
+{
+  "name": "Black Friday Freeze",
+  "description": "No production deploys during peak trading.",  // optional
+  "reason": "Revenue-critical period",                          // required
+  "level": "HARD_FREEZE",                                       // or ADVISORY
+  "startsAt": "2026-11-27T00:00:00Z",
+  "endsAt":   "2026-12-02T00:00:00Z",
+  "scope": { "teamIds": [1], "applicationIds": [2, 3], "environmentIds": [4] }
+}
+```
+
+Scope matching semantics — OR within a dimension, AND across dimensions, an empty dimension acting as a wildcard — are specified in `../docs/01-domain.md`. `FZ-020` only persists scope; evaluation is `FZ-051`.
+
+**Known gap:** the scope tables reference catalog rows with non-cascading foreign keys, so the database refuses to delete a team/application/environment that a restriction references — deliberately, since cascading would silently shrink a restriction's scope. That refusal isn't yet translated to HTTP, so deleting a **referenced** catalog resource currently returns `500` instead of `409`. The delete is genuinely refused and the data stays correct; only the status code is wrong. See `FZ-020` in `../docs/08-backlog.md`.
 
 ## Quick start
 
