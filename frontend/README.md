@@ -34,9 +34,11 @@ Sign in at `/signin` with the email of an existing user (see `../backend/README.
 src/
 ├── app/              # App, providers, router, layout, not-found
 ├── api/              # fetch wrapper (ApiError) + typed endpoint functions
+├── components/       # shared presentational pieces (level/status badges)
 ├── features/
 │   ├── auth/         # token context, route guard, dev sign-in
-│   └── dashboard/    # FZ-031
+│   ├── dashboard/    # FZ-031
+│   └── restrictions/ # FZ-032
 ├── types/            # request/response types mirroring the API
 ├── utils/            # UTC-aware date formatting
 ├── test/             # setup + render helper

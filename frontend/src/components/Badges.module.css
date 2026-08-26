@@ -1,0 +1,47 @@
+.levelBlocking,
+.levelAdvisory,
+.statusActive,
+.statusScheduled,
+.statusCompleted,
+.statusCancelled {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.levelBlocking {
+  border-color: var(--fh-danger);
+  color: var(--fh-danger);
+}
+
+.levelAdvisory {
+  border-color: var(--fh-border-strong);
+  color: var(--fh-text-muted);
+}
+
+.statusActive {
+  border-color: var(--fh-danger);
+  background: var(--fh-danger);
+  color: #fff;
+}
+
+.statusScheduled {
+  border-color: var(--fh-accent);
+  color: var(--fh-accent);
+}
+
+.statusCompleted,
+.statusCancelled {
+  border-color: var(--fh-border-strong);
+  color: var(--fh-text-muted);
+}
+
+.statusCancelled {
+  text-decoration: line-through;
+}

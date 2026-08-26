@@ -27,19 +27,26 @@ export function renderRoute(
     defaultOptions: { queries: { retry: false } },
   })
 
+  // The route pattern must not carry the query string, but the initial entry must — that
+  // is how a page whose filter state lives in the URL gets exercised.
+  const [pathname] = path.split('?')
+
   const router = createMemoryRouter(
     [
-      { path, element },
+      { path: pathname, element },
       { path: '/signin', element: <div>Sign in screen</div> },
     ],
     { initialEntries: [path] },
   )
 
-  return render(
+  const result = render(
     <AuthProvider>
       <QueryClientProvider client={queryClient}>
         <RouterProvider router={router} />
       </QueryClientProvider>
     </AuthProvider>,
   )
+
+  // Returned so tests can assert on the URL itself, not just what was rendered.
+  return { ...result, router }
 }

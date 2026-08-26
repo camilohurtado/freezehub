@@ -279,9 +279,15 @@ Two requests, not three — `status` is repeatable, so active and upcoming arriv
 Also fixed while building this: Testing Library's automatic DOM cleanup never registered, because it only self-registers when Vitest runs with `globals: true`. Every test was leaking its DOM into the next, which surfaced as phantom "found multiple elements" failures. `src/test/setup.ts` now calls `cleanup()` explicitly.
 
 ### FZ-032 — Restriction List
-**Status:** TODO
+**Status:** DONE
 
 Provide usable browsing/filtering of restrictions.
+
+`GET /restrictions` with checkbox filtering across all four statuses. **Filter state lives in the URL**, not component state, so a filtered view can be linked to, bookmarked and survives a reload — and unknown values typed into the query string are discarded rather than forwarded to the API. Results are rendered in the order the backend returns them and are never re-sorted client-side: soonest-start-first is the API's contract, not this page's.
+
+Empty results distinguish "nothing matches this filter" from "no restrictions yet" — very different things to tell someone.
+
+The level badge was extracted to a shared `components/Badges.tsx` (with a new status badge) now that the dashboard and the list both render one, so how a level or status reads is defined once instead of drifting between pages. `RestrictionCard` was updated to use it.
 
 ### FZ-036 — Catalog Management UI
 **Status:** TODO
