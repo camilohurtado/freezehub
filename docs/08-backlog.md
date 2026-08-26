@@ -227,9 +227,37 @@ Decisions made in this story:
 ## Milestone 3 — Frontend Product Slice
 
 ### FZ-030 — Frontend Specification
-**Status:** TODO
+**Status:** DONE
 
 Create `docs/05-frontend.md` with MVP routes, page responsibilities, shared UI conventions, and API interaction conventions.
+
+Two decisions were required that no existing document answered, and both shape every later frontend story:
+
+- **Styling: CSS Modules with native form controls**, no UI framework and no styling dependency (`CLAUDE.md`: no dependencies without a concrete need). `<input type="datetime-local">` and `<select multiple>` cover the create-restriction form; multi-select UX is basic, and that is an accepted trade-off.
+- **Development authentication: a dev-only token endpoint** (see `FZ-035`), because no Cognito user pool exists until `FZ-063` and a browser therefore has no way to obtain a token at all.
+
+Gaps this specification surfaced are tracked as items rather than prose — `FZ-035` (dev sign-in token, blocks `FZ-031`), `FZ-036` (catalog management UI, blocks `FZ-033`), a UTC-conversion acceptance criterion on `FZ-033`, and a note on `FZ-061` about revisiting the frontend's error handling. `05-frontend.md` carries the resulting Milestone 3 order:
+
+```text
+FZ-030 → FZ-035 → FZ-031 → FZ-032 → FZ-036 → FZ-033 → FZ-034
+```
+
+`FZ-036` still needs a product decision: build it, or explicitly defer it and accept catalog setup as an API-only onboarding operation.
+
+### FZ-035 — Development Sign-In Token
+**Status:** TODO
+
+Added during `FZ-030`. Runs immediately after it and **before `FZ-031`**, which cannot render an authenticated page without it.
+
+No Cognito user pool exists until `FZ-063`, so the browser currently has no way to obtain a JWT. Provide a dev-only endpoint that mints the same locally-signed token the tests already use, mirroring the local/real split `06-security.md` established for JWT validation.
+
+Acceptance:
+
+- Exposed **only** under the `local` Spring profile — `@Profile("local")`, like `LocalJwtConfig`. No deployed environment activates that profile, so the endpoint cannot exist there.
+- Accepts an identifier for an existing `users` row and returns a signed token whose `sub` matches that user's `cognito_subject`.
+- Returns 404/400 for an unknown user rather than minting a token for an identity that does not exist.
+- A test asserts the endpoint is **absent** when the `local` profile is not active — the security property, not just the happy path.
+- Replaced by the Cognito Hosted UI redirect at `FZ-063`.
 
 ### FZ-031 — Dashboard
 **Status:** TODO
@@ -241,10 +269,36 @@ Show active, upcoming, and recently completed restrictions.
 
 Provide usable browsing/filtering of restrictions.
 
+### FZ-036 — Catalog Management UI
+**Status:** TODO
+
+Added during `FZ-030`. Runs **before `FZ-033`**, which cannot offer scope pickers for teams, applications and environments that no one can create.
+
+`00-product.md` names an Organization Administrator who "configures the organization, users, catalog, integrations", and `FZ-013`–`FZ-015` built the tenant-isolated catalog API — but no story ever exposed it in the UI. Without this, creating a restriction through the product requires first creating catalog entries with `curl`.
+
+Scope is deliberately minimal — enough to make `FZ-033` usable, not full administration:
+
+- List and create teams, applications and environments.
+- Rename and delete where the API already supports it.
+- Associate/disassociate a team with an application (`FZ-014`), since restriction scope is evaluated per dimension and the team dimension is meaningless without membership.
+- Surface `409` on a duplicate name, and the tenant rules already enforced by the backend.
+
+**Known rough edge:** deleting a team/application/environment referenced by a restriction currently returns `500` rather than `409` (see the known gap under `FZ-020`). This UI will make that reachable by a user rather than only by an API client, which raises its priority.
+
+**Alternative, if this is not wanted in the MVP:** mark this item deferred and accept that catalog setup is an API-only operation for beta, done by the FreezeHub team during onboarding — the same posture already taken for provisioning an organization's first user (`06-security.md`). That is a legitimate product choice; what is not acceptable is leaving it undecided while `FZ-033` assumes the data exists.
+
 ### FZ-033 — Create Restriction UI
 **Status:** TODO
 
 Create the end-to-end form for FZ-020.
+
+Acceptance:
+
+- Submits `name`, `description` (optional), `reason` (**required, non-blank**), `level`, `startsAt`, `endsAt` and the three scope dimensions to `POST /api/restrictions`.
+- **Datetime values are converted to UTC before submission.** `<input type="datetime-local">` produces a *zoneless local* string; sending it unconverted silently shifts every freeze window by the user's UTC offset, violating `01-domain.md` invariants 9 and 10. This must be covered by a test that would fail under a non-UTC timezone — it is the single most likely correctness bug in this story.
+- Instants are displayed in the viewer's local zone **with the zone shown**, so a stated start time is never ambiguous.
+- Client-side validation mirrors the backend rules for fast feedback only and is never the source of truth: the backend re-validates, and its `400`/`404`/`409` responses are surfaced rather than swallowed (`CLAUDE.md` §5 — the frontend must not duplicate domain rules as an independent source of truth).
+- Depends on `FZ-036` (or on the explicit decision to keep catalog setup API-only) for the scope pickers to have anything to select.
 
 ### FZ-034 — Restriction Detail UI
 **Status:** TODO
@@ -320,6 +374,10 @@ Record important administrative and restriction lifecycle actions.
 **Status:** TODO
 
 Standardize API error responses and frontend handling.
+
+Note added during `FZ-030`: this milestone lands **after** the frontend is built, so Milestone 3 ships against unstandardised error bodies. `05-frontend.md` therefore requires the fetch wrapper to tolerate a body it cannot parse and fall back to a status-derived message. When this item is implemented, revisit that wrapper and the per-page error states rather than assuming they still match — the status codes the UI branches on (`400`/`401`/`403`/`404`/`409`) are already established by the endpoints and should not change, but the body shape will.
+
+The backend currently returns errors via `ResponseStatusException` and Spring's defaults; no custom error contract exists yet.
 
 ### FZ-062 — Observability Baseline
 **Status:** TODO
