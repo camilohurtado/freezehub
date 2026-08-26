@@ -1,0 +1,144 @@
+.page {
+  width: 100%;
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+.title {
+  margin: 0 0 1.25rem;
+  font-size: 1.5rem;
+}
+
+.notice {
+  margin: 0 0 1.25rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--fh-border-strong);
+  border-radius: 0.375rem;
+  color: var(--fh-text-muted);
+  font-size: 0.875rem;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+}
+
+.label {
+  margin-top: 1rem;
+  margin-bottom: 0.25rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.optional {
+  color: var(--fh-text-muted);
+  font-weight: 400;
+}
+
+.input,
+.textarea,
+.multi {
+  padding: 0.4375rem 0.5rem;
+  border: 1px solid var(--fh-border);
+  border-radius: 0.25rem;
+  background: var(--fh-bg);
+  color: inherit;
+  font: inherit;
+  font-size: 0.9375rem;
+}
+
+.textarea {
+  resize: vertical;
+}
+
+.multi {
+  width: 100%;
+  padding: 0.25rem;
+}
+
+.window {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.window .label {
+  display: block;
+}
+
+.window .input {
+  width: 100%;
+}
+
+.hint {
+  margin: 0.375rem 0 0;
+  color: var(--fh-text-muted);
+  font-size: 0.8125rem;
+}
+
+.scope {
+  margin: 1.5rem 0 0;
+  padding: 1rem;
+  border: 1px solid var(--fh-border);
+  border-radius: 0.375rem;
+}
+
+.legend {
+  padding: 0 0.375rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fh-text-muted);
+}
+
+.scopeGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+.fieldError {
+  margin: 0.3125rem 0 0;
+  color: var(--fh-danger);
+  font-size: 0.8125rem;
+}
+
+.submitError {
+  margin: 1.25rem 0 0;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid var(--fh-danger);
+  border-radius: 0.25rem;
+  color: var(--fh-danger);
+  font-size: 0.875rem;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1.75rem;
+}
+
+.primary {
+  padding: 0.5rem 1rem;
+  border: 1px solid transparent;
+  border-radius: 0.25rem;
+  background: var(--fh-accent);
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.primary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.cancel {
+  color: var(--fh-text-muted);
+  font-size: 0.875rem;
+}
