@@ -3,6 +3,8 @@ package com.freezhub.restriction;
 import com.freezhub.catalog.ApplicationRepository;
 import com.freezhub.catalog.EnvironmentRepository;
 import com.freezhub.catalog.TeamRepository;
+import com.freezhub.notification.NotificationEvent;
+import com.freezhub.notification.NotificationOutbox;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -21,15 +23,18 @@ public class ChangeRestrictionService {
     private final TeamRepository teamRepository;
     private final ApplicationRepository applicationRepository;
     private final EnvironmentRepository environmentRepository;
+    private final NotificationOutbox notificationOutbox;
 
     public ChangeRestrictionService(ChangeRestrictionRepository changeRestrictionRepository,
                                     TeamRepository teamRepository,
                                     ApplicationRepository applicationRepository,
-                                    EnvironmentRepository environmentRepository) {
+                                    EnvironmentRepository environmentRepository,
+                                    NotificationOutbox notificationOutbox) {
         this.changeRestrictionRepository = changeRestrictionRepository;
         this.teamRepository = teamRepository;
         this.applicationRepository = applicationRepository;
         this.environmentRepository = environmentRepository;
+        this.notificationOutbox = notificationOutbox;
     }
 
     /**
@@ -81,7 +86,7 @@ public class ChangeRestrictionService {
     public ChangeRestriction create(Long organizationId, Long createdBy, RestrictionRequest request) {
         validateRequest(organizationId, request);
 
-        return changeRestrictionRepository.save(new ChangeRestriction(
+        ChangeRestriction created = changeRestrictionRepository.save(new ChangeRestriction(
                 organizationId,
                 request.name(),
                 request.description(),
@@ -93,6 +98,12 @@ public class ChangeRestrictionService {
                 request.scope().teamIds(),
                 request.scope().applicationIds(),
                 request.scope().environmentIds()));
+
+        // Same transaction as the creation itself: the restriction and the intent to
+        // announce it are committed together or not at all (FZ-040).
+        notificationOutbox.enqueue(organizationId, created.getId(), NotificationEvent.SCHEDULED);
+
+        return created;
     }
 
     /**
@@ -148,6 +159,8 @@ public class ChangeRestrictionService {
         }
 
         restriction.cancel();
+        notificationOutbox.enqueue(organizationId, restriction.getId(), NotificationEvent.CANCELLED);
+
         return restriction;
     }
 

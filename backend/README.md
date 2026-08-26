@@ -44,6 +44,14 @@ A restriction whose whole window elapsed while the process was down goes straigh
 
 The scope tables reference catalog rows with non-cascading foreign keys, so the database refuses to delete a team/application/environment that a restriction references — deliberately, since cascading would silently shrink a restriction's scope and stop blocking deployments it was created to block. That refusal surfaces as **`409`** with an explanatory message (`FZ-036`).
 
+## Notifications (`FZ-040`)
+
+Lifecycle events are recorded in a database-backed **outbox** (`notification`) rather than published to a broker (`02-architecture.md`). One row is one delivery attempt to one destination, so a lifecycle event fans out to every enabled `integration` for the organization — Slack succeeding while a webhook fails is representable, and retry is per-destination.
+
+The row is written **in the same transaction as the domain change**, which is what makes the intent survive a crash between "restriction activated" and "notification queued". `NotificationOutbox.enqueue` is `Propagation.MANDATORY` so it cannot accidentally be called outside one. Enqueueing is idempotent — the service checks, and a unique constraint on `(restriction, integration, event)` guarantees it — because the lifecycle reconciler is itself idempotent and runs on a timer.
+
+**Nothing sends anything yet:** the channel adapters are `FZ-041`–`FZ-043` and the retry policy is `FZ-044`. There is also no API or UI for creating an `integration` yet, so destinations must currently be inserted directly (see the known gaps on `FZ-040`).
+
 ## Error responses
 
 Deliberately-thrown rejections carry their reason in a `message` field:

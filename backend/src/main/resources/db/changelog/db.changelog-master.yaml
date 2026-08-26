@@ -17,3 +17,7 @@ databaseChangeLog:
       file: db/changelog/008-change-restriction.yaml
   - include:
       file: db/changelog/009-change-restriction-scope.yaml
+  - include:
+      file: db/changelog/010-integration.yaml
+  - include:
+      file: db/changelog/011-notification.yaml

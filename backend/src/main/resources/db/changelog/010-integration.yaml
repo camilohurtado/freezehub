@@ -1,0 +1,62 @@
+databaseChangeLog:
+  - changeSet:
+      id: 010-integration
+      author: freezehub
+      changes:
+        - createTable:
+            tableName: integration
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: organization_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+                    references: organization(id)
+                    foreignKeyName: fk_integration_organization
+              - column:
+                  name: type
+                  type: varchar(20)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: enabled
+                  type: boolean
+                  defaultValueBoolean: true
+                  constraints:
+                    nullable: false
+              # Opaque per-channel settings: each channel needs different fields, and the
+              # owning channel is the only thing that interprets this.
+              - column:
+                  name: config
+                  type: text
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_at
+                  type: timestamptz
+                  defaultValueComputed: now()
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamptz
+                  defaultValueComputed: now()
+                  constraints:
+                    nullable: false
+        - sql:
+            sql: ALTER TABLE integration ADD CONSTRAINT chk_integration_type CHECK (type IN ('SLACK', 'EMAIL', 'WEBHOOK'))
+        - createIndex:
+            tableName: integration
+            indexName: idx_integration_organization_enabled
+            columns:
+              - column:
+                  name: organization_id
+              - column:
+                  name: enabled

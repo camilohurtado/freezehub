@@ -1,5 +1,7 @@
 package com.freezhub.restriction;
 
+import com.freezhub.notification.NotificationEvent;
+import com.freezhub.notification.NotificationOutbox;
 import java.time.Instant;
 import java.util.List;
 import org.slf4j.Logger;
@@ -32,9 +34,12 @@ public class RestrictionLifecycleService {
             List.of(RestrictionStatus.SCHEDULED, RestrictionStatus.ACTIVE);
 
     private final ChangeRestrictionRepository changeRestrictionRepository;
+    private final NotificationOutbox notificationOutbox;
 
-    public RestrictionLifecycleService(ChangeRestrictionRepository changeRestrictionRepository) {
+    public RestrictionLifecycleService(ChangeRestrictionRepository changeRestrictionRepository,
+                                       NotificationOutbox notificationOutbox) {
         this.changeRestrictionRepository = changeRestrictionRepository;
+        this.notificationOutbox = notificationOutbox;
     }
 
     /**
@@ -45,10 +50,25 @@ public class RestrictionLifecycleService {
      */
     @Transactional
     public LifecycleReconciliation reconcile(Instant now) {
+        // Captured before the updates: a set-based UPDATE reports a count, not the rows,
+        // and each restriction that actually transitions has to be announced (FZ-040).
+        // The two predicates are disjoint — activation excludes an already-elapsed window.
+        List<ChangeRestriction> activating =
+                changeRestrictionRepository.findDueForActivation(now, RestrictionStatus.SCHEDULED);
+        List<ChangeRestriction> completing =
+                changeRestrictionRepository.findDueForCompletion(now, OPEN_STATUSES);
+
         int activated = changeRestrictionRepository.activateDue(
                 now, RestrictionStatus.SCHEDULED, RestrictionStatus.ACTIVE);
         int completed = changeRestrictionRepository.completeDue(
                 now, OPEN_STATUSES, RestrictionStatus.COMPLETED);
+
+        // Still inside the same transaction as the status change itself, so a crash cannot
+        // leave a restriction activated with nobody ever told.
+        activating.forEach(restriction -> notificationOutbox.enqueue(
+                restriction.getOrganizationId(), restriction.getId(), NotificationEvent.ACTIVATED));
+        completing.forEach(restriction -> notificationOutbox.enqueue(
+                restriction.getOrganizationId(), restriction.getId(), NotificationEvent.COMPLETED));
 
         if (activated > 0 || completed > 0) {
             log.info("Restriction lifecycle reconciled at {}: {} activated, {} completed",

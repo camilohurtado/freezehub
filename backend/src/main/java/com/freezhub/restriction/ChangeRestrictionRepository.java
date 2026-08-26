@@ -22,6 +22,31 @@ public interface ChangeRestrictionRepository extends JpaRepository<ChangeRestric
      * activation - a CANCELLED restriction can never match. {@code updatedAt} is set
      * explicitly because a bulk JPQL update bypasses {@code @PreUpdate}.
      */
+    /**
+     * The rows {@link #activateDue} is about to change. Read before the bulk update
+     * because a set-based UPDATE returns a count, not the rows — and FZ-040 has to queue a
+     * notification per restriction that actually transitioned.
+     *
+     * <p>Same predicate as the update, so the two cannot disagree.
+     */
+    @Query("""
+            select r from ChangeRestriction r
+             where r.status = :scheduled
+               and r.startsAt <= :now
+               and r.endsAt > :now
+            """)
+    List<ChangeRestriction> findDueForActivation(@Param("now") Instant now,
+                                                 @Param("scheduled") RestrictionStatus scheduled);
+
+    /** The rows {@link #completeDue} is about to change; same predicate as that update. */
+    @Query("""
+            select r from ChangeRestriction r
+             where r.status in :openStatuses
+               and r.endsAt <= :now
+            """)
+    List<ChangeRestriction> findDueForCompletion(@Param("now") Instant now,
+                                                 @Param("openStatuses") Collection<RestrictionStatus> openStatuses);
+
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
             update ChangeRestriction r

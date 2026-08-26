@@ -1,0 +1,91 @@
+databaseChangeLog:
+  - changeSet:
+      id: 011-notification
+      author: freezehub
+      changes:
+        - createTable:
+            tableName: notification
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: organization_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+                    references: organization(id)
+                    foreignKeyName: fk_notification_organization
+              - column:
+                  name: restriction_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+                    references: change_restriction(id)
+                    foreignKeyName: fk_notification_restriction
+                    deleteCascade: true
+              - column:
+                  name: integration_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+                    references: integration(id)
+                    foreignKeyName: fk_notification_integration
+                    deleteCascade: true
+              - column:
+                  name: event
+                  type: varchar(30)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: status
+                  type: varchar(20)
+                  defaultValue: PENDING
+                  constraints:
+                    nullable: false
+              - column:
+                  name: attempts
+                  type: integer
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: last_error
+                  type: text
+              - column:
+                  name: created_at
+                  type: timestamptz
+                  defaultValueComputed: now()
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamptz
+                  defaultValueComputed: now()
+                  constraints:
+                    nullable: false
+              - column:
+                  name: sent_at
+                  type: timestamptz
+        - sql:
+            sql: ALTER TABLE notification ADD CONSTRAINT chk_notification_event CHECK (event IN ('SCHEDULED', 'ACTIVATED', 'COMPLETED', 'CANCELLED'))
+        - sql:
+            sql: ALTER TABLE notification ADD CONSTRAINT chk_notification_status CHECK (status IN ('PENDING', 'SENT', 'FAILED'))
+        # The constraint that makes enqueueing idempotent: a reconciliation that runs
+        # twice, or a restart mid-transition, cannot duplicate a notification.
+        - addUniqueConstraint:
+            tableName: notification
+            columnNames: restriction_id, integration_id, event
+            constraintName: uq_notification_restriction_integration_event
+        - createIndex:
+            tableName: notification
+            indexName: idx_notification_status_id
+            columns:
+              - column:
+                  name: status
+              - column:
+                  name: id
