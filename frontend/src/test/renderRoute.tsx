@@ -11,11 +11,16 @@ import { AuthProvider } from '../features/auth/AuthProvider'
  * Retries are off: a test asserting an error state should not wait for TanStack Query to
  * exhaust attempts first.
  */
+/**
+ * `path` is the URL actually visited. `route` is the pattern to match it against, needed
+ * whenever the page reads params — without it a component would receive the literal
+ * ":restrictionId" instead of an id.
+ */
 export function renderRoute(
   element: ReactElement,
-  options: { path?: string; token?: string | null } = {},
+  options: { path?: string; route?: string; token?: string | null } = {},
 ) {
-  const { path = '/', token = 'test-token' } = options
+  const { path = '/', route, token = 'test-token' } = options
 
   if (token === null) {
     sessionStorage.removeItem('freezehub.token')
@@ -30,10 +35,11 @@ export function renderRoute(
   // The route pattern must not carry the query string, but the initial entry must — that
   // is how a page whose filter state lives in the URL gets exercised.
   const [pathname] = path.split('?')
+  const pattern = route ?? pathname
 
   const router = createMemoryRouter(
     [
-      { path: pathname, element },
+      { path: pattern, element },
       { path: '/signin', element: <div>Sign in screen</div> },
     ],
     { initialEntries: [path] },

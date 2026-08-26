@@ -54,3 +54,16 @@ export function validateRestrictionForm(
 
   return errors
 }
+
+/** A blank form. Lives beside the rules it must satisfy, not in the component file. */
+export const EMPTY_FORM: RestrictionFormValues = {
+  name: '',
+  description: '',
+  reason: '',
+  level: 'HARD_FREEZE',
+  startsAtLocal: '',
+  endsAtLocal: '',
+  teamIds: [],
+  applicationIds: [],
+  environmentIds: [],
+}
