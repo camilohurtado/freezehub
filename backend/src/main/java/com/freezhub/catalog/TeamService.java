@@ -42,7 +42,7 @@ public class TeamService {
     @Transactional
     public void delete(Long organizationId, Long teamId) {
         Team team = findOwned(organizationId, teamId);
-        teamRepository.delete(team);
+        CatalogDeletion.deleteOrReportInUse(team, teamRepository, "team");
     }
 
     private Team findOwned(Long organizationId, Long teamId) {

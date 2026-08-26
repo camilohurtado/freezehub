@@ -42,7 +42,7 @@ public class EnvironmentService {
     @Transactional
     public void delete(Long organizationId, Long environmentId) {
         Environment environment = findOwned(organizationId, environmentId);
-        environmentRepository.delete(environment);
+        CatalogDeletion.deleteOrReportInUse(environment, environmentRepository, "environment");
     }
 
     private Environment findOwned(Long organizationId, Long environmentId) {

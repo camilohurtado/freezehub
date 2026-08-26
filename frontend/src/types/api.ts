@@ -26,6 +26,19 @@ export interface RestrictionSummary {
   updatedAt: string
 }
 
+/** Teams and environments: name plus timestamps (FZ-013, FZ-015). */
+export interface CatalogEntry {
+  id: number
+  name: string
+  createdAt: string
+  updatedAt: string
+}
+
+/** Applications additionally carry their associated teams (FZ-014). */
+export interface ApplicationSummary extends CatalogEntry {
+  teamIds: number[]
+}
+
 /** Shape returned by `POST /api/dev/token` (local development only — FZ-035). */
 export interface DevSignInResponse {
   token: string

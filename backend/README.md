@@ -42,7 +42,18 @@ A restriction whose whole window elapsed while the process was down goes straigh
 
 > **For policy evaluation (`FZ-051`):** the `status` column is a materialised convenience and may lag by up to one interval. Evaluate from `startsAt`/`endsAt` plus "not `CANCELLED`" — trusting `status` alone could allow a deployment during a freeze whose activation tick had not yet run.
 
-**Known gap:** the scope tables reference catalog rows with non-cascading foreign keys, so the database refuses to delete a team/application/environment that a restriction references — deliberately, since cascading would silently shrink a restriction's scope. That refusal isn't yet translated to HTTP, so deleting a **referenced** catalog resource currently returns `500` instead of `409`. The delete is genuinely refused and the data stays correct; only the status code is wrong. See `FZ-020` in `../docs/08-backlog.md`.
+The scope tables reference catalog rows with non-cascading foreign keys, so the database refuses to delete a team/application/environment that a restriction references — deliberately, since cascading would silently shrink a restriction's scope and stop blocking deployments it was created to block. That refusal surfaces as **`409`** with an explanatory message (`FZ-036`).
+
+## Error responses
+
+Deliberately-thrown rejections carry their reason in a `message` field:
+
+```jsonc
+{ "timestamp": "…", "status": 409, "error": "Conflict",
+  "message": "A team with this name already exists", "path": "/api/teams" }
+```
+
+Spring omits `message` by default, which silently discarded every reason this API produces. `ApiExceptionHandler` restores it for `ResponseStatusException` only — unexpected exceptions still fall through to Spring's default with no message, so a `500` never leaks internals. The full error contract is `FZ-061`.
 
 ## Quick start
 

@@ -47,7 +47,7 @@ public class ApplicationService {
     @Transactional
     public void delete(Long organizationId, Long applicationId) {
         Application application = findOwnedApplication(organizationId, applicationId);
-        applicationRepository.delete(application);
+        CatalogDeletion.deleteOrReportInUse(application, applicationRepository, "application");
     }
 
     public List<Long> teamIds(Long applicationId) {
