@@ -91,4 +91,17 @@ public class Integration {
         return config;
     }
 
+    /** Replaces the channel settings. Validated by IntegrationConfigs before it gets here. */
+    public void setConfig(String config) {
+        this.config = config;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
+    public Instant getUpdatedAt() {
+        return updatedAt;
+    }
+
 }

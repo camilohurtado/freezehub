@@ -6,6 +6,7 @@ import { SignInPage } from '../features/auth/SignInPage'
 import { DashboardPage } from '../features/dashboard/DashboardPage'
 import { RestrictionsPage } from '../features/restrictions/RestrictionsPage'
 import { CatalogPage } from '../features/catalog/CatalogPage'
+import { SettingsPage } from '../features/settings/SettingsPage'
 import { CreateRestrictionPage } from '../features/restrictions/CreateRestrictionPage'
 import { RestrictionDetailPage } from '../features/restrictions/RestrictionDetailPage'
 import { EditRestrictionPage } from '../features/restrictions/EditRestrictionPage'
@@ -31,6 +32,7 @@ export const routes = [
       { path: 'restrictions/:restrictionId', element: <RestrictionDetailPage /> },
       { path: 'restrictions/:restrictionId/edit', element: <EditRestrictionPage /> },
       { path: 'catalog', element: <CatalogPage /> },
+      { path: 'settings', element: <SettingsPage /> },
     ],
   },
   { path: '*', element: <NotFoundPage /> },
