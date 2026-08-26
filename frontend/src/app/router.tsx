@@ -5,6 +5,7 @@ import { RequireAuth } from '../features/auth/RequireAuth'
 import { SignInPage } from '../features/auth/SignInPage'
 import { DashboardPage } from '../features/dashboard/DashboardPage'
 import { RestrictionsPage } from '../features/restrictions/RestrictionsPage'
+import { CatalogPage } from '../features/catalog/CatalogPage'
 
 /**
  * MVP routes per 05-frontend.md. Routes arrive with the story that builds their page:
@@ -23,6 +24,7 @@ export const routes = [
       { index: true, element: <Navigate to="/dashboard" replace /> },
       { path: 'dashboard', element: <DashboardPage /> },
       { path: 'restrictions', element: <RestrictionsPage /> },
+      { path: 'catalog', element: <CatalogPage /> },
     ],
   },
   { path: '*', element: <NotFoundPage /> },

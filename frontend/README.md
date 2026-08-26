@@ -37,6 +37,7 @@ src/
 ├── components/       # shared presentational pieces (level/status badges)
 ├── features/
 │   ├── auth/         # token context, route guard, dev sign-in
+│   ├── catalog/      # FZ-036
 │   ├── dashboard/    # FZ-031
 │   └── restrictions/ # FZ-032
 ├── types/            # request/response types mirroring the API
