@@ -364,9 +364,28 @@ Verified live through the exact endpoints the UI calls: `GET` → `PUT` (200 whi
 ## Milestone 4 — Notifications
 
 ### FZ-040 — Notification Model + Outbox
-**Status:** TODO
+**Status:** DONE
 
 Persist notification intent and delivery state without a message broker.
+
+Schema specified just-in-time in `03-data-model.md` (`integration`, `notification`). Two decisions were required that no document answered:
+
+- **One outbox row = one delivery attempt to one destination.** Slack succeeding while a webhook fails is a normal outcome, and a single status per event could not express it; retry (`FZ-044`) also has to be per-destination. Matches `01-domain.md`'s "a delivery attempt" literally.
+- **A minimal `integration` table is included**, because fan-out at enqueue time needs to know an organization's destinations, and `03-data-model.md` grouped it with this story. `config` is opaque JSON-as-text: each channel needs different settings and only the owning channel interprets them.
+
+**Rows are written in the same transaction as the domain change.** That is the entire point — a process dying between "restriction activated" and "notification queued" cannot lose the notification, which is what a broker would otherwise have been for (`02-architecture.md`). `NotificationOutbox.enqueue` is `Propagation.MANDATORY`, so calling it outside a transaction fails loudly rather than silently reopening that gap; there is a test for it.
+
+**Enqueueing is idempotent**, enforced both in the service and by a unique constraint on `(restriction, integration, event)`. Reconciliation runs on a timer and is deliberately idempotent, so without this an organization would be notified once a minute for the life of a restriction. Verified live that the database itself refuses a duplicate.
+
+Enqueue points: creation → `SCHEDULED`, cancellation → `CANCELLED`, and the lifecycle reconciler → `ACTIVATED` / `COMPLETED`. The reconciler's set-based updates report a count rather than rows, so the affected restrictions are read with the same predicate immediately before the update.
+
+**Nothing is delivered yet** — `FZ-041`–`FZ-043` add the channel adapters, `FZ-044` the retry policy.
+
+**Known gaps:**
+
+1. **No API or UI configures integrations.** Same shape of gap as the catalog before `FZ-036`: the schema exists and notifications fan out to it, but a destination can currently only be created directly in the database. Needs its own story before `FZ-041` is usable by a customer.
+2. **The "restriction starting soon" notification from `00-product.md` is not implemented.** It needs a lead-time decision no document makes (how soon is "soon"), and unlike every other event it is triggered by the passage of time rather than by a transition. Needs a decision plus a story.
+3. **A Slack webhook URL is a credential**, and `integration.config` stores it in the database as plain text. Acceptable for local development; worth revisiting against `06-security.md`'s Secrets Manager posture before beta.
 
 ### FZ-041 — Slack Notifications
 **Status:** TODO
