@@ -1,5 +1,17 @@
 import { apiRequest } from './client'
-import type { RestrictionStatus, RestrictionSummary } from '../types/api'
+import type {
+  CreateRestrictionBody,
+  RestrictionDetail,
+  RestrictionStatus,
+  RestrictionSummary,
+} from '../types/api'
+
+export function createRestriction(
+  token: string | null,
+  body: CreateRestrictionBody,
+): Promise<RestrictionDetail> {
+  return apiRequest<RestrictionDetail>('/api/restrictions', { method: 'POST', body, token })
+}
 
 /**
  * `status` is repeatable server-side (FZ-021), so several states come back in one

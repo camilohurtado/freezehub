@@ -28,6 +28,10 @@ Sign in at `/signin` with the email of an existing user (see `../backend/README.
 
 **If the browser reports a CORS error**, the backend has to allow the origin the UI is served from. The `local` profile allows `http://localhost:5173` and `:5174`; for any other port set `FREEZEHUB_CORS_ALLOWED_ORIGINS` when starting the backend.
 
+## Testing
+
+The suite runs at `TZ=America/Bogota` (UTC-5), set in `vite.config.ts`. This is deliberate: a `datetime-local` value submitted without conversion to UTC looks perfectly correct on a UTC machine, so only a non-UTC zone makes that class of bug fail a test instead of shipping. **Do not change it to UTC** — `datetime.test.ts` asserts the zone is not UTC precisely so this cannot be undone silently.
+
 ## Current structure
 
 ```text

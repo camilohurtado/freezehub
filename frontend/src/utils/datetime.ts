@@ -28,6 +28,41 @@ export function formatInstant(iso: string): string {
   }).format(date)
 }
 
+/**
+ * Converts a `<input type="datetime-local">` value to an ISO-8601 UTC instant.
+ *
+ * The input's value is **zoneless** — "2026-11-27T09:00" means 09:00 wherever the user
+ * happens to be. Sending it as-is would shift every freeze window by the viewer's offset,
+ * which is silently invisible on a UTC machine and wrong everywhere else.
+ *
+ * `new Date(value)` is what does the work: ECMAScript parses a date-time form with no
+ * offset as *local* time, so `toISOString()` then yields the correct UTC instant.
+ */
+export function localInputToUtcIso(value: string): string {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    throw new Error(`Not a valid datetime-local value: ${value}`)
+  }
+  return date.toISOString()
+}
+
+/**
+ * The inverse: renders a UTC instant as the zoneless local string the input expects.
+ *
+ * Built from local getters rather than by slicing the ISO string, which would show the
+ * user a UTC wall-clock time labelled as their own.
+ */
+export function utcIsoToLocalInput(iso: string): string {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return ''
+
+  const pad = (value: number) => String(value).padStart(2, '0')
+  return (
+    `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` +
+    `T${pad(date.getHours())}:${pad(date.getMinutes())}`
+  )
+}
+
 /** Whole days from now until `iso`; negative once the instant has passed. */
 export function daysUntil(iso: string, now: Date = new Date()): number {
   const target = new Date(iso)

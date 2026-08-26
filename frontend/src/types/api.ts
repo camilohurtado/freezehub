@@ -26,6 +26,36 @@ export interface RestrictionSummary {
   updatedAt: string
 }
 
+/** Scope, as the API expresses it: one list per dimension (01-domain.md). */
+export interface RestrictionScope {
+  teamIds: number[]
+  applicationIds: number[]
+  environmentIds: number[]
+}
+
+/** Full representation from `GET /api/restrictions/{id}` — summary plus scope (FZ-022). */
+export interface RestrictionDetail extends RestrictionSummary {
+  description: string | null
+  scope: RestrictionScope
+}
+
+/**
+ * `POST /api/restrictions` body. No `type` or `status`: both are server-controlled, so
+ * the client does not get to state them (FZ-020).
+ *
+ * `startsAt`/`endsAt` are ISO-8601 **UTC** instants — never the zoneless value a
+ * datetime-local input produces.
+ */
+export interface CreateRestrictionBody {
+  name: string
+  description?: string | null
+  reason: string
+  level: RestrictionLevel
+  startsAt: string
+  endsAt: string
+  scope: RestrictionScope
+}
+
 /** Teams and environments: name plus timestamps (FZ-013, FZ-015). */
 export interface CatalogEntry {
   id: number

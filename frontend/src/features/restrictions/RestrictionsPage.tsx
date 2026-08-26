@@ -28,7 +28,12 @@ export function RestrictionsPage() {
 
   return (
     <main className={styles.page}>
-      <h1 className={styles.title}>Restrictions</h1>
+      <div className={styles.header}>
+        <h1 className={styles.title}>Restrictions</h1>
+        <Link className={styles.newButton} to="/restrictions/new">
+          New restriction
+        </Link>
+      </div>
 
       <fieldset className={styles.filters}>
         <legend className={styles.legend}>Filter by status</legend>
