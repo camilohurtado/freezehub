@@ -1,0 +1,49 @@
+.shell {
+  min-height: 100vh;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 0.75rem 1.5rem;
+  border-bottom: 1px solid var(--fh-border);
+  background: var(--fh-surface);
+}
+
+.brand {
+  font-weight: 700;
+}
+
+.nav {
+  display: flex;
+  gap: 1rem;
+  flex: 1;
+}
+
+.link,
+.linkActive {
+  color: var(--fh-text-muted);
+  font-size: 0.875rem;
+  text-decoration: none;
+}
+
+.linkActive {
+  color: var(--fh-text);
+  font-weight: 600;
+}
+
+.link:hover {
+  color: var(--fh-text);
+}
+
+.signOut {
+  padding: 0.3125rem 0.625rem;
+  border: 1px solid var(--fh-border-strong);
+  border-radius: 0.25rem;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
