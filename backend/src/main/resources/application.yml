@@ -11,6 +11,10 @@ spring:
     open-in-view: false
 
 freezehub:
+  cors:
+    # Empty by default: a deployed environment must name its frontend origin explicitly
+    # rather than inherit a permissive default. The local profile below fills in Vite.
+    allowed-origins: ${FREEZEHUB_CORS_ALLOWED_ORIGINS:}
   lifecycle:
     # Reconciles restriction status against the wall clock (FZ-025). The persisted
     # timestamps stay authoritative; this only keeps the stored status in step with them.
@@ -25,3 +29,15 @@ management:
   endpoint:
     health:
       show-details: never
+
+---
+# Local development only. Kept in this file as a profile document rather than a separate
+# application-local.yml, which the test classpath would shadow.
+spring:
+  config:
+    activate:
+      on-profile: local
+
+freezehub:
+  cors:
+    allowed-origins: ${FREEZEHUB_CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:5174}
