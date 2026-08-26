@@ -43,6 +43,7 @@ src/
 │   ├── auth/         # token context, route guard, dev sign-in
 │   ├── catalog/      # FZ-036
 │   ├── dashboard/    # FZ-031
+│   ├── settings/     # FZ-045
 │   └── restrictions/ # FZ-032
 ├── types/            # request/response types mirroring the API
 ├── utils/            # UTC-aware date formatting

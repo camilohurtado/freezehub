@@ -28,6 +28,12 @@ export function AppLayout() {
           >
             Catalog
           </NavLink>
+          <NavLink
+            to="/settings"
+            className={({ isActive }) => (isActive ? styles.linkActive : styles.link)}
+          >
+            Settings
+          </NavLink>
         </nav>
         <button className={styles.signOut} type="button" onClick={signOut}>
           Sign out

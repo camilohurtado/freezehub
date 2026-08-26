@@ -383,9 +383,35 @@ Enqueue points: creation → `SCHEDULED`, cancellation → `CANCELLED`, and the 
 
 **Known gaps:**
 
-1. **No API or UI configures integrations.** Same shape of gap as the catalog before `FZ-036`: the schema exists and notifications fan out to it, but a destination can currently only be created directly in the database. Needs its own story before `FZ-041` is usable by a customer.
+1. **No API or UI configures integrations** — now tracked as `FZ-045`, which runs before `FZ-041`.
 2. **The "restriction starting soon" notification from `00-product.md` is not implemented.** It needs a lead-time decision no document makes (how soon is "soon"), and unlike every other event it is triggered by the passage of time rather than by a transition. Needs a decision plus a story.
 3. **A Slack webhook URL is a credential**, and `integration.config` stores it in the database as plain text. Acceptable for local development; worth revisiting against `06-security.md`'s Secrets Manager posture before beta.
+
+### FZ-045 — Integration Configuration
+**Status:** DONE
+
+`/api/integrations` (list, create, enable/disable, replace config, delete) plus a Settings area in the UI. `ADMINISTRATOR`-only, like invite.
+
+**The stored credential is never returned.** A Slack webhook URL is a bearer credential — anyone holding it can post into that channel — so the API stores it and reads back only a `summary` that identifies the destination without being enough to reuse it (`hooks.slack.com`, `2 recipients`). There is no endpoint that returns `config`, which is why changing a credential means replacing it rather than editing it. Verified live: the secret is absent from the response body and still present in the database.
+
+`IntegrationConfigs` owns what each channel's config must contain — the one place that knows, since `integration.config` is deliberately opaque to everything else (`03-data-model.md`). It also rejects non-`https` destinations: these carry credentials and freeze announcements.
+
+Disabling is distinct from deleting: disabling stops announcements while keeping the configuration, so a destination can be switched back on without re-entering its credential. Deleting cascades any queued notifications for it, since a delivery attempt to a destination that no longer exists has nowhere to go.
+
+Verified end to end with `FZ-040`: a destination created through the API receives fan-out on restriction creation, and once disabled receives nothing further.
+
+Added during `FZ-040`. Runs **before `FZ-041`**, which is otherwise implementable but not usable: the outbox fans out to an organization's integrations, and nothing lets a customer create one.
+
+`00-product.md` names an Organization Administrator who "configures the organization, users, catalog, integrations", and `FZ-040` built the schema — but no story exposed it. Without this, enabling Slack means inserting a row directly into the database.
+
+Acceptance:
+
+- List, create, enable/disable and delete integrations for the authenticated organization, tenant-isolated on the same rules as every other resource (another organization's integration is `404`, never `403`).
+- Restricted to `ADMINISTRATOR`, like invite (`06-security.md`) — a destination is where freeze announcements go, and its config may hold a credential.
+- Each type's `config` is validated by the code that owns that type, since `integration.config` is deliberately opaque to everything else (`03-data-model.md`).
+- **A stored credential is never returned.** A Slack webhook URL is a bearer credential; the API must not read it back out in a list response. Show enough to identify the destination, not enough to reuse it.
+- Deleting an integration cascades its queued notifications (`ON DELETE CASCADE`, already in the schema) — document that this discards undelivered ones.
+- A Settings area in the UI covering the same operations.
 
 ### FZ-041 — Slack Notifications
 **Status:** TODO

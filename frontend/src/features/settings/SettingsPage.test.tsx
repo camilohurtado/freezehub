@@ -1,0 +1,153 @@
+import { screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
+import { SettingsPage } from './SettingsPage'
+import { renderRoute } from '../../test/renderRoute'
+import type { Integration } from '../../types/api'
+
+const integration = (overrides: Partial<Integration> = {}): Integration => ({
+  id: 1,
+  type: 'SLACK',
+  enabled: true,
+  summary: 'hooks.slack.com',
+  createdAt: '2026-01-01T00:00:00Z',
+  updatedAt: '2026-01-01T00:00:00Z',
+  ...overrides,
+})
+
+function stubApi(list: Integration[], writeResponse?: () => Response) {
+  const spy = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+    void input
+    if (init?.method && init.method !== 'GET') {
+      return Promise.resolve(writeResponse?.() ?? new Response(null, { status: 204 }))
+    }
+    return Promise.resolve(
+      new Response(JSON.stringify(list), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    )
+  })
+  vi.stubGlobal('fetch', spy)
+  return spy
+}
+
+describe('SettingsPage', () => {
+  beforeEach(() => sessionStorage.clear())
+  afterEach(() => vi.unstubAllGlobals())
+
+  test('lists destinations by channel and summary', async () => {
+    stubApi([integration(), integration({ id: 2, type: 'EMAIL', summary: '2 recipients' })])
+    renderRoute(<SettingsPage />, { path: '/settings' })
+
+    // Asserted on the summaries, which are unique to the list — "Slack" and "Email" also
+    // appear as options in the create form, which renders before the request resolves.
+    expect(await screen.findByText('hooks.slack.com')).toBeInTheDocument()
+    expect(screen.getByText('2 recipients')).toBeInTheDocument()
+
+    const list = screen.getByRole('list')
+    expect(within(list).getByText('Slack')).toBeInTheDocument()
+    expect(within(list).getByText('Email')).toBeInTheDocument()
+  })
+
+  test('warns that nothing is announced without a destination', async () => {
+    stubApi([])
+    renderRoute(<SettingsPage />, { path: '/settings' })
+
+    expect(await screen.findByText(/nothing will be announced/i)).toBeInTheDocument()
+  })
+
+  test('adds a destination', async () => {
+    const user = userEvent.setup()
+    const spy = stubApi([])
+    renderRoute(<SettingsPage />, { path: '/settings' })
+
+    await user.type(
+      await screen.findByLabelText('Configuration'),
+      '{{"webhookUrl": "https://hooks.slack.com/services/x"}',
+    )
+    await user.click(screen.getByRole('button', { name: /add destination/i }))
+
+    await waitFor(() => {
+      const posted = spy.mock.calls.find(([, init]) => init?.method === 'POST')
+      expect(posted).toBeDefined()
+      expect(JSON.parse(String(posted?.[1]?.body)).type).toBe('SLACK')
+    })
+  })
+
+  test('explains a config the backend rejects', async () => {
+    // The backend owns what each channel's config must contain; its message is the useful
+    // one, so it is surfaced rather than replaced with something generic.
+    const user = userEvent.setup()
+    stubApi(
+      [],
+      () =>
+        new Response(JSON.stringify({ message: '"webhookUrl" must be an https URL' }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+    )
+    renderRoute(<SettingsPage />, { path: '/settings' })
+
+    await user.type(await screen.findByLabelText('Configuration'), '{{"webhookUrl": "http://x"}')
+    await user.click(screen.getByRole('button', { name: /add destination/i }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/must be an https URL/i)
+  })
+
+  test('disables a destination without deleting it', async () => {
+    const user = userEvent.setup()
+    const spy = stubApi([integration()])
+    renderRoute(<SettingsPage />, { path: '/settings' })
+
+    await user.click(await screen.findByLabelText('Slack enabled'))
+
+    await waitFor(() => {
+      const patched = spy.mock.calls.find(([, init]) => init?.method === 'PATCH')
+      expect(JSON.parse(String(patched?.[1]?.body))).toEqual({ enabled: false })
+    })
+  })
+
+  test('deletes a destination', async () => {
+    const user = userEvent.setup()
+    const spy = stubApi([integration()])
+    renderRoute(<SettingsPage />, { path: '/settings' })
+
+    await user.click(await screen.findByRole('button', { name: /delete slack destination/i }))
+
+    await waitFor(() => {
+      expect(spy.mock.calls.some(([, init]) => init?.method === 'DELETE')).toBe(true)
+    })
+  })
+
+  test('tells a non-administrator why the page is empty', async () => {
+    // The endpoint is ADMINISTRATOR-only; a bare error would look like a bug.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(JSON.stringify({ message: 'Forbidden' }), {
+            status: 403,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        ),
+      ),
+    )
+    renderRoute(<SettingsPage />, { path: '/settings' })
+
+    // Awaited on the message itself: a loading status renders first, so findByRole('status')
+    // would resolve against that instead.
+    expect(await screen.findByText(/only an administrator/i)).toBeInTheDocument()
+  })
+
+  test('never renders a stored credential', async () => {
+    // Belt and braces with the backend test: the API omits config, and the UI has no
+    // field that would display one.
+    stubApi([integration({ summary: 'hooks.slack.com' })])
+    const { container } = renderRoute(<SettingsPage />, { path: '/settings' })
+
+    await screen.findByText('Slack')
+    expect(container.textContent).not.toContain('webhookUrl')
+    expect(within(container).queryByDisplayValue(/hooks\.slack\.com\/services/)).toBeNull()
+  })
+})

@@ -50,7 +50,7 @@ Lifecycle events are recorded in a database-backed **outbox** (`notification`) r
 
 The row is written **in the same transaction as the domain change**, which is what makes the intent survive a crash between "restriction activated" and "notification queued". `NotificationOutbox.enqueue` is `Propagation.MANDATORY` so it cannot accidentally be called outside one. Enqueueing is idempotent — the service checks, and a unique constraint on `(restriction, integration, event)` guarantees it — because the lifecycle reconciler is itself idempotent and runs on a timer.
 
-**Nothing sends anything yet:** the channel adapters are `FZ-041`–`FZ-043` and the retry policy is `FZ-044`. There is also no API or UI for creating an `integration` yet, so destinations must currently be inserted directly (see the known gaps on `FZ-040`).
+**Nothing sends anything yet:** the channel adapters are `FZ-041`–`FZ-043` and the retry policy is `FZ-044`. Destinations are configured through `/api/integrations` (`FZ-045`, ADMINISTRATOR-only) — a stored credential is never read back, only a summary that identifies the destination.
 
 ## Error responses
 

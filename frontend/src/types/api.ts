@@ -84,3 +84,19 @@ export interface CurrentUser {
   email: string
   role: 'ADMINISTRATOR' | 'MEMBER'
 }
+
+export type IntegrationType = 'SLACK' | 'EMAIL' | 'WEBHOOK'
+
+/**
+ * Note the absent `config`: the API never returns stored channel settings, because they
+ * can hold a credential. `summary` identifies a destination without being enough to
+ * reuse it.
+ */
+export interface Integration {
+  id: number
+  type: IntegrationType
+  enabled: boolean
+  summary: string
+  createdAt: string
+  updatedAt: string
+}
