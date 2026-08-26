@@ -72,6 +72,22 @@ Every endpoint except `/actuator/health` requires a Cognito-issued JWT (`Authori
 - Any real/deployed environment must set `SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI` to the real Cognito user pool's issuer URI and must **not** activate the `local` profile.
 - Minting a test token: use `com.freezhub.shared.security.TestTokens.forSubject(jwtEncoder, subject)` (test-only helper); see `MeControllerTest` for a full example.
 
+### Signing in during development (`FZ-035`)
+
+No Cognito user pool exists until `FZ-063`, so a browser has no way to obtain a token. Under the `local` profile only, an endpoint mints one for an **existing** user:
+
+```bash
+curl -X POST http://localhost:8080/api/dev/token \
+  -H 'Content-Type: application/json' -d '{"email":"dev@acme.test"}'
+# -> {"token":"eyJ...","userId":1,"organizationId":1,"email":"dev@acme.test","role":"ADMINISTRATOR"}
+
+curl http://localhost:8080/api/me -H "Authorization: Bearer <token>"
+```
+
+`404` if no such user (it is a sign-in shortcut, not a way to create identities); `409` if the email exists in more than one organization, since email is unique per organization rather than globally.
+
+**It cannot exist in a deployed environment.** The controller, the `JwtEncoder` it needs, and the filter chain that makes the path reachable without a token are all `@Profile("local")`, and no deployed environment activates that profile — there the path falls through to the main chain and is rejected as unauthenticated. Tests assert that absence. Replaced by the Cognito Hosted UI redirect at `FZ-063`.
+
 ### Provisioning a user
 
 An organization's first (`ADMINISTRATOR`) user is provisioned out-of-band, manually:

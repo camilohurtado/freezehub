@@ -1,11 +1,19 @@
 package com.freezhub.organization;
 
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface UserRepository extends JpaRepository<User, Long> {
 
     Optional<User> findByCognitoSubject(String cognitoSubject);
+
+    /**
+     * Email is unique per organization, not globally, so this can legitimately return
+     * several users. Used by local development sign-in (FZ-035), which reports an
+     * ambiguous email rather than guessing which organization was meant.
+     */
+    List<User> findAllByEmail(String email);
 
     boolean existsByOrganizationIdAndEmail(Long organizationId, String email);
 
