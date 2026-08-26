@@ -7,6 +7,8 @@ import { DashboardPage } from '../features/dashboard/DashboardPage'
 import { RestrictionsPage } from '../features/restrictions/RestrictionsPage'
 import { CatalogPage } from '../features/catalog/CatalogPage'
 import { CreateRestrictionPage } from '../features/restrictions/CreateRestrictionPage'
+import { RestrictionDetailPage } from '../features/restrictions/RestrictionDetailPage'
+import { EditRestrictionPage } from '../features/restrictions/EditRestrictionPage'
 
 /**
  * MVP routes per 05-frontend.md. Routes arrive with the story that builds their page:
@@ -26,6 +28,8 @@ export const routes = [
       { path: 'dashboard', element: <DashboardPage /> },
       { path: 'restrictions', element: <RestrictionsPage /> },
       { path: 'restrictions/new', element: <CreateRestrictionPage /> },
+      { path: 'restrictions/:restrictionId', element: <RestrictionDetailPage /> },
+      { path: 'restrictions/:restrictionId/edit', element: <EditRestrictionPage /> },
       { path: 'catalog', element: <CatalogPage /> },
     ],
   },
