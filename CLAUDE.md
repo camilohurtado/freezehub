@@ -344,6 +344,10 @@ Do not automatically:
 
 These operations require explicit instruction.
 
+**Standing instruction, granted during `FZ-031`:** merging a *finished* story into `master` is pre-approved. Once a story has passed its Definition of Done and been committed on its own branch, merge it with `git merge --no-ff` and branch the next story from the updated `master`.
+
+This covers merging only. Everything else in the list above — pushing, pull requests, deleting branches, rewriting history, force pushing — still requires explicit instruction each time, as does committing work that is not a completed story.
+
 ### Story Completion
 
 A backlog item is considered ready for human review when:
