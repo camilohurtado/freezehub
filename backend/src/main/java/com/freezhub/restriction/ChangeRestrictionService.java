@@ -48,14 +48,24 @@ public class ChangeRestrictionService {
      * One restriction with its scope, or 404 if it is unknown or belongs to another
      * organization - the two are indistinguishable on purpose, so cross-tenant existence
      * is never revealed.
-     *
-     * <p>Transactional and initialising the scope collections explicitly: they are LAZY
-     * (so that listing stays a single query) and {@code spring.jpa.open-in-view} is
-     * disabled, so anything left uninitialised here would fail when the controller maps
-     * the response outside this transaction.
      */
     @Transactional(readOnly = true)
     public ChangeRestriction get(Long organizationId, Long restrictionId) {
+        return findOwnedWithScope(organizationId, restrictionId);
+    }
+
+    /**
+     * Loads a restriction owned by the organization, with its scope initialised.
+     *
+     * <p>Every caller that returns the entity for mapping needs this: the scope
+     * collections are LAZY (so that listing stays a single query) and
+     * {@code spring.jpa.open-in-view} is disabled, so anything left uninitialised here
+     * fails when the controller maps the response outside the transaction. Doing it in
+     * one place means a new endpoint cannot forget it.
+     *
+     * <p>Must be called from within a transaction.
+     */
+    private ChangeRestriction findOwnedWithScope(Long organizationId, Long restrictionId) {
         ChangeRestriction restriction = changeRestrictionRepository
                 .findByIdAndOrganizationId(restrictionId, organizationId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Restriction not found"));
@@ -94,9 +104,7 @@ public class ChangeRestrictionService {
      */
     @Transactional
     public ChangeRestriction update(Long organizationId, Long restrictionId, RestrictionRequest request) {
-        ChangeRestriction restriction = changeRestrictionRepository
-                .findByIdAndOrganizationId(restrictionId, organizationId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Restriction not found"));
+        ChangeRestriction restriction = findOwnedWithScope(organizationId, restrictionId);
 
         if (!restriction.isScheduled()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
@@ -116,6 +124,30 @@ public class ChangeRestrictionService {
                 request.scope().applicationIds(),
                 request.scope().environmentIds());
 
+        return restriction;
+    }
+
+    /**
+     * Cancels a SCHEDULED or ACTIVE restriction (FZ-024). Cancelling is terminal and
+     * preserves the record - the restriction stays visible with status CANCELLED rather
+     * than being deleted, because what was communicated to engineers actually happened.
+     *
+     * <p>A COMPLETED restriction cannot be cancelled (it already ran its course) and
+     * neither can an already-CANCELLED one; both are 409. Cancellation is deliberately
+     * not idempotent: the backlog scopes this to "a scheduled or active restriction", and
+     * a repeat cancel signals the caller believed it was still live.
+     */
+    @Transactional
+    public ChangeRestriction cancel(Long organizationId, Long restrictionId) {
+        ChangeRestriction restriction = findOwnedWithScope(organizationId, restrictionId);
+
+        if (!restriction.isCancellable()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Only a SCHEDULED or ACTIVE restriction can be cancelled; this one is "
+                            + restriction.getStatus());
+        }
+
+        restriction.cancel();
         return restriction;
     }
 

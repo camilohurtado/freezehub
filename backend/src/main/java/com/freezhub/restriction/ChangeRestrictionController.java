@@ -35,6 +35,17 @@ public class ChangeRestrictionController {
     }
 
     /**
+     * Cancels a SCHEDULED or ACTIVE restriction (FZ-024). Modelled as an action rather
+     * than DELETE: the restriction is kept as a record with status CANCELLED, not removed.
+     * 409 if it is COMPLETED or already CANCELLED.
+     */
+    @PostMapping("/{restrictionId}/cancel")
+    public RestrictionResponse cancel(@AuthenticationPrincipal AuthenticatedUser caller,
+                                      @PathVariable Long restrictionId) {
+        return RestrictionResponse.from(changeRestrictionService.cancel(caller.organizationId(), restrictionId));
+    }
+
+    /**
      * Full replacement of a still-SCHEDULED restriction's editable state (FZ-023).
      * 409 if it is no longer SCHEDULED, 404 if unknown or owned by another organization.
      */

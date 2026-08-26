@@ -141,6 +141,23 @@ public class ChangeRestriction {
         return this.status == RestrictionStatus.SCHEDULED;
     }
 
+    /**
+     * Only a SCHEDULED or ACTIVE restriction can be cancelled (01-domain.md lifecycle).
+     * A COMPLETED one has already run its course and a CANCELLED one is already there.
+     */
+    public boolean isCancellable() {
+        return this.status == RestrictionStatus.SCHEDULED || this.status == RestrictionStatus.ACTIVE;
+    }
+
+    /**
+     * Moves the restriction to CANCELLED (FZ-024). Domain invariants 5 and 6 follow from
+     * this being terminal: a cancelled restriction can never become ACTIVE again, and it
+     * no longer affects policy evaluation.
+     */
+    void cancel() {
+        this.status = RestrictionStatus.CANCELLED;
+    }
+
     @PrePersist
     void onCreate() {
         Instant now = Instant.now();
