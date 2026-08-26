@@ -110,6 +110,37 @@ public class ChangeRestriction {
         this.environmentIds = new LinkedHashSet<>(environmentIds);
     }
 
+    /**
+     * Replaces the editable state of a still-SCHEDULED restriction (FZ-023). Identity,
+     * ownership, {@code type} and {@code status} are not editable here - status moves only
+     * through cancellation (FZ-024) and the lifecycle (FZ-025).
+     *
+     * <p>The scope collections are cleared and refilled rather than reassigned: they are
+     * Hibernate-managed once the entity is persistent, and swapping the instance out from
+     * under the persistence context loses that tracking.
+     */
+    void replaceEditableState(String name, String description, String reason, RestrictionLevel level,
+                              Instant startsAt, Instant endsAt,
+                              Set<Long> teamIds, Set<Long> applicationIds, Set<Long> environmentIds) {
+        this.name = name;
+        this.description = description;
+        this.reason = reason;
+        this.level = level;
+        this.startsAt = startsAt;
+        this.endsAt = endsAt;
+
+        this.teamIds.clear();
+        this.teamIds.addAll(teamIds);
+        this.applicationIds.clear();
+        this.applicationIds.addAll(applicationIds);
+        this.environmentIds.clear();
+        this.environmentIds.addAll(environmentIds);
+    }
+
+    public boolean isScheduled() {
+        return this.status == RestrictionStatus.SCHEDULED;
+    }
+
     @PrePersist
     void onCreate() {
         Instant now = Instant.now();

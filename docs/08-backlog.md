@@ -162,11 +162,26 @@ Implemented as `GET /api/restrictions/{id}`, returning the full representation i
 The scope collections are `LAZY` (see `FZ-021`) and `spring.jpa.open-in-view` is disabled, so the service initialises them explicitly inside its read-only transaction — otherwise mapping the response in the controller would fail with `LazyInitializationException`. The detail test covers this: removing the initialisation makes it fail, so the guard is real rather than incidental.
 
 ### FZ-023 — Update Scheduled Restriction
-**Status:** TODO
+**Status:** DONE
 
 Allow supported changes while a restriction is still scheduled.
 
-Exact mutable fields must be specified before implementation.
+Exact mutable fields, specified by this story:
+
+| Editable while `SCHEDULED` | Never editable |
+|---|---|
+| `name`, `description`, `reason` | `id`, `organizationId`, `createdBy`, `createdAt` |
+| `level` | `type` (server-controlled) |
+| `startsAt`, `endsAt` | `status` (see `FZ-024`, `FZ-025`) |
+| all three scope dimensions | |
+
+Implemented as `PUT /api/restrictions/{id}` — a **full replacement**, not a partial patch. PUT avoids the null-versus-absent ambiguity a PATCH would hit on the nullable `description`: in a Java record there is no way to distinguish "field omitted" from "field explicitly set to null", so a PATCH could not express clearing a field.
+
+Editing is permitted only while the restriction is still `SCHEDULED`; `ACTIVE`, `COMPLETED` and `CANCELLED` return `409`. Once a restriction has taken effect it is a record of what happened, and editing it would rewrite history. Every creation invariant is re-checked on update, so an update can never leave a restriction in a state creation would have rejected.
+
+`CreateRestrictionRequest` was renamed to `RestrictionRequest` and is shared by create and update: full-replacement semantics mean both carry identical fields and identical validation, and one record cannot drift out of step with itself. The shared invariant checks were likewise extracted into a single private method used by both paths.
+
+**Deferred architectural concern — mutable aggregate vs. immutability + activity history.** Editing in place overwrites the previous state with no record that it changed or who changed it. The alternative (immutable/versioned restrictions, or an append-only change history) was raised during this story and deliberately deferred, not overlooked. `FZ-060` (Audit Events) covers part of it — recording *that* an administrative action happened — but not making the aggregate itself pristine. This deserves its own focused decision before beta; `docs/07-decisions.md` is the place to record the outcome.
 
 ### FZ-024 — Cancel Restriction
 **Status:** TODO

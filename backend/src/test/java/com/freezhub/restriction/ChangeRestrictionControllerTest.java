@@ -91,8 +91,8 @@ class ChangeRestrictionControllerTest {
                 .getId();
     }
 
-    private CreateRestrictionRequest validRequest(CreateRestrictionRequest.ScopeRequest scope) {
-        return new CreateRestrictionRequest("Black Friday Freeze", "No production deploys",
+    private RestrictionRequest validRequest(RestrictionRequest.ScopeRequest scope) {
+        return new RestrictionRequest("Black Friday Freeze", "No production deploys",
                 "Revenue-critical period", RestrictionLevel.HARD_FREEZE, FUTURE_START, FUTURE_END, scope);
     }
 
@@ -105,7 +105,7 @@ class ChangeRestrictionControllerTest {
         mockMvc.perform(post("/api/restrictions")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(validRequest(
-                                new CreateRestrictionRequest.ScopeRequest(null, null, Set.of(1L))))))
+                                new RestrictionRequest.ScopeRequest(null, null, Set.of(1L))))))
                 .andExpect(status().isUnauthorized());
     }
 
@@ -126,7 +126,7 @@ class ChangeRestrictionControllerTest {
         mockMvc.perform(post("/api/restrictions")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(validRequest(new CreateRestrictionRequest.ScopeRequest(
+                        .content(json(validRequest(new RestrictionRequest.ScopeRequest(
                                 Set.of(teamId), Set.of(applicationId), Set.of(environmentId))))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.name", is("Black Friday Freeze")))
@@ -151,7 +151,7 @@ class ChangeRestrictionControllerTest {
         mockMvc.perform(post("/api/restrictions")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(validRequest(new CreateRestrictionRequest.ScopeRequest(
+                        .content(json(validRequest(new RestrictionRequest.ScopeRequest(
                                 null, null, Set.of(environmentId))))))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.scope.teamIds", is(empty())))
@@ -166,9 +166,9 @@ class ChangeRestrictionControllerTest {
         Long environmentId =
                 environmentRepository.saveAndFlush(new Environment(organization.getId(), "staging")).getId();
 
-        CreateRestrictionRequest request = new CreateRestrictionRequest("Migration window", null,
+        RestrictionRequest request = new RestrictionRequest("Migration window", null,
                 "Database migration in progress", RestrictionLevel.ADVISORY, FUTURE_START, FUTURE_END,
-                new CreateRestrictionRequest.ScopeRequest(null, null, Set.of(environmentId)));
+                new RestrictionRequest.ScopeRequest(null, null, Set.of(environmentId)));
 
         mockMvc.perform(post("/api/restrictions")
                         .header("Authorization", "Bearer " + token)
@@ -186,9 +186,9 @@ class ChangeRestrictionControllerTest {
         Long environmentId =
                 environmentRepository.saveAndFlush(new Environment(organization.getId(), "production")).getId();
 
-        CreateRestrictionRequest request = new CreateRestrictionRequest("Bad window", null, "Reason",
+        RestrictionRequest request = new RestrictionRequest("Bad window", null, "Reason",
                 RestrictionLevel.HARD_FREEZE, FUTURE_END, FUTURE_START,
-                new CreateRestrictionRequest.ScopeRequest(null, null, Set.of(environmentId)));
+                new RestrictionRequest.ScopeRequest(null, null, Set.of(environmentId)));
 
         mockMvc.perform(post("/api/restrictions")
                         .header("Authorization", "Bearer " + token)
@@ -204,10 +204,10 @@ class ChangeRestrictionControllerTest {
         Long environmentId =
                 environmentRepository.saveAndFlush(new Environment(organization.getId(), "production")).getId();
 
-        CreateRestrictionRequest request = new CreateRestrictionRequest("Past freeze", null, "Reason",
+        RestrictionRequest request = new RestrictionRequest("Past freeze", null, "Reason",
                 RestrictionLevel.HARD_FREEZE,
                 Instant.now().minus(10, ChronoUnit.DAYS), Instant.now().minus(5, ChronoUnit.DAYS),
-                new CreateRestrictionRequest.ScopeRequest(null, null, Set.of(environmentId)));
+                new RestrictionRequest.ScopeRequest(null, null, Set.of(environmentId)));
 
         mockMvc.perform(post("/api/restrictions")
                         .header("Authorization", "Bearer " + token)
@@ -225,7 +225,7 @@ class ChangeRestrictionControllerTest {
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(validRequest(
-                                new CreateRestrictionRequest.ScopeRequest(Set.of(), Set.of(), Set.of())))))
+                                new RestrictionRequest.ScopeRequest(Set.of(), Set.of(), Set.of())))))
                 .andExpect(status().isBadRequest());
     }
 
@@ -248,9 +248,9 @@ class ChangeRestrictionControllerTest {
         Long environmentId =
                 environmentRepository.saveAndFlush(new Environment(organization.getId(), "production")).getId();
 
-        CreateRestrictionRequest request = new CreateRestrictionRequest("No reason", null, null,
+        RestrictionRequest request = new RestrictionRequest("No reason", null, null,
                 RestrictionLevel.HARD_FREEZE, FUTURE_START, FUTURE_END,
-                new CreateRestrictionRequest.ScopeRequest(null, null, Set.of(environmentId)));
+                new RestrictionRequest.ScopeRequest(null, null, Set.of(environmentId)));
 
         mockMvc.perform(post("/api/restrictions")
                         .header("Authorization", "Bearer " + token)
@@ -266,9 +266,9 @@ class ChangeRestrictionControllerTest {
         Long environmentId =
                 environmentRepository.saveAndFlush(new Environment(organization.getId(), "production")).getId();
 
-        CreateRestrictionRequest request = new CreateRestrictionRequest("Blank reason", null, "   ",
+        RestrictionRequest request = new RestrictionRequest("Blank reason", null, "   ",
                 RestrictionLevel.HARD_FREEZE, FUTURE_START, FUTURE_END,
-                new CreateRestrictionRequest.ScopeRequest(null, null, Set.of(environmentId)));
+                new RestrictionRequest.ScopeRequest(null, null, Set.of(environmentId)));
 
         mockMvc.perform(post("/api/restrictions")
                         .header("Authorization", "Bearer " + token)
@@ -284,9 +284,9 @@ class ChangeRestrictionControllerTest {
         Long environmentId =
                 environmentRepository.saveAndFlush(new Environment(organization.getId(), "production")).getId();
 
-        CreateRestrictionRequest request = new CreateRestrictionRequest(null, null, "Reason",
+        RestrictionRequest request = new RestrictionRequest(null, null, "Reason",
                 RestrictionLevel.HARD_FREEZE, FUTURE_START, FUTURE_END,
-                new CreateRestrictionRequest.ScopeRequest(null, null, Set.of(environmentId)));
+                new RestrictionRequest.ScopeRequest(null, null, Set.of(environmentId)));
 
         mockMvc.perform(post("/api/restrictions")
                         .header("Authorization", "Bearer " + token)
@@ -302,9 +302,9 @@ class ChangeRestrictionControllerTest {
         Long environmentId =
                 environmentRepository.saveAndFlush(new Environment(organization.getId(), "production")).getId();
 
-        CreateRestrictionRequest request = new CreateRestrictionRequest("No level", null, "Reason",
+        RestrictionRequest request = new RestrictionRequest("No level", null, "Reason",
                 null, FUTURE_START, FUTURE_END,
-                new CreateRestrictionRequest.ScopeRequest(null, null, Set.of(environmentId)));
+                new RestrictionRequest.ScopeRequest(null, null, Set.of(environmentId)));
 
         mockMvc.perform(post("/api/restrictions")
                         .header("Authorization", "Bearer " + token)
@@ -322,7 +322,7 @@ class ChangeRestrictionControllerTest {
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(json(validRequest(
-                                new CreateRestrictionRequest.ScopeRequest(null, null, Set.of(999_999L))))))
+                                new RestrictionRequest.ScopeRequest(null, null, Set.of(999_999L))))))
                 .andExpect(status().isNotFound());
     }
 
@@ -341,7 +341,7 @@ class ChangeRestrictionControllerTest {
         mockMvc.perform(post("/api/restrictions")
                         .header("Authorization", "Bearer " + tokenA)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(json(validRequest(new CreateRestrictionRequest.ScopeRequest(
+                        .content(json(validRequest(new RestrictionRequest.ScopeRequest(
                                 Set.of(foreignTeamId), null, Set.of(ownEnvironmentId))))))
                 .andExpect(status().isNotFound());
 

@@ -6,10 +6,15 @@ import java.time.Instant;
 import java.util.Set;
 
 /**
- * Creation payload. {@code type} and {@code status} are deliberately absent: both are
- * server-controlled (DEPLOYMENT_FREEZE / SCHEDULED) per 01-domain.md and FZ-020.
+ * The full mutable state of a restriction, shared by create (FZ-020) and update (FZ-023).
+ * Update is a full replacement (PUT), so both carry exactly the same fields and the same
+ * validation rules - one record rather than two that would have to be kept in step.
+ *
+ * <p>{@code type} and {@code status} are deliberately absent: both are server-controlled
+ * (DEPLOYMENT_FREEZE / SCHEDULED) per 01-domain.md, and status transitions belong to the
+ * cancel and lifecycle stories (FZ-024, FZ-025), not to editing.
  */
-public record CreateRestrictionRequest(
+public record RestrictionRequest(
         @NotBlank String name,
         String description,
         @NotBlank String reason,

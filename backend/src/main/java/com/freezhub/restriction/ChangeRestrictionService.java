@@ -68,7 +68,59 @@ public class ChangeRestrictionService {
     }
 
     @Transactional
-    public ChangeRestriction create(Long organizationId, Long createdBy, CreateRestrictionRequest request) {
+    public ChangeRestriction create(Long organizationId, Long createdBy, RestrictionRequest request) {
+        validateRequest(organizationId, request);
+
+        return changeRestrictionRepository.save(new ChangeRestriction(
+                organizationId,
+                request.name(),
+                request.description(),
+                request.reason(),
+                request.level(),
+                request.startsAt(),
+                request.endsAt(),
+                createdBy,
+                request.scope().teamIds(),
+                request.scope().applicationIds(),
+                request.scope().environmentIds()));
+    }
+
+    /**
+     * Full replacement of a restriction's editable state (FZ-023), permitted only while it
+     * is still SCHEDULED - once it is active, completed or cancelled it is a record of what
+     * happened and editing it would rewrite history. The same invariants as creation are
+     * re-checked, so an update can never leave a restriction in a state creation would have
+     * rejected.
+     */
+    @Transactional
+    public ChangeRestriction update(Long organizationId, Long restrictionId, RestrictionRequest request) {
+        ChangeRestriction restriction = changeRestrictionRepository
+                .findByIdAndOrganizationId(restrictionId, organizationId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Restriction not found"));
+
+        if (!restriction.isScheduled()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Only a SCHEDULED restriction can be updated; this one is " + restriction.getStatus());
+        }
+
+        validateRequest(organizationId, request);
+
+        restriction.replaceEditableState(
+                request.name(),
+                request.description(),
+                request.reason(),
+                request.level(),
+                request.startsAt(),
+                request.endsAt(),
+                request.scope().teamIds(),
+                request.scope().applicationIds(),
+                request.scope().environmentIds());
+
+        return restriction;
+    }
+
+    /** Invariants shared by create and update, so the two cannot drift apart. */
+    private void validateRequest(Long organizationId, RestrictionRequest request) {
         Set<Long> teamIds = request.scope().teamIds();
         Set<Long> applicationIds = request.scope().applicationIds();
         Set<Long> environmentIds = request.scope().environmentIds();
@@ -81,19 +133,6 @@ public class ChangeRestrictionService {
                 "Application");
         requireAllOwned(organizationId, environmentIds, environmentRepository::countByOrganizationIdAndIdIn,
                 "Environment");
-
-        return changeRestrictionRepository.save(new ChangeRestriction(
-                organizationId,
-                request.name(),
-                request.description(),
-                request.reason(),
-                request.level(),
-                request.startsAt(),
-                request.endsAt(),
-                createdBy,
-                teamIds,
-                applicationIds,
-                environmentIds));
     }
 
     /**
