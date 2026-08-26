@@ -1,5 +1,6 @@
 import { Link } from 'react-router'
 import type { RestrictionSummary } from '../../types/api'
+import { LevelBadge } from '../../components/Badges'
 import { formatInstant } from '../../utils/datetime'
 import styles from './RestrictionCard.module.css'
 
@@ -11,20 +12,13 @@ import styles from './RestrictionCard.module.css'
  * (00-product.md — ADVISORY vs HARD_FREEZE).
  */
 export function RestrictionCard({ restriction }: { restriction: RestrictionSummary }) {
-  const blocking = restriction.level === 'HARD_FREEZE'
-
   return (
     <li className={styles.card}>
       <div className={styles.header}>
         <Link className={styles.name} to={`/restrictions/${restriction.id}`}>
           {restriction.name}
         </Link>
-        <span
-          className={blocking ? styles.levelBlocking : styles.levelAdvisory}
-          title={blocking ? 'Deployments are blocked' : 'Deployments are allowed, with a warning'}
-        >
-          {blocking ? 'Blocks deploys' : 'Advisory'}
-        </span>
+        <LevelBadge level={restriction.level} />
       </div>
 
       <p className={styles.reason}>{restriction.reason}</p>

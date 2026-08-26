@@ -16,6 +16,12 @@ export function AppLayout() {
           >
             Dashboard
           </NavLink>
+          <NavLink
+            to="/restrictions"
+            className={({ isActive }) => (isActive ? styles.linkActive : styles.link)}
+          >
+            Restrictions
+          </NavLink>
         </nav>
         <button className={styles.signOut} type="button" onClick={signOut}>
           Sign out

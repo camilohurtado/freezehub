@@ -4,6 +4,7 @@ import { NotFoundPage } from './NotFoundPage'
 import { RequireAuth } from '../features/auth/RequireAuth'
 import { SignInPage } from '../features/auth/SignInPage'
 import { DashboardPage } from '../features/dashboard/DashboardPage'
+import { RestrictionsPage } from '../features/restrictions/RestrictionsPage'
 
 /**
  * MVP routes per 05-frontend.md. Routes arrive with the story that builds their page:
@@ -21,6 +22,7 @@ export const routes = [
     children: [
       { index: true, element: <Navigate to="/dashboard" replace /> },
       { path: 'dashboard', element: <DashboardPage /> },
+      { path: 'restrictions', element: <RestrictionsPage /> },
     ],
   },
   { path: '*', element: <NotFoundPage /> },
