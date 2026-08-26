@@ -10,6 +10,13 @@ spring:
   jpa:
     open-in-view: false
 
+freezehub:
+  lifecycle:
+    # Reconciles restriction status against the wall clock (FZ-025). The persisted
+    # timestamps stay authoritative; this only keeps the stored status in step with them.
+    enabled: true
+    interval: PT1M
+
 management:
   endpoints:
     web:

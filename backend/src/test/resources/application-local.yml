@@ -1,0 +1,11 @@
+# Test-only overlay for the "local" profile every integration test activates.
+#
+# Spring merges this with the base src/main/resources/application.yml rather than
+# replacing it, so datasource/Liquibase configuration still applies.
+#
+# The lifecycle trigger is switched off so the suite is never racing a background job
+# that mutates restriction rows underneath it. The reconciliation logic itself is tested
+# directly against an explicit clock in RestrictionLifecycleTest, which is deterministic.
+freezehub:
+  lifecycle:
+    enabled: false

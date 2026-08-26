@@ -32,6 +32,16 @@ POST /api/restrictions
 
 Scope matching semantics — OR within a dimension, AND across dimensions, an empty dimension acting as a wildcard — are specified in `../docs/01-domain.md`. `FZ-020` only persists scope; evaluation is `FZ-051`.
 
+## Restriction lifecycle (`FZ-025`)
+
+`SCHEDULED → ACTIVE → COMPLETED` is applied by **reconciliation**, not by a timer holding state: `RestrictionLifecycleService.reconcile(now)` corrects stored statuses from the persisted timestamps with two set-based updates, so it is idempotent and self-healing after any outage. `CANCELLED` matches neither query, which is what makes cancellation prevent future activation.
+
+It runs on startup (`ApplicationReadyEvent`, so a restart catches up immediately rather than waiting for a tick) and then every `freezehub.lifecycle.interval` (default `PT1M`). Set `freezehub.lifecycle.enabled=false` to disable — the test suite does, so it never races the job.
+
+A restriction whose whole window elapsed while the process was down goes straight to `COMPLETED`; it did elapse, and leaving it `SCHEDULED` would be wrong.
+
+> **For policy evaluation (`FZ-051`):** the `status` column is a materialised convenience and may lag by up to one interval. Evaluate from `startsAt`/`endsAt` plus "not `CANCELLED`" — trusting `status` alone could allow a deployment during a freeze whose activation tick had not yet run.
+
 **Known gap:** the scope tables reference catalog rows with non-cascading foreign keys, so the database refuses to delete a team/application/environment that a restriction references — deliberately, since cascading would silently shrink a restriction's scope. That refusal isn't yet translated to HTTP, so deleting a **referenced** catalog resource currently returns `500` instead of `409`. The delete is genuinely refused and the data stays correct; only the status code is wrong. See `FZ-020` in `../docs/08-backlog.md`.
 
 ## Quick start
