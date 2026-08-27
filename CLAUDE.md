@@ -15,7 +15,8 @@ Before implementing any feature:
 3. Read `docs/01-domain.md`.
 4. Read `docs/02-architecture.md`.
 5. Read the requested item in `docs/08-backlog.md`.
-6. Inspect the existing implementation before changing it.
+6. Check `docs/09-open-issues.md` for known defects and deferred decisions touching the area.
+7. Inspect the existing implementation before changing it.
 
 Do not invent business rules.
 
@@ -111,7 +112,8 @@ freezhub/
 │   ├── 00-product.md
 │   ├── 01-domain.md
 │   ├── 02-architecture.md
-│   └── 08-backlog.md
+│   ├── 08-backlog.md
+│   └── 09-open-issues.md   # known defects, gaps and deferred decisions
 ├── backend/
 ├── frontend/
 ├── infra/

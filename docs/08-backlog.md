@@ -384,8 +384,8 @@ Enqueue points: creation → `SCHEDULED`, cancellation → `CANCELLED`, and the 
 **Known gaps:**
 
 1. **No API or UI configures integrations** — now tracked as `FZ-045`, which runs before `FZ-041`.
-2. **The "restriction starting soon" notification from `00-product.md` is not implemented.** It needs a lead-time decision no document makes (how soon is "soon"), and unlike every other event it is triggered by the passage of time rather than by a transition. Needs a decision plus a story.
-3. **A Slack webhook URL is a credential**, and `integration.config` stores it in the database as plain text. Acceptable for local development; worth revisiting against `06-security.md`'s Secrets Manager posture before beta.
+2. **The "restriction starting soon" notification is not implemented** — `OI-3`, owned by `FZ-047`.
+3. **Destination credentials are stored in plain text** — `OI-4`, needs a decision before beta.
 
 ### FZ-045 — Integration Configuration
 **Status:** DONE
@@ -430,7 +430,7 @@ Verified end to end against a real HTTP receiver, not only mocks — creating a 
 `{"text":"Deployment freeze scheduled: Black Friday Freeze\nReason: …\nWindow: 27 Nov 2027 14:00 to 2 Dec 2027 09:30 UTC"}`,
 and the notification moved to `SENT` with `sent_at` set.
 
-**Known gap — retry is unbounded until `FZ-044`.** A failed delivery stays `PENDING` and is retried on *every* dispatch pass, for ever. Measured live: a destination that could not be reached reached `attempts=3` within about twelve seconds at a five-second interval. Against a permanently dead endpoint this is a hot loop that will fill logs and hammer the destination. `FZ-044` must add bounded attempts and backoff, and decide when a notification becomes `FAILED`.
+**Known gap — retry is unbounded.** Tracked as `OI-1` in `09-open-issues.md`, owned by `FZ-044`. A failed delivery stays `PENDING` and is retried on every dispatch pass, for ever; measured live at `attempts=3` within about twelve seconds at a five-second interval.
 
 ### FZ-042 — Email Notifications
 **Status:** TODO
@@ -446,6 +446,34 @@ Deliver machine-readable lifecycle events to configured webhook endpoints.
 **Status:** TODO
 
 Implement bounded retry and observable failure state.
+
+**Fixes `OI-1`** (`09-open-issues.md`): today a failed delivery stays `PENDING` and is retried on every dispatch pass for ever. Measured during `FZ-041` — an unreachable destination reached `attempts=3` in about twelve seconds at a five-second interval.
+
+Acceptance:
+
+- A notification is attempted at most a bounded number of times, then becomes `FAILED` and is not attempted again.
+- Attempts are spaced by a backoff, so a dead destination is not hit on every pass. This needs a `next_attempt_at` column — the current schema has no way to say "not yet", so the dispatcher cannot skip a row without either losing it or spinning on it.
+- `FAILED` is observable: the reason is retained in `last_error`, and it is possible to see that an announcement was never delivered. A silently undelivered freeze notice is the failure mode that matters — engineers deploy believing nothing is frozen.
+- Retry state is per notification, not per event, since the outbox is already per destination.
+- A transient failure followed by a success still ends `SENT`, with the earlier error no longer presented as current.
+
+### FZ-046 — Cognito Identity Provider
+**Status:** TODO
+
+**Fixes `OI-2`.** Implements the real `AdminCreateUser` path behind the existing `IdentityProvider` port, so inviting a user works outside the `local` profile.
+
+Until this exists the backend **cannot start at all** without the `local` profile, because no `IdentityProvider` bean is defined — deliberate fail-fast (`FZ-016`), but it blocks any deployed environment.
+
+Depends on a Cognito user pool existing, so sequence with `FZ-063`. Acceptance: an implementation selected outside the `local` profile, configured per environment rather than hardcoded, that creates the identity and returns its `sub`; failures surface as a clear error rather than a half-created user.
+
+### FZ-047 — "Starting Soon" Notification
+**Status:** TODO
+
+**Fixes `OI-3`.** `00-product.md` lists a "restriction starting soon" notification; nothing implements it.
+
+**Blocked on a product decision:** how soon is "soon", and is the lead time fixed, per organization, or per restriction? No document says.
+
+It also differs structurally from every other lifecycle event — it is triggered by the passage of time rather than by a state transition, so a scheduled check writes the outbox rather than a domain change doing so. That check must be idempotent in the same way the lifecycle reconciler is, or a restriction would be announced as "starting soon" on every pass.
 
 ## Milestone 5 — Policy Enforcement
 
