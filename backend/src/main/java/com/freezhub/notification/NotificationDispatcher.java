@@ -1,5 +1,6 @@
 package com.freezhub.notification;
 
+import java.time.Instant;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,13 +36,19 @@ public class NotificationDispatcher {
     }
 
     public DispatchResult dispatchPending() {
-        List<Notification> pending = notificationRepository.findAllByStatusOrderByIdAsc(
-                NotificationStatus.PENDING, Limit.of(BATCH_SIZE));
+        return dispatchPending(Instant.now());
+    }
+
+    /** Explicit clock so retry scheduling can be tested without waiting for real time. */
+    public DispatchResult dispatchPending(Instant now) {
+        List<Notification> pending =
+                notificationRepository.findAllByStatusAndNextAttemptAtLessThanEqualOrderByIdAsc(
+                        NotificationStatus.PENDING, now, Limit.of(BATCH_SIZE));
 
         int sent = 0;
         int failed = 0;
         for (Notification notification : pending) {
-            if (notificationDelivery.deliver(notification.getId())) {
+            if (notificationDelivery.deliver(notification.getId(), now)) {
                 sent += 1;
             } else {
                 failed += 1;

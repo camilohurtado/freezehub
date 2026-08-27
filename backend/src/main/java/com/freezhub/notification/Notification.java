@@ -64,6 +64,10 @@ public class Notification {
     @Column(name = "sent_at")
     private Instant sentAt;
 
+    /** When this becomes eligible again. The dispatcher will not touch it before then. */
+    @Column(name = "next_attempt_at", nullable = false)
+    private Instant nextAttemptAt;
+
     protected Notification() {
     }
 
@@ -75,9 +79,15 @@ public class Notification {
         this.event = event;
         this.status = NotificationStatus.PENDING;
         this.attempts = 0;
+        this.nextAttemptAt = Instant.now();
     }
 
-    /** Recorded as delivered. Called by the channel adapters (FZ-041 onwards). */
+    /**
+     * Recorded as delivered.
+     *
+     * <p>Clears {@code lastError}: a notification that eventually succeeded must not keep
+     * presenting an earlier transient failure as if it were the current state.
+     */
     public void markSent() {
         this.status = NotificationStatus.SENT;
         this.sentAt = Instant.now();
@@ -86,12 +96,40 @@ public class Notification {
     }
 
     /**
-     * Records a failed attempt. Stays PENDING so it remains eligible for retry; FZ-044
-     * decides when a row is abandoned as FAILED.
+     * Records a failed attempt and decides what happens next (FZ-044).
+     *
+     * <p>Either schedules the next attempt after a backoff, or — once the attempts are
+     * exhausted — abandons the notification as {@code FAILED}. Before this existed a
+     * failure left the row immediately eligible again, so an unreachable destination was
+     * retried on every dispatch pass for ever (`OI-1`).
+     *
+     * <p>The error is retained in both cases: on a {@code FAILED} row it is the only
+     * record of why an announcement never arrived.
      */
-    public void markAttemptFailed(String error) {
+    public void markAttemptFailed(String error, Instant now) {
         this.attempts += 1;
         this.lastError = error;
+
+        if (RetryPolicy.isExhausted(this.attempts)) {
+            this.status = NotificationStatus.FAILED;
+        } else {
+            this.nextAttemptAt = RetryPolicy.nextAttemptAfter(this.attempts, now);
+        }
+    }
+
+    /**
+     * Abandons a notification without consuming an attempt, for failures retrying cannot
+     * fix — a deleted destination, or a channel whose adapter does not exist.
+     */
+    public void abandon(String reason) {
+        this.status = NotificationStatus.FAILED;
+        this.lastError = reason;
+    }
+
+    /** Puts a notification back in the queue after a transient, non-delivery condition. */
+    public void deferUntil(String reason, Instant when) {
+        this.lastError = reason;
+        this.nextAttemptAt = when;
     }
 
     @PrePersist
@@ -144,6 +182,10 @@ public class Notification {
 
     public Instant getSentAt() {
         return sentAt;
+    }
+
+    public Instant getNextAttemptAt() {
+        return nextAttemptAt;
     }
 
 }

@@ -1,0 +1,31 @@
+databaseChangeLog:
+  - changeSet:
+      id: 012-notification-retry
+      author: freezehub
+      changes:
+        # Without this the dispatcher has no way to express "not yet": every PENDING row
+        # is eligible on every pass, which is what made retry an unbounded hot loop
+        # (OI-1). Existing rows become immediately eligible, which is correct - they were
+        # already being attempted every pass.
+        - addColumn:
+            tableName: notification
+            columns:
+              - column:
+                  name: next_attempt_at
+                  type: timestamptz
+                  defaultValueComputed: now()
+                  constraints:
+                    nullable: false
+        # Replaces idx_notification_status_id: the dispatcher now selects on
+        # (status, next_attempt_at), so ordering by id alone no longer matches the query.
+        - createIndex:
+            tableName: notification
+            indexName: idx_notification_status_next_attempt
+            columns:
+              - column:
+                  name: status
+              - column:
+                  name: next_attempt_at
+        - dropIndex:
+            tableName: notification
+            indexName: idx_notification_status_id

@@ -5,6 +5,7 @@ import com.freezhub.integration.IntegrationRepository;
 import com.freezhub.integration.IntegrationType;
 import com.freezhub.restriction.ChangeRestriction;
 import com.freezhub.restriction.ChangeRestrictionRepository;
+import java.time.Instant;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
@@ -56,7 +57,7 @@ public class NotificationDelivery {
      * @return true if it was delivered
      */
     @Transactional
-    public boolean deliver(Long notificationId) {
+    public boolean deliver(Long notificationId, Instant now) {
         Optional<Notification> found = notificationRepository.findById(notificationId);
         if (found.isEmpty()) {
             return false;
@@ -71,23 +72,28 @@ public class NotificationDelivery {
                 changeRestrictionRepository.findById(notification.getRestrictionId());
 
         if (destination.isEmpty() || restriction.isEmpty()) {
-            // Both cascade on delete, so this means a concurrent removal: nothing to send.
-            notification.markAttemptFailed("Destination or restriction no longer exists");
+            // Both cascade on delete, so this means a concurrent removal. Retrying cannot
+            // fix that, so it is abandoned rather than left to burn attempts.
+            notification.abandon("Destination or restriction no longer exists");
             return false;
         }
 
         if (!destination.get().isEnabled()) {
-            // Disabled after this was queued. Honour the current intent rather than
-            // announcing to a destination the organization has switched off.
-            notification.markAttemptFailed("Destination is disabled");
+            // Disabled after this was queued. Honour the current intent, but do not spend
+            // an attempt on it: the organization may re-enable the destination, and this
+            // is not a delivery failure.
+            notification.deferUntil("Destination is disabled",
+                    RetryPolicy.nextAttemptAfter(0, now));
             return false;
         }
 
         NotificationSender sender = sendersByType.get(destination.get().getType());
         if (sender == null) {
-            // A channel whose adapter is not built yet (FZ-042, FZ-043). Left PENDING so it
-            // delivers when that story lands rather than being lost.
-            notification.markAttemptFailed("No sender for channel " + destination.get().getType() + " yet");
+            // A channel whose adapter is not built yet (FZ-042, FZ-043). Deferred rather
+            // than failed: it must deliver once that story lands, and it must not consume
+            // attempts in the meantime.
+            notification.deferUntil("No sender for channel " + destination.get().getType() + " yet",
+                    RetryPolicy.nextAttemptAfter(0, now));
             return false;
         }
 
@@ -96,7 +102,7 @@ public class NotificationDelivery {
             notification.markSent();
             return true;
         } catch (RuntimeException failure) {
-            notification.markAttemptFailed(failure.getMessage());
+            notification.markAttemptFailed(failure.getMessage(), now);
             log.warn("Notification {} to {} failed (attempt {}): {}",
                     notification.getId(), destination.get().getType(),
                     notification.getAttempts(), failure.getMessage());
