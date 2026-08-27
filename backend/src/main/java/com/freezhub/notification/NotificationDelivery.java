@@ -89,10 +89,11 @@ public class NotificationDelivery {
 
         NotificationSender sender = sendersByType.get(destination.get().getType());
         if (sender == null) {
-            // A channel whose adapter is not built yet (FZ-042, FZ-043). Deferred rather
-            // than failed: it must deliver once that story lands, and it must not consume
-            // attempts in the meantime.
-            notification.deferUntil("No sender for channel " + destination.get().getType() + " yet",
+            // Either the channel adapter does not exist yet (FZ-043) or it exists but is
+            // unconfigured (email with no from-address). Both are configuration gaps, not
+            // delivery failures, so they defer without consuming a retry attempt.
+            notification.deferUntil(
+                    "No sender configured for channel " + destination.get().getType(),
                     RetryPolicy.nextAttemptAfter(0, now));
             return false;
         }

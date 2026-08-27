@@ -21,10 +21,16 @@ freezehub:
     enabled: true
     interval: PT1M
   notifications:
-    # Drains the notification outbox (FZ-041). Delivery is at-least-once by design;
-    # bounded retry and backoff are FZ-044.
+    # Drains the notification outbox (FZ-041). Bounded retry and backoff are FZ-044.
     enabled: true
     interval: PT30S
+    # freezehub.notifications.email.from is deliberately NOT declared here. The email
+    # sender is @ConditionalOnProperty on it, and an empty value would count as present —
+    # registering a sender with a blank from-address. Absent means absent: EMAIL
+    # notifications then defer instead of failing.
+    #
+    # To enable email, set FREEZEHUB_NOTIFICATIONS_EMAIL_FROM plus spring.mail.* (SES
+    # exposes an SMTP endpoint, so the same configuration works locally and deployed).
 
 management:
   endpoints:
