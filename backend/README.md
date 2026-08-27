@@ -54,7 +54,28 @@ Destinations are configured through `/api/integrations` (`FZ-045`, ADMINISTRATOR
 
 **Delivery** (`FZ-041`): `NotificationDispatcher` drains pending rows on a timer (`freezehub.notifications.interval`, default `PT30S`; set `freezehub.notifications.enabled=false` to disable, as the tests do). Each notification is delivered in its own transaction by `NotificationDelivery` — a separate bean because Spring's proxy-based transactions do not apply to a self-invoked `@Transactional` method — so one failing destination cannot roll back deliveries that succeeded beside it.
 
-Channels implement `NotificationSender`. Slack (`FZ-041`) and email (`FZ-042`) are built; the generic webhook (`FZ-043`) is not, and its notifications defer until that adapter exists rather than being lost.
+Channels implement `NotificationSender`: Slack (`FZ-041`), email (`FZ-042`) and generic webhook (`FZ-043`). A channel with no usable sender — email with no from-address, say — defers its notifications indefinitely rather than losing them, and without consuming retry attempts.
+
+**Webhook payload** (`FZ-043`) — a versioned contract, since customer software parses it:
+
+```jsonc
+// POST <configured url>   header: X-FreezeHub-Event: ACTIVATED
+{
+  "version": 1,
+  "event": "ACTIVATED",
+  "occurredAt": "2026-11-27T14:00:00.123Z",
+  "restriction": {
+    "id": 23, "name": "Black Friday Freeze", "description": "Peak trading",
+    "reason": "Revenue-critical period", "type": "DEPLOYMENT_FREEZE",
+    "level": "HARD_FREEZE", "status": "ACTIVE",
+    "startsAt": "2028-11-27T14:00:00Z", "endsAt": "2028-12-02T09:30:00Z"
+  }
+}
+```
+
+Scope is intentionally not included: deciding whether a given deployment is affected is the Policy API's job (`FZ-051`), and a consumer re-implementing those rules would drift from them. Treat this event as "something changed, re-check", not as an authorization answer.
+
+> **Webhook requests are not signed** — a receiver cannot currently verify a request came from FreezeHub (`OI-7`).
 
 **Email** requires `FREEZEHUB_NOTIFICATIONS_EMAIL_FROM` plus `spring.mail.*`. Without a from-address the sender is not registered at all and EMAIL notifications defer. SES exposes an SMTP endpoint, so the same settings work locally and when deployed. For local development:
 

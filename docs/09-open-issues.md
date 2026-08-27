@@ -38,6 +38,17 @@ Depends on a Cognito user pool existing (`FZ-063`), so the adapter and that infr
 
 Needs the lead-time decision before it can be specified.
 
+### OI-7 — Webhook deliveries are not authenticated
+**Severity:** Decision · **Owner:** needs a decision, then a story · **Found in:** `FZ-043`
+
+A receiver has no way to verify that a webhook request actually came from FreezeHub. Anyone who learns or guesses a customer's endpoint can post a forged event to it — and a forged `CANCELLED` telling an automated consumer that a freeze has been lifted is exactly the event worth forging.
+
+Standard remedies are an HMAC signature over the body with a per-integration shared secret, or requiring the customer's endpoint to carry its own token. Neither is specified anywhere: `00-product.md` lists the webhook channel, and `06-security.md` covers FreezeHub's *inbound* authentication but says nothing about authenticating what FreezeHub *sends*.
+
+Partly mitigated by the endpoint URL being secret-ish in practice (usually carrying a token in its path or query), which is why the URL is kept out of logs and `last_error` — but obscurity of the URL is not authentication of the request.
+
+Not fixed in `FZ-043` because inventing a signing scheme would have been inventing a requirement. It should be decided before a customer relies on webhook events for automation.
+
 ### OI-4 — Destination credentials are stored in plain text
 **Severity:** Decision · **Owner:** needs a decision, then a story · **Found in:** `FZ-040`, `FZ-045`
 
