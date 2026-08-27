@@ -1,13 +1,23 @@
 package com.freezhub.notification;
 
+import java.time.Instant;
 import java.util.List;
 import org.springframework.data.domain.Limit;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface NotificationRepository extends JpaRepository<Notification, Long> {
 
-    /** Oldest first, so a backlog drains in the order events happened. */
-    List<Notification> findAllByStatusOrderByIdAsc(NotificationStatus status, Limit limit);
+    /**
+     * Notifications due for an attempt now.
+     *
+     * <p>The {@code nextAttemptAt} filter is what bounds retry (FZ-044): without it every
+     * PENDING row was eligible on every pass, so a failing destination was hammered
+     * continuously (`OI-1`).
+     *
+     * <p>Oldest first, so a backlog drains in the order events happened.
+     */
+    List<Notification> findAllByStatusAndNextAttemptAtLessThanEqualOrderByIdAsc(
+            NotificationStatus status, Instant dueBy, Limit limit);
 
     List<Notification> findAllByRestrictionIdOrderByIdAsc(Long restrictionId);
 

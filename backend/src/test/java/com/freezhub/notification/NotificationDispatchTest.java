@@ -14,6 +14,7 @@ import com.freezhub.organization.UserRole;
 import com.freezhub.restriction.ChangeRestriction;
 import com.freezhub.restriction.ChangeRestrictionRepository;
 import com.freezhub.restriction.RestrictionLevel;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Set;
@@ -172,6 +173,66 @@ class NotificationDispatchTest {
         Notification skipped = notificationFor(fixture);
         assertThat(skipped.getStatus()).isEqualTo(NotificationStatus.PENDING);
         assertThat(skipped.getLastError()).contains("disabled");
+        // Being switched off is not a delivery failure, so it costs no attempt: the
+        // organization may re-enable the destination.
+        assertThat(skipped.getAttempts()).isZero();
+    }
+
+    @Test
+    void doesNotRetryAFailedDeliveryOnTheVeryNextPass() {
+        // The defect this story fixes (OI-1): a failing destination used to be attempted
+        // again on every single pass, for ever.
+        Fixture fixture = given(IntegrationType.EMAIL);
+        emailSender.failFor(fixture.restrictionId(), "temporary outage");
+        Instant now = Instant.now();
+
+        notificationDispatcher.dispatchPending(now);
+        assertThat(notificationFor(fixture).getAttempts()).isEqualTo(1);
+
+        // A pass moments later must leave it alone.
+        notificationDispatcher.dispatchPending(now.plusSeconds(1));
+        assertThat(notificationFor(fixture).getAttempts()).isEqualTo(1);
+
+        // Once the backoff has elapsed it becomes eligible again.
+        notificationDispatcher.dispatchPending(now.plus(Duration.ofMinutes(1)));
+        assertThat(notificationFor(fixture).getAttempts()).isEqualTo(2);
+    }
+
+    @Test
+    void givesUpAfterTheAttemptLimitAndSaysWhy() {
+        // A permanently undeliverable announcement must become visibly FAILED rather than
+        // being retried indefinitely — otherwise nobody learns it never arrived.
+        Fixture fixture = given(IntegrationType.EMAIL);
+        emailSender.failFor(fixture.restrictionId(), "destination is gone");
+        Instant now = Instant.now();
+
+        for (int pass = 0; pass < RetryPolicy.MAX_ATTEMPTS + 2; pass++) {
+            // Each pass well past any backoff, so attempts are what limits it, not time.
+            notificationDispatcher.dispatchPending(now.plus(Duration.ofHours(pass + 1)));
+        }
+
+        Notification abandoned = notificationFor(fixture);
+        assertThat(abandoned.getStatus()).isEqualTo(NotificationStatus.FAILED);
+        assertThat(abandoned.getAttempts()).isEqualTo(RetryPolicy.MAX_ATTEMPTS);
+        assertThat(abandoned.getLastError()).contains("destination is gone");
+    }
+
+    @Test
+    void aTransientFailureFollowedBySuccessEndsSentWithNoStaleError() {
+        // The earlier error must not linger as though it were the current state.
+        Fixture fixture = given(IntegrationType.EMAIL);
+        emailSender.failFor(fixture.restrictionId(), "blip");
+        Instant now = Instant.now();
+
+        notificationDispatcher.dispatchPending(now);
+        assertThat(notificationFor(fixture).getLastError()).contains("blip");
+
+        emailSender.succeedFor(fixture.restrictionId());
+        notificationDispatcher.dispatchPending(now.plus(Duration.ofMinutes(1)));
+
+        Notification delivered = notificationFor(fixture);
+        assertThat(delivered.getStatus()).isEqualTo(NotificationStatus.SENT);
+        assertThat(delivered.getLastError()).isNull();
     }
 
     @Test
@@ -185,6 +246,9 @@ class NotificationDispatchTest {
         Notification waiting = notificationFor(fixture);
         assertThat(waiting.getStatus()).isEqualTo(NotificationStatus.PENDING);
         assertThat(waiting.getLastError()).contains("No sender for channel WEBHOOK");
+        // Deferred, not attempted: waiting for FZ-043 must not consume its retry budget
+        // and abandon it before that adapter ever exists.
+        assertThat(waiting.getAttempts()).isZero();
     }
 
     @Test

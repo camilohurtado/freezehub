@@ -58,7 +58,7 @@ Channels implement `NotificationSender`. Slack is built; email (`FZ-042`) and we
 
 > **Diagnosing a missing announcement:** read `notification.status`, `attempts` and `last_error`. Note that `last_error` deliberately never quotes a destination URL — a Slack webhook URL is a bearer credential.
 
-> **Retry is currently unbounded** — a failing notification is retried on every pass for ever. Bounded attempts and backoff are `FZ-044`.
+**Retry** (`FZ-044`): a failed delivery backs off (30 s doubling to a 15 min cap) via `next_attempt_at`, and becomes terminal `FAILED` after six attempts. A deleted destination is abandoned immediately; a disabled destination, or a channel whose adapter is not built yet, is deferred **without** consuming an attempt.
 
 ## Error responses
 

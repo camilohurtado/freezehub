@@ -22,15 +22,6 @@ Severity is about consequence if it reaches beta, not effort:
 
 ## Open
 
-### OI-1 — Notification retry is unbounded
-**Severity:** Defect · **Owner:** `FZ-044` · **Found in:** `FZ-041`
-
-A failed delivery stays `PENDING` and is retried on **every** dispatch pass, indefinitely. There is no attempt limit, no backoff, and nothing ever moves a notification to `FAILED`.
-
-Measured live during `FZ-041`: an unreachable destination reached `attempts=3` in about twelve seconds at a five-second interval. Against a permanently dead endpoint this is a hot loop that hammers the destination and floods the logs, and a genuinely undeliverable notification is never visibly given up on — so nobody learns that an announcement never arrived.
-
-Resolved by bounded attempts, backoff between them, and a terminal `FAILED` state that is observable.
-
 ### OI-2 — No real Cognito identity provider
 **Severity:** Gap · **Owner:** needs a story · **Found in:** `FZ-016`
 
@@ -77,5 +68,6 @@ Each is currently recorded only in the backlog entry of the story that made it, 
 | No API or UI configured notification destinations | `FZ-040` | `FZ-045` |
 | No UI created catalog data, so the create-restriction form had nothing to scope to | `FZ-030` | `FZ-036` |
 | No way to obtain a token in development before a Cognito pool exists | `FZ-030` | `FZ-035` |
+| **Notification retry was unbounded** — a failed delivery was retried on every dispatch pass for ever, with no attempt limit, no backoff and no terminal state | `FZ-041` | `FZ-044` |
 | CORS was absent, so every browser request failed preflight with `401` | `FZ-031` | `FZ-031` |
 | Testing Library's DOM cleanup never registered, leaking rendered DOM between tests | `FZ-031` | `FZ-031` |

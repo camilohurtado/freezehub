@@ -443,7 +443,17 @@ Deliver selected lifecycle notifications by email.
 Deliver machine-readable lifecycle events to configured webhook endpoints.
 
 ### FZ-044 — Notification Retry
-**Status:** TODO
+**Status:** DONE
+
+**Fixed `OI-1`.** Verified by re-running the exact scenario that exposed it, with a *harsher* dispatch interval: previously a dead destination reached `attempts=3` in ~12 s at a 5 s interval; now it reaches `attempts=1` in 20 s at a **2 s** interval, with the next attempt scheduled 41 s out.
+
+- `notification.next_attempt_at` (migration `012`) is what makes "not yet" expressible — without it every `PENDING` row was eligible on every pass, which *was* the defect. The dispatcher now selects on `(status, next_attempt_at)`, and the index was changed to match.
+- `RetryPolicy` is standalone and static so the schedule is asserted directly rather than by waiting: 30 s doubling to a 15 min cap, six attempts, then terminal `FAILED`. The cap exists because unbounded doubling eventually means "never"; the limit exists so an undeliverable announcement is visibly given up on — nobody learns an announcement never arrived if it retries for ever.
+- **Failures are separated by kind**, which the original code conflated:
+  - *delivery failed* — consumes an attempt, backs off, eventually `FAILED`;
+  - *destination or restriction deleted* — `abandon()`, terminal immediately, since retrying cannot fix it;
+  - *destination disabled*, or *channel adapter not built yet* (`FZ-042`/`FZ-043`) — `deferUntil()`, **no attempt consumed**. A webhook notification must not exhaust its retry budget waiting for an adapter that does not exist yet, and being switched off is not a delivery failure.
+- A transient failure followed by success ends `SENT` with `lastError` cleared, so a stale error is never presented as the current state.
 
 Implement bounded retry and observable failure state.
 
