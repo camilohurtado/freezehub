@@ -235,21 +235,8 @@ class NotificationDispatchTest {
         assertThat(delivered.getLastError()).isNull();
     }
 
-    @Test
-    void leavesAChannelWithNoAdapterPendingRatherThanLosingIt() {
-        // The webhook adapter is FZ-043; its notifications must wait for that story rather
-        // than being marked delivered or discarded.
-        Fixture fixture = given(IntegrationType.WEBHOOK);
-
-        notificationDispatcher.dispatchPending();
-
-        Notification waiting = notificationFor(fixture);
-        assertThat(waiting.getStatus()).isEqualTo(NotificationStatus.PENDING);
-        assertThat(waiting.getLastError()).contains("No sender configured for channel WEBHOOK");
-        // Deferred, not attempted: waiting for FZ-043 must not consume its retry budget
-        // and abandon it before that adapter ever exists.
-        assertThat(waiting.getAttempts()).isZero();
-    }
+    // The "channel with no sender" case moved to UnconfiguredEmailTest: every channel now
+    // has an adapter, so the realistic version of it is email without a from-address.
 
     @Test
     void doesNotResendAnAlreadyDeliveredNotification() {
