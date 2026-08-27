@@ -9,3 +9,5 @@
 freezehub:
   lifecycle:
     enabled: false
+  notifications:
+    enabled: false

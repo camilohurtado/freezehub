@@ -414,9 +414,23 @@ Acceptance:
 - A Settings area in the UI covering the same operations.
 
 ### FZ-041 — Slack Notifications
-**Status:** TODO
+**Status:** DONE
 
 Deliver selected restriction lifecycle notifications to Slack.
+
+A `NotificationSender` port (the same shape as `IdentityProvider`) plus `SlackNotificationSender`, drained by `NotificationDispatcher` on a timer (`freezehub.notifications.interval`, default `PT30S`, disabled in tests). Email (`FZ-042`) and webhook (`FZ-043`) arrive as new senders without touching the dispatcher; a channel with no adapter yet leaves its notification `PENDING` rather than marking it delivered or discarding it.
+
+**Delivery is one notification per transaction**, in a bean of its own (`NotificationDelivery`). That separation is load-bearing rather than stylistic: Spring's transactions are proxy-based, so a `@Transactional` method called from another method of the *same* bean is not intercepted at all — the first draft had exactly that bug, and it would have run the whole batch with no per-notification transaction and nothing to show for it. Per-notification transactions are also what stop one failing destination rolling back deliveries that succeeded alongside it.
+
+**A destination credential never reaches `last_error`.** That column is read by whoever is diagnosing a missing announcement, and most HTTP client exceptions include the request URI by default — which for Slack *is* the credential. The sender raises its own exception type carrying a description instead. Verified live: a genuine connection failure recorded `Slack rejected or could not be reached: ResourceAccessException`, with no URL in it.
+
+Announcement wording lives in `NotificationMessage`, separate from any channel so every channel says the same thing and the wording can be asserted without sending anything. Times are rendered **in UTC and labelled**: a freeze announcement reaches a distributed audience with no shared local zone.
+
+Verified end to end against a real HTTP receiver, not only mocks — creating a restriction produced an actual POST carrying
+`{"text":"Deployment freeze scheduled: Black Friday Freeze\nReason: …\nWindow: 27 Nov 2027 14:00 to 2 Dec 2027 09:30 UTC"}`,
+and the notification moved to `SENT` with `sent_at` set.
+
+**Known gap — retry is unbounded until `FZ-044`.** A failed delivery stays `PENDING` and is retried on *every* dispatch pass, for ever. Measured live: a destination that could not be reached reached `attempts=3` within about twelve seconds at a five-second interval. Against a permanently dead endpoint this is a hot loop that will fill logs and hammer the destination. `FZ-044` must add bounded attempts and backoff, and decide when a notification becomes `FAILED`.
 
 ### FZ-042 — Email Notifications
 **Status:** TODO

@@ -20,6 +20,11 @@ freezehub:
     # timestamps stay authoritative; this only keeps the stored status in step with them.
     enabled: true
     interval: PT1M
+  notifications:
+    # Drains the notification outbox (FZ-041). Delivery is at-least-once by design;
+    # bounded retry and backoff are FZ-044.
+    enabled: true
+    interval: PT30S
 
 management:
   endpoints:

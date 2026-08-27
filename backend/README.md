@@ -50,7 +50,15 @@ Lifecycle events are recorded in a database-backed **outbox** (`notification`) r
 
 The row is written **in the same transaction as the domain change**, which is what makes the intent survive a crash between "restriction activated" and "notification queued". `NotificationOutbox.enqueue` is `Propagation.MANDATORY` so it cannot accidentally be called outside one. Enqueueing is idempotent — the service checks, and a unique constraint on `(restriction, integration, event)` guarantees it — because the lifecycle reconciler is itself idempotent and runs on a timer.
 
-**Nothing sends anything yet:** the channel adapters are `FZ-041`–`FZ-043` and the retry policy is `FZ-044`. Destinations are configured through `/api/integrations` (`FZ-045`, ADMINISTRATOR-only) — a stored credential is never read back, only a summary that identifies the destination.
+Destinations are configured through `/api/integrations` (`FZ-045`, ADMINISTRATOR-only) — a stored credential is never read back, only a summary that identifies the destination.
+
+**Delivery** (`FZ-041`): `NotificationDispatcher` drains pending rows on a timer (`freezehub.notifications.interval`, default `PT30S`; set `freezehub.notifications.enabled=false` to disable, as the tests do). Each notification is delivered in its own transaction by `NotificationDelivery` — a separate bean because Spring's proxy-based transactions do not apply to a self-invoked `@Transactional` method — so one failing destination cannot roll back deliveries that succeeded beside it.
+
+Channels implement `NotificationSender`. Slack is built; email (`FZ-042`) and webhook (`FZ-043`) are not, and their notifications stay `PENDING` until those adapters exist rather than being lost.
+
+> **Diagnosing a missing announcement:** read `notification.status`, `attempts` and `last_error`. Note that `last_error` deliberately never quotes a destination URL — a Slack webhook URL is a bearer credential.
+
+> **Retry is currently unbounded** — a failing notification is retried on every pass for ever. Bounded attempts and backoff are `FZ-044`.
 
 ## Error responses
 
