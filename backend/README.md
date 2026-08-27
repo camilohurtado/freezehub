@@ -54,7 +54,17 @@ Destinations are configured through `/api/integrations` (`FZ-045`, ADMINISTRATOR
 
 **Delivery** (`FZ-041`): `NotificationDispatcher` drains pending rows on a timer (`freezehub.notifications.interval`, default `PT30S`; set `freezehub.notifications.enabled=false` to disable, as the tests do). Each notification is delivered in its own transaction by `NotificationDelivery` — a separate bean because Spring's proxy-based transactions do not apply to a self-invoked `@Transactional` method — so one failing destination cannot roll back deliveries that succeeded beside it.
 
-Channels implement `NotificationSender`. Slack is built; email (`FZ-042`) and webhook (`FZ-043`) are not, and their notifications stay `PENDING` until those adapters exist rather than being lost.
+Channels implement `NotificationSender`. Slack (`FZ-041`) and email (`FZ-042`) are built; the generic webhook (`FZ-043`) is not, and its notifications defer until that adapter exists rather than being lost.
+
+**Email** requires `FREEZEHUB_NOTIFICATIONS_EMAIL_FROM` plus `spring.mail.*`. Without a from-address the sender is not registered at all and EMAIL notifications defer. SES exposes an SMTP endpoint, so the same settings work locally and when deployed. For local development:
+
+```bash
+docker compose --profile dev up -d mailpit    # SMTP on 1025, inbox at http://localhost:8025
+
+FREEZEHUB_NOTIFICATIONS_EMAIL_FROM=freezehub@acme.test \
+  SPRING_MAIL_HOST=localhost SPRING_MAIL_PORT=1025 \
+  ./mvnw spring-boot:run -Dspring-boot.run.profiles=local
+```
 
 > **Diagnosing a missing announcement:** read `notification.status`, `attempts` and `last_error`. Note that `last_error` deliberately never quotes a destination URL — a Slack webhook URL is a bearer credential.
 

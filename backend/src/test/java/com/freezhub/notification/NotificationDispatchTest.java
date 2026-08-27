@@ -245,7 +245,7 @@ class NotificationDispatchTest {
 
         Notification waiting = notificationFor(fixture);
         assertThat(waiting.getStatus()).isEqualTo(NotificationStatus.PENDING);
-        assertThat(waiting.getLastError()).contains("No sender for channel WEBHOOK");
+        assertThat(waiting.getLastError()).contains("No sender configured for channel WEBHOOK");
         // Deferred, not attempted: waiting for FZ-043 must not consume its retry budget
         // and abandon it before that adapter ever exists.
         assertThat(waiting.getAttempts()).isZero();
