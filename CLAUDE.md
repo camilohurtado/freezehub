@@ -123,7 +123,7 @@ freezhub/
 Additional documentation is created just-in-time when implementation requires it:
 
 - `docs/03-data-model.md`
-- `docs/04-api.md`
+- `docs/04-api.md`  — created by FZ-050
 - `docs/05-frontend.md`
 - `docs/06-security.md`
 - `docs/07-decisions.md`

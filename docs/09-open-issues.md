@@ -38,6 +38,28 @@ Depends on a Cognito user pool existing (`FZ-063`), so the adapter and that infr
 
 Needs the lead-time decision before it can be specified.
 
+### OI-8 — Unrecognised names in a policy request can bypass a freeze
+**Severity:** Decision · **Owner:** blocks `FZ-051` · **Found in:** `FZ-050`
+
+An unrecognised application or environment name matches no explicit scope list, so evaluating it normally tends toward `ALLOW`. Sending `"prod"` where the environment is registered as `"production"` means a freeze scoped to `production` does not match and the deployment proceeds **during a freeze**.
+
+Not only a typo risk — a **deliberate bypass vector**. Anyone wanting to ship during a freeze can misspell the environment and receive an `ALLOW` that looks entirely legitimate in the pipeline log.
+
+Options and their trade-off are set out in `04-api.md` § Open decision: evaluate-and-flag (bypassable but visible), reject (unbypassable but blocks unregistered applications), or evaluate silently (bypassable and invisible).
+
+Already agreed regardless of choice: **a rejection must still name what was not recognised**; a bare `404` gives a pipeline nothing to act on. Worth deciding alongside it whether such evaluations are recorded so the pattern is detectable afterwards (`FZ-060`).
+
+**Must be decided before `FZ-051` is implemented** — it is a property of the enforcement boundary, not a detail to settle in code.
+
+### OI-9 — The Policy API has no machine authentication until `FZ-052`
+**Severity:** Gap · **Owner:** sequencing between `FZ-051` and `FZ-052` · **Found in:** `FZ-050`
+
+`06-security.md` says machine clients authenticate with `X-API-Key`, but API keys are `FZ-052` and the Policy API is `FZ-051` — the backlog builds the endpoint first. As ordered, the machine-facing endpoint would exist with no machine credential to call it.
+
+Neither workaround is good: shipping it briefly behind JWT-only auth means CI would have to hold a human credential, and leaving it unauthenticated is not an option for the endpoint that decides whether deployments are blocked.
+
+Simplest resolution is to **implement `FZ-052` before or together with `FZ-051`**. Raised here rather than discovered mid-story.
+
 ### OI-7 — Webhook deliveries are not authenticated
 **Severity:** Decision · **Owner:** needs a decision, then a story · **Found in:** `FZ-043`
 
