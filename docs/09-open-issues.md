@@ -38,19 +38,6 @@ Depends on a Cognito user pool existing (`FZ-063`), so the adapter and that infr
 
 Needs the lead-time decision before it can be specified.
 
-### OI-8 — Unrecognised names in a policy request can bypass a freeze
-**Severity:** Decision · **Owner:** blocks `FZ-051` · **Found in:** `FZ-050`
-
-An unrecognised application or environment name matches no explicit scope list, so evaluating it normally tends toward `ALLOW`. Sending `"prod"` where the environment is registered as `"production"` means a freeze scoped to `production` does not match and the deployment proceeds **during a freeze**.
-
-Not only a typo risk — a **deliberate bypass vector**. Anyone wanting to ship during a freeze can misspell the environment and receive an `ALLOW` that looks entirely legitimate in the pipeline log.
-
-Options and their trade-off are set out in `04-api.md` § Open decision: evaluate-and-flag (bypassable but visible), reject (unbypassable but blocks unregistered applications), or evaluate silently (bypassable and invisible).
-
-Already agreed regardless of choice: **a rejection must still name what was not recognised**; a bare `404` gives a pipeline nothing to act on. Worth deciding alongside it whether such evaluations are recorded so the pattern is detectable afterwards (`FZ-060`).
-
-**Must be decided before `FZ-051` is implemented** — it is a property of the enforcement boundary, not a detail to settle in code.
-
 ### OI-7 — Webhook deliveries are not authenticated
 **Severity:** Decision · **Owner:** needs a decision, then a story · **Found in:** `FZ-043`
 
@@ -108,3 +95,4 @@ Each is currently recorded only in the backlog entry of the story that made it, 
 | **The Policy API had no machine credential** — `FZ-051` was ordered before API keys, so the endpoint deciding whether deployments are blocked would have shipped with nothing able to authenticate to it | `FZ-050` | `FZ-052`, taken out of order |
 | Any error behind the machine chain came back as `401` — the forward to `/error` is re-filtered and does not match `/api/policy/**`, so it fell through to the human chain and reported a credential failure instead of the real one | `FZ-052` | `FZ-052` |
 | Testing Library's DOM cleanup never registered, leaking rendered DOM between tests | `FZ-031` | `FZ-031` |
+| **An unrecognised application or environment name could bypass a freeze** — it matches no scope list, so evaluating it normally tended toward `ALLOW`; misspelling the environment was a deliberate route to deploying during a freeze | `FZ-050` | `FZ-051` — decided: it blocks, and the response names what was not recognised |

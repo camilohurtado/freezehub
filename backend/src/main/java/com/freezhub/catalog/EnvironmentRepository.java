@@ -13,6 +13,9 @@ public interface EnvironmentRepository extends JpaRepository<Environment, Long> 
 
     boolean existsByOrganizationIdAndName(Long organizationId, String name);
 
+    /** Policy evaluation identifies catalog entries by name, not id (`04-api.md`). */
+    Optional<Environment> findByOrganizationIdAndName(Long organizationId, String name);
+
     /** Batched ownership check: compare against the requested id count. */
     long countByOrganizationIdAndIdIn(Long organizationId, Collection<Long> ids);
 

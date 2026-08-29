@@ -527,7 +527,23 @@ Two things `FZ-051` must not decide on its own:
 - **`OI-9` — the Policy API has no machine credential until `FZ-052`.** The backlog orders `FZ-051` before API keys; the endpoint that decides whether deployments are blocked should not ship without machine authentication. Simplest fix is to do `FZ-052` first or alongside — which is what happened; closed by `FZ-052`.
 
 ### FZ-051 — Policy Evaluation
-**Status:** TODO
+**Status:** DONE
+
+`POST /api/policy/evaluate`, the machine boundary and the reason FreezeHub is a service rather than a wiki page. Authenticated by API key alone (`FZ-052`), so the organization comes from the credential and a caller cannot ask about a tenant that is not its own.
+
+- **"In force" is derived from `startsAt`/`endsAt`, never from `status`** — the contract `FZ-025` flagged and `FZ-050` formalised. Verified live rather than only in tests: with four restrictions whose windows had opened but whose stored status was still `SCHEDULED` because the reconciler had not run, evaluation correctly returned `BLOCK`. Making the service trust the status column instead makes five tests fail.
+- **The matching rule lives on `ChangeRestriction.covers(...)`**, not in a query or a service — it is the rule the whole product exists to enforce, so it is expressed once, in the domain object, in a form that reads like `01-domain.md` and is provable without a database. `RestrictionScopeMatchingTest` walks the worked examples from the docs, including the one that is easy to get backwards: naming a team *and* an application **narrows** rather than widens.
+- The response lists **every** matching restriction, advisories included, and carries each one's `reason`: someone staring at a blocked pipeline needs to know why the freeze exists, not merely that it does.
+
+**`OI-8` is decided and closed: an unregistered application or environment name blocks**, and the response names which one. An unrecognised name matches no scope list, so evaluating it normally tended toward `ALLOW` — misspelling the environment was a deliberate route to deploying straight through a freeze with a legitimate-looking permission in the log.
+
+Returned as a `200` carrying `BLOCK` rather than a `4xx`, deliberately. An error status lands in the pipeline's error branch, which is exactly where `04-api.md` tells clients to choose fail-open or fail-closed for themselves — so a rejection expressed as an error could be configured back into a deployment, while a decision cannot. Applied to the environment dimension as well as the application: the bypass originally raised was literally `prod` versus `production`.
+
+Names match **exactly, including case**, because catalog uniqueness is case-sensitive and a looser match here would disagree with the registry being read. The accepted cost, taken knowingly: FreezeHub becomes a gate on catalog completeness — an unregistered application cannot deploy at all, even with no freeze anywhere.
+
+**Performance.** Scope collections gained `@BatchSize`, so evaluation costs a constant number of queries rather than three per candidate restriction — this is asked once per deployment. Measured live: **20 in-force restrictions, three scope queries**, where the unbatched form would have issued 60.
+
+Still open and belonging to `FZ-060`: whether evaluations naming an unregistered resource should be **recorded**, so a repeated bypass attempt is visible afterwards rather than only refused in the moment.
 
 Evaluate a `DEPLOY` action for application/environment context.
 
@@ -537,11 +553,6 @@ Required semantics:
 - only matching `ADVISORY` → `ALLOW` with advisory information;
 - any matching `HARD_FREEZE` → `BLOCK`;
 - cancelled/completed restrictions do not affect the decision.
-
-**Sequencing note added by `FZ-052`:** machine authentication now exists ahead of this story, so the endpoint only has to be mapped under `/api/policy/**` and read its organization from the `ApiKeyPrincipal` on the security context. `OI-9` is closed.
-
-**Still blocked by `OI-8`** — what happens when a policy request names an application or environment FreezeHub does not recognise. `04-api.md` § Open decision sets out the options; it must not be settled in code.
-
 ### FZ-052 — API Keys
 **Status:** DONE
 

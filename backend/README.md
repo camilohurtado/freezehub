@@ -171,7 +171,7 @@ curl -X POST http://localhost:8080/api/policy/evaluate -H "X-API-Key: $KEY" ...
 
 `POST /api/api-keys/{id}/revoke` withdraws a key permanently; there is no un-revoke, because a withdrawn key may already be in someone else's hands. Issue a new one instead.
 
-The `/api/policy/**` chain exists before the endpoint it guards — `FZ-051` adds `POST /api/policy/evaluate`. Until then a valid key against that path gets a `404`, which is the useful signal: it means the credential was accepted and the endpoint is simply not built yet.
+`POST /api/policy/evaluate` (`FZ-051`) is the only endpoint a key reaches. It answers with `ALLOW` or `BLOCK` plus every restriction that matched. Note that an application or environment the catalog does not know about is **blocked**, with the unrecognised name reported — see `../docs/04-api.md`.
 
 ### Provisioning a user
 
