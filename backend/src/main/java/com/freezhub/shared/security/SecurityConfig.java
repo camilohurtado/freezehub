@@ -1,5 +1,6 @@
 package com.freezhub.shared.security;
 
+import jakarta.servlet.DispatcherType;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.Customizer;
@@ -25,6 +26,15 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authorize -> authorize
+                        // An error is already the outcome of a request that was authorized
+                        // (or refused) on its way in; re-authorizing the forward to /error
+                        // only replaces that outcome with a worse one. It broke the machine
+                        // chain in particular: /error does not match /api/policy/**, so a
+                        // 400 from a policy call fell through to this chain, which found no
+                        // JWT and answered 401 — telling CI its credential was bad when the
+                        // request was. Verified live; MockMvc does not forward to /error, so
+                        // no controller test could have shown it (FZ-052).
+                        .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
                         .requestMatchers("/actuator/health").permitAll()
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.jwtAuthenticationConverter(converter)));

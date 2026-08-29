@@ -124,7 +124,14 @@ Requires Docker running for `./mvnw clean verify` (Testcontainers) and for `spri
 
 ## Authentication
 
-Every endpoint except `/actuator/health` requires a Cognito-issued JWT (`Authorization: Bearer <token>`), resolved to a `users` row and its `organization_id` — see `../docs/06-security.md`.
+Every endpoint except `/actuator/health` requires a credential, and there are two of them (`../docs/06-security.md`):
+
+| Caller | Credential | Reaches |
+|---|---|---|
+| Human (browser) | Cognito JWT, `Authorization: Bearer <token>`, resolved to a `users` row and its `organization_id` | everything except `/api/policy/**` |
+| Machine (CI/CD) | API key, `X-API-Key: <key>`, resolved to the organization that owns it | `/api/policy/**` only |
+
+Presenting either one where the other is expected is a `401`. A key leaked from CI therefore cannot touch an organization's data or issue further keys.
 
 - **Local dev and tests always run with the `local` Spring profile active** (`-Dspring-boot.run.profiles=local`, or `@ActiveProfiles("local")` in tests). It self-issues/validates JWTs with a locally-generated key — no AWS dependency. Without it, the app has no `JwtDecoder` bean and **will not start**, since `spring.security.oauth2.resourceserver.jwt.issuer-uri` isn't set locally.
 - Any real/deployed environment must set `SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI` to the real Cognito user pool's issuer URI and must **not** activate the `local` profile.
@@ -145,6 +152,26 @@ curl http://localhost:8080/api/me -H "Authorization: Bearer <token>"
 `404` if no such user (it is a sign-in shortcut, not a way to create identities); `409` if the email exists in more than one organization, since email is unique per organization rather than globally.
 
 **It cannot exist in a deployed environment.** The controller, the `JwtEncoder` it needs, and the filter chain that makes the path reachable without a token are all `@Profile("local")`, and no deployed environment activates that profile — there the path falls through to the main chain and is rejected as unauthenticated. Tests assert that absence. Replaced by the Cognito Hosted UI redirect at `FZ-063`.
+
+### Machine credentials (`FZ-052`)
+
+An Administrator issues an API key for CI. The raw key is returned **once** — only its SHA-256 hash is stored, so it cannot be read back afterwards:
+
+```bash
+TOKEN=$(curl -s -X POST http://localhost:8080/api/dev/token \
+  -H 'Content-Type: application/json' -d '{"email":"dev@acme.test"}' | jq -r .token)
+
+curl -X POST http://localhost:8080/api/api-keys \
+  -H "Authorization: Bearer $TOKEN" \
+  -H 'Content-Type: application/json' -d '{"name":"gitlab-ci"}'
+# -> {"id":1,"name":"gitlab-ci","keyPrefix":"fzh_...","key":"fzh_...","createdBy":3,...}
+
+curl -X POST http://localhost:8080/api/policy/evaluate -H "X-API-Key: $KEY" ...
+```
+
+`POST /api/api-keys/{id}/revoke` withdraws a key permanently; there is no un-revoke, because a withdrawn key may already be in someone else's hands. Issue a new one instead.
+
+The `/api/policy/**` chain exists before the endpoint it guards — `FZ-051` adds `POST /api/policy/evaluate`. Until then a valid key against that path gets a `404`, which is the useful signal: it means the credential was accepted and the endpoint is simply not built yet.
 
 ### Provisioning a user
 
