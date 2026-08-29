@@ -51,15 +51,6 @@ Already agreed regardless of choice: **a rejection must still name what was not 
 
 **Must be decided before `FZ-051` is implemented** — it is a property of the enforcement boundary, not a detail to settle in code.
 
-### OI-9 — The Policy API has no machine authentication until `FZ-052`
-**Severity:** Gap · **Owner:** sequencing between `FZ-051` and `FZ-052` · **Found in:** `FZ-050`
-
-`06-security.md` says machine clients authenticate with `X-API-Key`, but API keys are `FZ-052` and the Policy API is `FZ-051` — the backlog builds the endpoint first. As ordered, the machine-facing endpoint would exist with no machine credential to call it.
-
-Neither workaround is good: shipping it briefly behind JWT-only auth means CI would have to hold a human credential, and leaving it unauthenticated is not an option for the endpoint that decides whether deployments are blocked.
-
-Simplest resolution is to **implement `FZ-052` before or together with `FZ-051`**. Raised here rather than discovered mid-story.
-
 ### OI-7 — Webhook deliveries are not authenticated
 **Severity:** Decision · **Owner:** needs a decision, then a story · **Found in:** `FZ-043`
 
@@ -85,6 +76,17 @@ Editing a scheduled restriction overwrites the previous state with no record tha
 
 `FZ-060` (Audit Events) covers part of it — recording *that* an administrative action happened — but not making the aggregate itself pristine. The alternatives (immutable/versioned restrictions, or an append-only change log) differ enough that the choice should be made before `FZ-060` is designed, not after.
 
+### OI-10 — Frontend tests finish with three unhandled rejections
+**Severity:** Defect · **Owner:** needs a story · **Found in:** `FZ-052`
+
+`npm run test` reports 64 passing tests **and** "Vitest caught 3 unhandled errors during the test run", which Vitest itself flags as a possible source of false positives.
+
+All three are the same thing: `CreateRestrictionPage` navigates in its mutation `onSuccess`, and the test's router is torn down before that navigation settles, so React Router dereferences a route that no longer exists (`Cannot read properties of undefined (reading 'element')`).
+
+The product code is not implicated — this is the test harness not awaiting the navigation it triggers. It still matters, because a suite that always ends with unhandled rejections is a suite where a *real* one goes unnoticed.
+
+Not touched by `FZ-052`, which changed no frontend file; found while running the frontend suite for its Definition of Done.
+
 ### OI-6 — `docs/07-decisions.md` does not exist
 **Severity:** Gap · **Owner:** needs a story · **Found in:** ongoing
 
@@ -103,4 +105,6 @@ Each is currently recorded only in the backlog entry of the story that made it, 
 | No way to obtain a token in development before a Cognito pool exists | `FZ-030` | `FZ-035` |
 | **Notification retry was unbounded** — a failed delivery was retried on every dispatch pass for ever, with no attempt limit, no backoff and no terminal state | `FZ-041` | `FZ-044` |
 | CORS was absent, so every browser request failed preflight with `401` | `FZ-031` | `FZ-031` |
+| **The Policy API had no machine credential** — `FZ-051` was ordered before API keys, so the endpoint deciding whether deployments are blocked would have shipped with nothing able to authenticate to it | `FZ-050` | `FZ-052`, taken out of order |
+| Any error behind the machine chain came back as `401` — the forward to `/error` is re-filtered and does not match `/api/policy/**`, so it fell through to the human chain and reported a credential failure instead of the real one | `FZ-052` | `FZ-052` |
 | Testing Library's DOM cleanup never registered, leaking rendered DOM between tests | `FZ-031` | `FZ-031` |

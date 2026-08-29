@@ -1,0 +1,71 @@
+databaseChangeLog:
+  - changeSet:
+      id: 013-api-key
+      author: freezehub
+      changes:
+        - createTable:
+            tableName: api_key
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: organization_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+                    references: organization(id)
+                    foreignKeyName: fk_api_key_organization
+              # What a human calls this credential ("gitlab-ci"), so it can be told apart
+              # from the others when deciding what to revoke.
+              - column:
+                  name: name
+                  type: varchar(255)
+                  constraints:
+                    nullable: false
+              # The non-secret opening of the key, kept so a listing can identify which
+              # credential a row is without being enough to authenticate with.
+              - column:
+                  name: key_prefix
+                  type: varchar(32)
+                  constraints:
+                    nullable: false
+              # SHA-256 of the raw key, hex. The raw key itself is never stored anywhere
+              # (06-security.md): it is returned once at creation and cannot be recovered.
+              - column:
+                  name: token_hash
+                  type: varchar(64)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: created_by
+                  type: bigint
+                  constraints:
+                    nullable: false
+                    references: users(id)
+                    foreignKeyName: fk_api_key_created_by
+              - column:
+                  name: created_at
+                  type: timestamptz
+                  defaultValueComputed: now()
+                  constraints:
+                    nullable: false
+              # Set once, never cleared: a revoked credential may already be public, so
+              # un-revoking it would resurrect a secret someone else may hold.
+              - column:
+                  name: revoked_at
+                  type: timestamptz
+        - addUniqueConstraint:
+            tableName: api_key
+            columnNames: token_hash
+            constraintName: uq_api_key_token_hash
+        - createIndex:
+            tableName: api_key
+            indexName: idx_api_key_organization
+            columns:
+              - column:
+                  name: organization_id

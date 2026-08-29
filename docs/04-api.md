@@ -19,6 +19,12 @@ Two mechanisms, deliberately distinct (`06-security.md`):
 
 `/actuator/health` is the only unauthenticated endpoint. Under the `local` profile only, `POST /api/dev/token` mints a development JWT (`FZ-035`).
 
+The two credentials do not overlap, and that is enforced rather than merely intended (`FZ-052`):
+
+- An API key is accepted **only** under `/api/policy/**`. Presented anywhere on the human API it is not a credential at all, so a key leaked from a CI variable cannot read an organization's restrictions, change its catalog, or issue further keys.
+- A JWT is not accepted on `/api/policy/**`. A signed-in browser session cannot reach the machine boundary.
+- Both mismatches are `401`, indistinguishable from no credential at all.
+
 ### Tenant isolation
 
 The organization is always resolved from the credential, never from the request. A client-supplied organization identifier is not authorization and appears nowhere in this API.
@@ -62,6 +68,21 @@ Authenticated with a JWT; all tenant-scoped.
 | `GET PUT` | `/api/restrictions/{id}` | detail; full replacement, `SCHEDULED` only |
 | `POST` | `/api/restrictions/{id}/cancel` | `SCHEDULED` or `ACTIVE` only |
 | `GET POST PATCH DELETE` | `/api/integrations` | **ADMINISTRATOR only**; stored credentials are never returned |
+| `GET POST` | `/api/api-keys` | **ADMINISTRATOR only**; `POST` returns the raw key once |
+| `POST` | `/api/api-keys/{id}/revoke` | **ADMINISTRATOR only**; permanent, `409` if already revoked |
+
+### API keys
+
+```jsonc
+// POST /api/api-keys   {"name": "gitlab-ci"}   → 201
+{ "id": 1, "name": "gitlab-ci", "keyPrefix": "fzh_exampl",
+  "key": "fzh_exampleKeyOnly-doNotUse-0000000000000000000",
+  "createdBy": 3, "createdAt": "2026-08-29T06:21:27Z" }
+```
+
+`key` appears in this one response and nowhere else, ever. Only its hash is stored, so it cannot be read back, resent, or recovered by support — a lost key is replaced, not retrieved. Every other endpoint returns `keyPrefix` instead, which says *which* credential a row is without being enough to use it.
+
+`POST /api/api-keys/{id}/revoke` is permanent and returns `409` if the key is already revoked, matching restriction cancellation: a second revoke means the caller believed the key was still live.
 
 ## Policy Evaluation (specification for `FZ-051`)
 
@@ -159,7 +180,7 @@ An empty dimension is a **wildcard**, not an empty set. Worked examples:
 | Code | When |
 |---|---|
 | `400` | malformed body, missing field, or unsupported `action` |
-| `401` | missing, unknown or revoked API key |
+| `401` | missing, unknown or revoked API key, or a human JWT presented instead of one |
 
 ### ⚠ Open decision — unrecognised application or environment names
 

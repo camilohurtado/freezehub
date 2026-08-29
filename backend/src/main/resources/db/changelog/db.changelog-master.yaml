@@ -23,3 +23,5 @@ databaseChangeLog:
       file: db/changelog/011-notification.yaml
   - include:
       file: db/changelog/012-notification-retry.yaml
+  - include:
+      file: db/changelog/013-api-key.yaml

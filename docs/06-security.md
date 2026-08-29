@@ -34,7 +34,7 @@ Restated from `CLAUDE.md` and `02-architecture.md` — this document must not co
 
 **Implemented by `FZ-016`:** `POST /api/invites`, Administrator-only. The Cognito `AdminCreateUser` call is behind an `IdentityProvider` port — same local/real split as JWT validation below, since no real Cognito user pool exists yet. Only the local fake ships now; a real Cognito-backed implementation is required before this endpoint runs against a deployed environment (see `FZ-016`'s known gap in `08-backlog.md`).
 
-**Resolved by `FZ-012`:** minimal role model — `users.role` is one of `ADMINISTRATOR` or `MEMBER`. This is not "advanced RBAC" (`00-product.md`'s exclusion): it gates exactly one action so far (inviting a user), not general resource permissions. `Team`/`Application`/`Environment`/restriction management remain open to any authenticated org member unless a future requirement says otherwise.
+**Resolved by `FZ-012`:** minimal role model — `users.role` is one of `ADMINISTRATOR` or `MEMBER`. This is not "advanced RBAC" (`00-product.md`'s exclusion): it gates a short, enumerated list of organization-level actions (see Authorization, below), not general resource permissions. `Team`/`Application`/`Environment`/restriction management remain open to any authenticated org member unless a future requirement says otherwise.
 
 ### Local development and automated tests
 
@@ -53,14 +53,23 @@ X-API-Key: <key>
 
 A separate header (rather than reusing `Authorization`) keeps human (JWT) and machine (API key) authentication mechanically distinct, per Governing Principle 1.
 
-- **Key format:** a high-entropy random secret, prefixed for identifiability, e.g. `fzh_<random>`. The prefix aids leak-scanning and quick identification in logs; it does not reduce the secret portion's entropy.
-- **Storage:** only a salted hash (e.g. SHA-256) of the key is persisted. The raw key is shown to the caller exactly once, at creation time (`FZ-052`).
+- **Key format:** `fzh_` followed by 256 bits of `SecureRandom` entropy in URL-safe Base64. The prefix aids leak-scanning and quick identification in logs; it does not reduce the secret portion's entropy.
+- **Storage:** only the SHA-256 hash of the key is persisted. The raw key is shown to the caller exactly once, at creation time, and is not recoverable afterwards.
 - **Lookup:** the backend hashes the incoming key and looks up the matching `ApiKey` record. `organization_id` is resolved from that record — never from any client-supplied identifier.
-- **Revocation:** an `ApiKey` can be disabled. Exact lifecycle fields (e.g. `revoked_at`) are not schema'd yet — deferred to `FZ-052`, consistent with `03-data-model.md`'s deferral of the `ApiKey` table.
+- **Revocation:** `api_key.revoked_at` is set once and never cleared. Revocation is not a toggle: a key is withdrawn because it may already be in someone else's hands, and restoring it would revive that copy. Issue a new key instead.
+- **Reach:** a key authenticates only against `/api/policy/**`. It cannot read or change an organization's data and cannot mint another key, so a credential leaked from CI is not an account takeover. Managing keys is part of the human API and requires an Administrator JWT.
+
+**Resolved by `FZ-052` — the hash is not salted.** This document originally said "salted hash (e.g. SHA-256)". A salt defeats rainbow tables and offline brute force against *low-entropy* secrets; neither attack applies to a 256-bit random value, because there is nothing to guess. A per-key salt would also mean the hash of an incoming key no longer identifies its row, forcing either a second lookup handle inside the token or hashing every stored row on every call — and the Policy API is asked on every deployment. What this section actually requires is unchanged and holds exactly: the raw key is never stored, and lookup is by hash.
 
 ## Authorization
 
-MVP does not implement advanced RBAC (`00-product.md`, Out of Scope). The only role check is: inviting a new user requires `role = ADMINISTRATOR` (see Human Authentication, above). Every other authenticated action is available to any user within their own organization — no further authorization rule is specified by existing documentation.
+MVP does not implement advanced RBAC (`00-product.md`, Out of Scope). Role checks are deliberately few, and each one guards something that decides what the organization itself can do rather than a resource within it. `role = ADMINISTRATOR` is required to:
+
+- invite a user (`FZ-016`);
+- configure a notification destination (`FZ-045`) — it decides who hears about a freeze, and its configuration can hold a credential;
+- issue or revoke an API key (`FZ-052`) — a key authenticates as the whole organization.
+
+Every other authenticated action is available to any user within their own organization.
 
 ## Tenant Isolation Enforcement
 
