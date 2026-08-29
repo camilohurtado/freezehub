@@ -15,11 +15,17 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Set;
+import org.hibernate.annotations.BatchSize;
 
 /**
  * A time-bounded policy affecting software changes (01-domain.md).
+ *
+ * <p>Scope collections are LAZY (FZ-021: EAGER made every list call 3N+1 queries) and
+ * batch-fetched, so policy evaluation initialises the scope of a whole candidate set in
+ * three queries rather than three per restriction — it is asked once per deployment.
  *
  * <p>Scope is modelled as three {@link ElementCollection}s rather than separate entities:
  * scope rows have no identity of their own and are owned parts of this aggregate, so they
@@ -74,16 +80,19 @@ public class ChangeRestriction {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    @BatchSize(size = 100)
     @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(name = "change_restriction_team", joinColumns = @JoinColumn(name = "restriction_id"))
     @Column(name = "team_id")
     private Set<Long> teamIds = new LinkedHashSet<>();
 
+    @BatchSize(size = 100)
     @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(name = "change_restriction_application", joinColumns = @JoinColumn(name = "restriction_id"))
     @Column(name = "application_id")
     private Set<Long> applicationIds = new LinkedHashSet<>();
 
+    @BatchSize(size = 100)
     @ElementCollection(fetch = FetchType.LAZY)
     @CollectionTable(name = "change_restriction_environment", joinColumns = @JoinColumn(name = "restriction_id"))
     @Column(name = "environment_id")
@@ -220,6 +229,30 @@ public class ChangeRestriction {
 
     public Instant getUpdatedAt() {
         return updatedAt;
+    }
+
+    /**
+     * Whether this restriction covers a deployment of {@code applicationId} to
+     * {@code environmentId} (FZ-051).
+     *
+     * <p>The rule is 01-domain.md's, verbatim: OR within a dimension, AND across
+     * dimensions, and an <strong>empty dimension is a wildcard</strong> rather than an
+     * empty set — which is what lets "freeze every deployment to production" be expressed
+     * by naming only an environment. Invariant 3 keeps that safe: a restriction with no
+     * targets at all is rejected at creation, so this can never mean "everything".
+     *
+     * <p>Teams and applications are separate dimensions, so naming both narrows rather
+     * than widens — "this application, and only while it belongs to this team". A scope
+     * naming a team and an application outside it therefore matches nothing, which is
+     * accepted rather than rejected at creation because membership is mutable.
+     *
+     * <p>Says nothing about <em>when</em>: whether the restriction is in force is decided
+     * from the persisted timestamps by the caller's query.
+     */
+    public boolean covers(Long applicationId, Long environmentId, Set<Long> applicationTeamIds) {
+        return (teamIds.isEmpty() || !Collections.disjoint(teamIds, applicationTeamIds))
+                && (applicationIds.isEmpty() || applicationIds.contains(applicationId))
+                && (environmentIds.isEmpty() || environmentIds.contains(environmentId));
     }
 
     public Set<Long> getTeamIds() {

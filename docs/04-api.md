@@ -4,7 +4,7 @@
 
 The HTTP surface, and in particular the **machine-facing Policy Evaluation contract** that CI/CD systems depend on, per `FZ-050`.
 
-The policy section is a specification for `FZ-051`, which is not yet implemented. Everything else documents what exists today.
+Everything here documents what exists today.
 
 ## Conventions
 
@@ -84,7 +84,7 @@ Authenticated with a JWT; all tenant-scoped.
 
 `POST /api/api-keys/{id}/revoke` is permanent and returns `409` if the key is already revoked, matching restriction cancellation: a second revoke means the caller believed the key was still live.
 
-## Policy Evaluation (specification for `FZ-051`)
+## Policy Evaluation
 
 The machine boundary, and the reason FreezeHub exists as a service rather than a wiki page. It answers `00-product.md`'s second question: **"is this deployment currently allowed?"**
 
@@ -119,6 +119,8 @@ Consequence to accept: renaming a catalog entry changes the key a pipeline sends
   "application": "payments-api",
   "environment": "production",
   "evaluatedAt": "2026-11-27T14:03:11Z",
+  "message": "Blocked by a change restriction in force: Black Friday Freeze.",
+  "unregistered": [],
   "restrictions": [
     {
       "id": 23,
@@ -135,6 +137,10 @@ Consequence to accept: renaming a catalog entry changes the key a pipeline sends
 `decision` is `ALLOW` or `BLOCK` (`01-domain.md`).
 
 `restrictions` lists **every** restriction that matched, not only the deciding one — the domain requires a decision to identify what contributed, and an engineer told only "BLOCK" cannot act. An `ALLOW` carrying advisory restrictions is normal and the array is the useful part of that response.
+
+`message` is always present and is the line worth printing in a build log — it names the freezes that blocked, or says that nothing applied.
+
+`unregistered` is empty on a normal decision. It is non-empty only in the case below, and then names which parts of the request were not recognised.
 
 ### Decision rules
 
@@ -182,25 +188,37 @@ An empty dimension is a **wildcard**, not an empty set. Worked examples:
 | `400` | malformed body, missing field, or unsupported `action` |
 | `401` | missing, unknown or revoked API key, or a human JWT presented instead of one |
 
-### ⚠ Open decision — unrecognised application or environment names
+### Unregistered application or environment names
 
-**This is unresolved and blocks `FZ-051`.** Tracked as `OI-8`. It must not be settled by whoever implements the endpoint without an explicit decision.
+**Decided (`OI-8`, closed): an unregistered name blocks.** The response says which one.
 
-The problem: because an unrecognised name matches no explicit scope list, evaluating it normally tends toward `ALLOW`. Sending `"prod"` when the environment is registered as `"production"` means a freeze scoped to `production` does not match, and the deployment proceeds **during a freeze**.
+The problem it solves: an unrecognised name matches no explicit scope list, so evaluating it normally tends toward `ALLOW`. Sending `"prod"` when the environment is registered as `"production"` meant a freeze scoped to `production` did not match and the deployment proceeded **during a freeze** — not merely a typo risk but a deliberate bypass, since anyone wanting to ship during a freeze could misspell the environment and get an `ALLOW` that looked entirely legitimate in the pipeline log.
 
-That is not only a typo risk. It is a **deliberate bypass vector**: anyone who wants to ship during a freeze can misspell the environment and get an `ALLOW` that looks entirely legitimate in the pipeline log.
+```jsonc
+// POST /api/policy/evaluate  {"action":"DEPLOY","application":"payments-api","environment":"prod"}
+{
+  "decision": "BLOCK",
+  "action": "DEPLOY",
+  "application": "payments-api",
+  "environment": "prod",
+  "evaluatedAt": "2026-11-27T14:03:11Z",
+  "message": "Blocked: no environment 'prod' is registered in this organization, so this deployment cannot be evaluated against the restrictions that may apply to it.",
+  "unregistered": ["ENVIRONMENT"],
+  "restrictions": []
+}
+```
 
-The trade-off:
+Three properties of that response are deliberate:
 
-| Option | Bypass | Availability |
-|---|---|---|
-| Evaluate and flag the unrecognised name in the response | possible, but visible to anyone reading the response | unaffected |
-| Reject the request | prevented | a pipeline for an application nobody has registered is blocked outright — FreezeHub becomes a gate on catalog completeness |
-| Evaluate silently | possible and invisible | unaffected |
+- **`200` carrying `BLOCK`, not a `4xx`.** An error status lands in the pipeline's error branch — which is exactly where *Client guidance* below tells clients to choose fail-open or fail-closed for themselves. A fail-open pipeline would quietly convert this block back into a deployment, so a rejection expressed as an error can be configured away and a decision cannot.
+- **`unregistered` names the dimension, and the echoed `application`/`environment` name the value.** A refusal a pipeline cannot act on is barely better than no refusal.
+- **Every unrecognised dimension is reported**, not just the first, so one round trip is enough to fix both.
 
-Constraint already agreed regardless of which is chosen: **if the request is rejected, the response must still name what was not recognised.** A bare `404` tells a pipeline nothing it can act on.
+**Names match exactly, including case.** Catalog uniqueness is case-sensitive, so accepting `"Production"` for `"production"` would make this endpoint disagree with the registry it reads from. A case mismatch is therefore unregistered, and blocks.
 
-Also worth deciding alongside it: whether an evaluation involving an unrecognised name should be recorded, so the pattern is detectable after the fact (`FZ-060`).
+**Accepted cost: FreezeHub becomes a gate on catalog completeness.** An application nobody has registered cannot deploy at all, including when no freeze exists anywhere. That is the deliberate trade — the alternative leaves a bypass open to anyone who can misspell a string. Registering applications and environments is therefore part of onboarding, not an optional tidiness step.
+
+Still open: whether these evaluations should be **recorded**, so a repeated bypass attempt is visible after the fact rather than only refused in the moment. That belongs to `FZ-060`.
 
 ## Client guidance
 

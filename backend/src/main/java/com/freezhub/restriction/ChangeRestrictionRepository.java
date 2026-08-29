@@ -77,6 +77,30 @@ public interface ChangeRestrictionRepository extends JpaRepository<ChangeRestric
                     @Param("openStatuses") Collection<RestrictionStatus> openStatuses,
                     @Param("completed") RestrictionStatus completed);
 
+    /**
+     * Every restriction in force at {@code now} for one organization (FZ-051).
+     *
+     * <p><strong>Derived from the persisted timestamps, never from {@code status}.</strong>
+     * The status column is maintained by a reconciler running on an interval (FZ-025), so
+     * it lags by up to that interval; reading {@code status = ACTIVE} here would allow a
+     * deployment during a freeze whose activation tick had not yet run — a hole that would
+     * surface only under load or just after a restart. {@code CANCELLED} is the one status
+     * consulted, because cancellation is an intent that no timestamp expresses.
+     *
+     * <p>Half-open window: a restriction ending at 09:30 does not block a deployment at
+     * 09:30, matching the lifecycle reconciler's own predicates.
+     */
+    @Query("""
+            select r from ChangeRestriction r
+             where r.organizationId = :organizationId
+               and r.startsAt <= :now
+               and r.endsAt > :now
+               and r.status <> :cancelled
+            """)
+    List<ChangeRestriction> findInForce(@Param("organizationId") Long organizationId,
+                                        @Param("now") Instant now,
+                                        @Param("cancelled") RestrictionStatus cancelled);
+
     /** Tenant-scoped lookup: a restriction owned by another organization is simply absent. */
     Optional<ChangeRestriction> findByIdAndOrganizationId(Long id, Long organizationId);
 
