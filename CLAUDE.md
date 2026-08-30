@@ -117,7 +117,8 @@ freezhub/
 ├── backend/
 ├── frontend/
 ├── infra/
-└── scripts/
+├── scripts/
+└── examples/          # CI/CD integration example (FZ-053)
 ```
 
 Additional documentation is created just-in-time when implementation requires it:

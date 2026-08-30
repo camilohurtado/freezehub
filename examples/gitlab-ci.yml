@@ -1,0 +1,50 @@
+# FreezeHub deployment gate for GitLab CI (FZ-053).
+#
+# Copy these two jobs into your .gitlab-ci.yml, or `include:` this file.
+#
+# Set in Settings -> CI/CD -> Variables:
+#   FREEZEHUB_URL      https://freezehub.example.com
+#   FREEZEHUB_API_KEY  fzh_...   (Masked, Protected — it is a credential)
+#
+# The key is an organization-wide credential, so protect it as you would a
+# deploy token. It grants nothing but this one question: it cannot read your
+# restrictions, change your catalog, or issue another key.
+
+stages:
+  - freeze-check
+  - deploy
+
+.freeze-check:
+  stage: freeze-check
+  image: alpine:3.20
+  before_script:
+    - apk add --no-cache curl jq
+  script:
+    - ./examples/freeze-check.sh
+  variables:
+    # FreezeHub identifies both by name, exactly as registered — including case.
+    FREEZEHUB_APPLICATION: payments-api
+    # Refuse to deploy if FreezeHub cannot be reached. Set to "allow" to deploy
+    # anyway; read the note in freeze-check.sh before you do.
+    FREEZEHUB_ON_ERROR: block
+
+freeze-check:production:
+  extends: .freeze-check
+  variables:
+    FREEZEHUB_ENVIRONMENT: production
+  # Only on the branch that actually deploys; asking on every feature branch
+  # would block merge-request pipelines during a freeze, which is not the point.
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+deploy:production:
+  stage: deploy
+  # The gate is enforced by ordering, not by trust: `needs` makes this job wait
+  # for freeze-check, and a failed freeze-check fails the pipeline before this
+  # job is created. Do not add `allow_failure: true` to the check — it would
+  # turn every freeze into a warning.
+  needs: ["freeze-check:production"]
+  script:
+    - echo "deploying..."
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
