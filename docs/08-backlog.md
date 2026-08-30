@@ -574,12 +574,28 @@ Not built, deliberately: **no frontend.** `05-frontend.md` specifies no API keys
 
 Implement secure organization-owned machine credentials according to `06-security.md`.
 ### FZ-053 — CI/CD Integration Example
-**Status:** TODO
+**Status:** DONE
+
+`examples/` holds a worked deployment gate: `freeze-check.sh` (POSIX shell, `curl` + `jq`) and `gitlab-ci.yml` wiring it into a pipeline. No native plugin, per the story.
+
+**The logic lives in a script, not in pipeline YAML.** It is then identical on every CI system, runnable on a laptop while debugging, and readable by whoever is looking at it during an actual freeze. `gitlab-ci.yml` is wiring; the README carries a six-line GitHub Actions equivalent calling the same script rather than a second copy of the logic.
+
+**It answers the question `04-api.md` deliberately left to the client** — what FreezeHub's silence means. `FREEZEHUB_ON_ERROR` is `block` by default, because a gate that opens when it breaks is not a gate, and the trade-off is stated in the script itself rather than buried in prose.
+
+Two cases are deliberately **not** subject to that setting, and this is the part worth keeping:
+
+- **`HTTP 401` fails the pipeline even under `allow`.** A bad or revoked credential is not an outage. If it failed open, revoking a key — or fat-fingering a CI variable — would silently switch enforcement off for every pipeline still using it, and nothing would look broken.
+- **A missing required variable fails.** Enforcement must not be disableable by breaking the configuration.
+
+Exit `1` (blocked) and exit `2` (not evaluated) are distinct, because "you may not deploy" and "I could not find out" are different facts and only the second is the platform team's problem. A request timeout is set, since without one "fail closed" quietly becomes "hang until the job times out" — worse than either choice on offer.
+
+**Verified by running it against a live backend**, not by inspection: ten paths — allow; allow with an advisory printed; hard freeze blocking; unregistered environment blocking with the corrective hint; bad key under `ON_ERROR=allow` still exiting `2`; unreachable FreezeHub under both `block` and `allow`; missing variable; invalid `ON_ERROR` value rejected rather than silently treated as permissive; and no temp file left behind.
+
+The root `README.md` status section was five milestones stale ("Milestone 0 in progress"); corrected while adding `examples/` to the layout it documents.
 
 Provide at least one simple pipeline example consuming the Policy API.
 
 Do not build a native plugin yet.
-
 ## Milestone 6 — Audit and Beta Readiness
 
 ### FZ-060 — Audit Events

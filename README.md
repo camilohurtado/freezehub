@@ -25,12 +25,17 @@ freezehub/
 ├── backend/    # Java + Spring Boot modular monolith
 ├── frontend/   # React + TypeScript
 ├── infra/      # Terraform (AWS)
-└── scripts/    # local dev / automation scripts
+├── scripts/    # local dev / automation scripts
+└── examples/   # CI/CD integration example for the Policy API
 ```
 
 ## Status
 
-Milestone 0 (Foundation) is in progress. See `docs/08-backlog.md` for the current backlog item statuses. `FZ-001`–`FZ-004` are done.
+Milestones 0–3 and 5 are complete: foundation, tenancy and catalog, restrictions and their lifecycle, the frontend slice, and the Policy API with machine authentication.
+
+Milestone 4 (notifications) delivers Slack, email and webhook announcements with bounded retry, but keeps two open items: `FZ-046` (a real Cognito identity provider, which also blocks running outside the `local` profile) and `FZ-047` (the "starting soon" notification, blocked on a lead-time decision). Milestone 6 — audit and beta readiness — is next.
+
+See [`docs/08-backlog.md`](./docs/08-backlog.md) for per-item status and [`docs/09-open-issues.md`](./docs/09-open-issues.md) for known defects and deferred decisions.
 
 ## Commands
 
