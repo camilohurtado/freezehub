@@ -68,6 +68,17 @@ class IntegrationControllerTest {
                 organizationId, IntegrationType.SLACK, "{\"webhookUrl\":\"" + SLACK_WEBHOOK + "\"}"));
     }
 
+    private static final String WEBHOOK_URL = "https://acme.test/hooks/freezehub";
+
+    private Integration givenWebhook(Long organizationId) {
+        return integrationRepository.saveAndFlush(new Integration(
+                organizationId, IntegrationType.WEBHOOK, "{\"url\":\"" + WEBHOOK_URL + "\"}"));
+    }
+
+    private String webhookBody() {
+        return "{\"type\":\"WEBHOOK\",\"config\":\"{\\\"url\\\":\\\"" + WEBHOOK_URL + "\\\"}\"}";
+    }
+
     private String slackBody() {
         return "{\"type\":\"SLACK\",\"config\":\"{\\\"webhookUrl\\\":\\\"" + SLACK_WEBHOOK + "\\\"}\"}";
     }
@@ -102,6 +113,85 @@ class IntegrationControllerTest {
         mockMvc.perform(get("/api/integrations").header("Authorization", "Bearer " + admin.token()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].type", is("SLACK")));
+    }
+
+    @Test
+    void issuesAWebhookSigningSecretOnceAtCreation() throws Exception {
+        // Without a way to verify a delivery, anyone who learns a customer's endpoint can
+        // forge an event to it — a forged CANCELLED especially (FZ-048).
+        Caller admin = callerWith(UserRole.ADMINISTRATOR);
+
+        mockMvc.perform(post("/api/integrations")
+                        .header("Authorization", "Bearer " + admin.token())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(webhookBody()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.signingSecret", org.hamcrest.Matchers.startsWith("whsec_")));
+    }
+
+    @Test
+    void doesNotIssueASigningSecretToChannelsThatDoNotSign() throws Exception {
+        Caller admin = callerWith(UserRole.ADMINISTRATOR);
+
+        mockMvc.perform(post("/api/integrations")
+                        .header("Authorization", "Bearer " + admin.token())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(slackBody()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.signingSecret", org.hamcrest.Matchers.nullValue()));
+    }
+
+    @Test
+    void neverReturnsTheSigningSecretInAListing() throws Exception {
+        // Same rule as the stored channel credential: shown once, then never again.
+        Caller admin = callerWith(UserRole.ADMINISTRATOR);
+        Integration webhook = givenWebhook(admin.organizationId());
+
+        mockMvc.perform(get("/api/integrations").header("Authorization", "Bearer " + admin.token()))
+                .andExpect(status().isOk())
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString(webhook.getSigningSecret()))))
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("signingSecret"))));
+    }
+
+    @Test
+    void rotatesAWebhookSigningSecret() throws Exception {
+        Caller admin = callerWith(UserRole.ADMINISTRATOR);
+        Integration webhook = givenWebhook(admin.organizationId());
+        String original = webhook.getSigningSecret();
+
+        mockMvc.perform(post("/api/integrations/" + webhook.getId() + "/signing-secret")
+                        .header("Authorization", "Bearer " + admin.token()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.signingSecret", org.hamcrest.Matchers.startsWith("whsec_")))
+                .andExpect(jsonPath("$.signingSecret", org.hamcrest.Matchers.not(original)));
+
+        // The previous secret stops working immediately — no overlap window, since one
+        // would keep a leaked secret alive for exactly as long as the window lasted.
+        assertThat(integrationRepository.findById(webhook.getId()).orElseThrow().getSigningSecret())
+                .isNotEqualTo(original);
+    }
+
+    @Test
+    void refusesToRotateASigningSecretOnAChannelThatDoesNotSign() throws Exception {
+        Caller admin = callerWith(UserRole.ADMINISTRATOR);
+        Integration slack = givenSlack(admin.organizationId());
+
+        mockMvc.perform(post("/api/integrations/" + slack.getId() + "/signing-secret")
+                        .header("Authorization", "Bearer " + admin.token()))
+                .andExpect(status().isConflict());
+    }
+
+    @Test
+    void treatsAnotherOrganizationsIntegrationAsUnknownWhenRotating() throws Exception {
+        Caller admin = callerWith(UserRole.ADMINISTRATOR);
+        Caller other = callerWith(UserRole.ADMINISTRATOR);
+        Integration theirs = givenWebhook(other.organizationId());
+
+        mockMvc.perform(post("/api/integrations/" + theirs.getId() + "/signing-secret")
+                        .header("Authorization", "Bearer " + admin.token()))
+                .andExpect(status().isNotFound());
     }
 
     @Test

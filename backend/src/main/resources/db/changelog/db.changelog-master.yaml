@@ -25,3 +25,5 @@ databaseChangeLog:
       file: db/changelog/012-notification-retry.yaml
   - include:
       file: db/changelog/013-api-key.yaml
+  - include:
+      file: db/changelog/014-integration-signing-secret.yaml

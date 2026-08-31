@@ -505,6 +505,30 @@ Depends on a Cognito user pool existing, so sequence with `FZ-063`. Acceptance: 
 
 It also differs structurally from every other lifecycle event — it is triggered by the passage of time rather than by a state transition, so a scheduled check writes the outbox rather than a domain change doing so. That check must be idempotent in the same way the lifecycle reconciler is, or a restriction would be announced as "starting soon" on every pass.
 
+### FZ-048 — Webhook Signing
+**Status:** DONE
+
+**Fixes `OI-7`.** A receiver currently has no way to verify that a webhook request came from FreezeHub, so anyone who learns a customer's endpoint can post a forged event to it — and a forged `CANCELLED`, telling an automated consumer that a freeze has been lifted, is exactly the event worth forging.
+
+**Decision (recorded in `07-decisions.md`): HMAC-SHA256 over timestamp and body**, with a per-integration secret FreezeHub generates and shows once.
+
+Acceptance:
+
+- A webhook integration is issued a signing secret at creation, returned once and never readable again.
+- Every delivery carries `X-FreezeHub-Timestamp` and `X-FreezeHub-Signature: sha256=<hex>`, computed over `timestamp + "." + body` so a captured request cannot be replayed with a new body or a stale one accepted for ever.
+- The secret can be rotated without recreating the integration.
+- The secret is never returned by any listing and never appears in a log or in `notification.last_error`.
+
+**Verified against a real receiver**, not only in tests: a Node endpoint doing standard HMAC verification accepted two genuine deliveries (`SCHEDULED`, `CANCELLED`), then rejected an unsigned forgery, a forgery with a guessed signature, and a genuine body replayed with a stale timestamp. After rotating the secret, the receiver — still holding the old one — rejected the next delivery, which is rotation taking effect with no overlap window.
+
+The signed string format is pinned by a test vector computed **outside this codebase** with `openssl dgst -sha256 -hmac`. That is the assertion that matters: change the `.` separator or drop the timestamp from the signed string and every receiver in the world silently starts rejecting deliveries, with nothing in Java to catch it.
+
+`WebhookSigning` deliberately does not reuse `ApiKeySecret` despite near-identical generation. The storage lifecycle is the opposite — an API key is stored hashed and verified by hashing what arrives; this secret must stay recoverable because signing needs the key. Sharing a type would invite someone to store this one hashed, which would break every delivery at once.
+
+A webhook created before this story has no secret and is delivered **unsigned with a warning logged**, rather than not at all: refusing would silently stop announcements a customer relies on. Rotating fixes it.
+
+**Cost, recorded in `D-2` and against `OI-4`:** this is a second credential that cannot be hashed at rest.
+
 ## Milestone 5 — Policy Enforcement
 
 ### FZ-050 — API Contract
@@ -602,6 +626,16 @@ Do not build a native plugin yet.
 **Status:** TODO
 
 Record important administrative and restriction lifecycle actions.
+
+**Shaped by `D-1` (`07-decisions.md`), which resolves `OI-5`.** An audit event is how a change to a restriction is remembered; restrictions stay mutable and are *not* versioned. That makes this story responsible for more than "an action happened":
+
+- Each event records who, when, the action, and the resource.
+- For an update, it carries a **snapshot of the fields that changed, before and after**. Without that, "someone edited this freeze" is not an answer to anything.
+- Events are immutable once written.
+
+`FZ-023` already refuses edits once a restriction is `ACTIVE`, `COMPLETED` or `CANCELLED`, so this covers the window before a freeze takes effect — which is the only window in which a restriction can change at all.
+
+Not in scope, and the accepted cost of `D-1`: point-in-time reconstruction. If that becomes a real requirement, an append-only revision table is the upgrade and these events are not wasted.
 
 ### FZ-061 — Error Handling
 **Status:** TODO

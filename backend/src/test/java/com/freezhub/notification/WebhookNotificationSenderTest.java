@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.headerDoesNotExist;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
@@ -13,6 +14,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.freezhub.integration.Integration;
 import com.freezhub.integration.IntegrationType;
+import com.freezhub.integration.WebhookSigning;
 import com.freezhub.restriction.ChangeRestriction;
 import com.freezhub.restriction.RestrictionLevel;
 import java.time.Instant;
@@ -132,6 +134,71 @@ class WebhookNotificationSenderTest {
         sender.send(notification(NotificationEvent.CANCELLED), restriction(), destination());
 
         endpoint.verify();
+    }
+
+    @Test
+    void signsTheDeliverySoAReceiverCanVerifyItCameFromFreezeHub() throws Exception {
+        // Without this, anyone who learns the endpoint can post a forged event to it —
+        // and a forged CANCELLED, telling an automated consumer a freeze has lifted, is
+        // the one worth forging (FZ-048).
+        Integration destination = destination();
+        AtomicReference<String> body = new AtomicReference<>();
+        AtomicReference<String> timestamp = new AtomicReference<>();
+        AtomicReference<String> signature = new AtomicReference<>();
+
+        endpoint.expect(requestTo(URL))
+                .andExpect(request -> {
+                    var mock = (org.springframework.mock.http.client.MockClientHttpRequest) request;
+                    body.set(mock.getBodyAsString());
+                    timestamp.set(mock.getHeaders().getFirst(WebhookSigning.TIMESTAMP_HEADER));
+                    signature.set(mock.getHeaders().getFirst(WebhookSigning.SIGNATURE_HEADER));
+                })
+                .andRespond(withSuccess());
+
+        sender.send(notification(NotificationEvent.CANCELLED), restriction(), destination);
+        endpoint.verify();
+
+        assertThat(timestamp.get()).isNotNull();
+        // Verified the way a receiver would: recompute over the body actually sent.
+        assertThat(signature.get()).isEqualTo(WebhookSigning.sign(
+                destination.getSigningSecret(), Long.parseLong(timestamp.get()), body.get()));
+    }
+
+    @Test
+    void deliversUnsignedRatherThanNotAtAllWhenThereIsNoSecretYet() {
+        // Only reachable for a webhook created before FZ-048, whose row has no secret.
+        // Refusing would silently stop announcements a customer is relying on; the
+        // downgrade is logged instead, and rotating the secret fixes it.
+        Integration legacy = destination();
+        org.springframework.test.util.ReflectionTestUtils.setField(legacy, "signingSecret", null);
+
+        endpoint.expect(requestTo(URL))
+                .andExpect(headerDoesNotExist(WebhookSigning.SIGNATURE_HEADER))
+                .andExpect(headerDoesNotExist(WebhookSigning.TIMESTAMP_HEADER))
+                .andRespond(withSuccess());
+
+        sender.send(notification(NotificationEvent.ACTIVATED), restriction(), legacy);
+
+        endpoint.verify();
+    }
+
+    @Test
+    void neverPutsTheSigningSecretOnTheWire() {
+        // The signature goes out; the key that produced it never does.
+        Integration destination = destination();
+        AtomicReference<String> everythingSent = new AtomicReference<>();
+
+        endpoint.expect(requestTo(URL))
+                .andExpect(request -> {
+                    var mock = (org.springframework.mock.http.client.MockClientHttpRequest) request;
+                    everythingSent.set(mock.getHeaders() + mock.getBodyAsString());
+                })
+                .andRespond(withSuccess());
+
+        sender.send(notification(NotificationEvent.ACTIVATED), restriction(), destination);
+        endpoint.verify();
+
+        assertThat(everythingSent.get()).doesNotContain(destination.getSigningSecret());
     }
 
     @Test

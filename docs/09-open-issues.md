@@ -38,17 +38,6 @@ Depends on a Cognito user pool existing (`FZ-063`), so the adapter and that infr
 
 Needs the lead-time decision before it can be specified.
 
-### OI-7 — Webhook deliveries are not authenticated
-**Severity:** Decision · **Owner:** needs a decision, then a story · **Found in:** `FZ-043`
-
-A receiver has no way to verify that a webhook request actually came from FreezeHub. Anyone who learns or guesses a customer's endpoint can post a forged event to it — and a forged `CANCELLED` telling an automated consumer that a freeze has been lifted is exactly the event worth forging.
-
-Standard remedies are an HMAC signature over the body with a per-integration shared secret, or requiring the customer's endpoint to carry its own token. Neither is specified anywhere: `00-product.md` lists the webhook channel, and `06-security.md` covers FreezeHub's *inbound* authentication but says nothing about authenticating what FreezeHub *sends*.
-
-Partly mitigated by the endpoint URL being secret-ish in practice (usually carrying a token in its path or query), which is why the URL is kept out of logs and `last_error` — but obscurity of the URL is not authentication of the request.
-
-Not fixed in `FZ-043` because inventing a signing scheme would have been inventing a requirement. It should be decided before a customer relies on webhook events for automation.
-
 ### OI-4 — Destination credentials are stored in plain text
 **Severity:** Decision · **Owner:** needs a decision, then a story · **Found in:** `FZ-040`, `FZ-045`
 
@@ -56,12 +45,7 @@ A Slack webhook URL is a bearer credential and lives in `integration.config` as 
 
 Partly mitigated already — the API never reads a credential back, and it is kept out of logs and `notification.last_error` — so the exposure is database-at-rest and anyone with database access, not the API surface. Acceptable for local development; needs an explicit decision before beta.
 
-### OI-5 — Mutable restrictions have no change history
-**Severity:** Decision · **Owner:** needs a decision · **Found in:** `FZ-023`
-
-Editing a scheduled restriction overwrites the previous state with no record that it changed or who changed it. Raised during `FZ-023` and deliberately deferred, not overlooked.
-
-`FZ-060` (Audit Events) covers part of it — recording *that* an administrative action happened — but not making the aggregate itself pristine. The alternatives (immutable/versioned restrictions, or an append-only change log) differ enough that the choice should be made before `FZ-060` is designed, not after.
+**Sharpened by `FZ-048`:** webhook signing added a second recoverable secret (`integration.signing_secret`), and unlike a channel credential it cannot be stored hashed — HMAC needs the key itself, so there is nothing to compare a hash against. Two kinds of plaintext credential now sit in one table.
 
 ### OI-10 — Frontend tests finish with three unhandled rejections
 **Severity:** Defect · **Owner:** needs a story · **Found in:** `FZ-052`
@@ -74,12 +58,14 @@ The product code is not implicated — this is the test harness not awaiting the
 
 Not touched by `FZ-052`, which changed no frontend file; found while running the frontend suite for its Definition of Done.
 
-### OI-6 — `docs/07-decisions.md` does not exist
+### OI-6 — `docs/07-decisions.md` is not backfilled
 **Severity:** Gap · **Owner:** needs a story · **Found in:** ongoing
 
-`02-architecture.md` says to create it "when meaningful architectural decisions accumulate". They have: Maven over Gradle; Cognito plus its Lite pricing tier; `BIGINT` keys over UUIDs; scope AND/OR/wildcard semantics; `@ElementCollection` for scope; `LAZY` collections with explicit initialisation; reconciliation rather than an in-memory timer; CSS Modules with no UI framework; the outbox's per-destination grain; hand-rolled forms instead of React Hook Form and Zod.
+**Partly resolved.** The file now exists, created by `FZ-048` to record `D-1` (restriction change history) and `D-2` (webhook signing) — the two decisions taken deliberately rather than as a side effect of implementing something.
 
-Each is currently recorded only in the backlog entry of the story that made it, which is not where anyone would look for "why is it like this".
+What remains is the **backfill**: Maven over Gradle; Cognito plus its Lite pricing tier; `BIGINT` keys over UUIDs; scope AND/OR/wildcard semantics; `@ElementCollection` for scope; `LAZY` collections with explicit initialisation; reconciliation rather than an in-memory timer; CSS Modules with no UI framework; the outbox's per-destination grain; hand-rolled forms instead of React Hook Form and Zod; the unsalted API key hash; `POST` rather than `GET` for policy evaluation; deriving "in force" from timestamps rather than status.
+
+Each is still recorded only in the backlog entry of the story that made it, which is not where anyone would look for "why is it like this".
 
 ## Resolved
 
@@ -95,4 +81,6 @@ Each is currently recorded only in the backlog entry of the story that made it, 
 | **The Policy API had no machine credential** — `FZ-051` was ordered before API keys, so the endpoint deciding whether deployments are blocked would have shipped with nothing able to authenticate to it | `FZ-050` | `FZ-052`, taken out of order |
 | Any error behind the machine chain came back as `401` — the forward to `/error` is re-filtered and does not match `/api/policy/**`, so it fell through to the human chain and reported a credential failure instead of the real one | `FZ-052` | `FZ-052` |
 | Testing Library's DOM cleanup never registered, leaking rendered DOM between tests | `FZ-031` | `FZ-031` |
+| **Mutable restrictions had no change history** — editing overwrote the previous state with no record of what changed or who changed it | `FZ-023` | decided (`D-1`): audit events with before/after, implemented by `FZ-060` |
+| **Webhook deliveries were unauthenticated** — a receiver could not tell a FreezeHub delivery from a forged one, and a forged `CANCELLED` announces that a freeze has been lifted | `FZ-043` | `FZ-048` |
 | **An unrecognised application or environment name could bypass a freeze** — it matches no scope list, so evaluating it normally tended toward `ALLOW`; misspelling the environment was a deliberate route to deploying during a freeze | `FZ-050` | `FZ-051` — decided: it blocks, and the response names what was not recognised |
