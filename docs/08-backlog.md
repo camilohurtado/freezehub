@@ -374,6 +374,23 @@ The suite now reports **zero** unhandled errors, and two tests were added for be
 
 Worth noting how it hid: the suite passed all 64 tests *and* reported the errors, so nothing failed. That is exactly the state in which a real unhandled rejection goes unnoticed.
 
+### FZ-038 — Administrator Settings UI
+**Status:** DONE
+
+**Closes most of `OI-11`.** Two things an administrator needed existed only in the API: issuing an API key — the primary integration step for the whole product — and setting how much warning a freeze gives. Requiring a hand-written HTTP call for either is not an onboarding path.
+
+**The one-time key reveal is the part that had to be right.** The raw key exists in exactly one HTTP response and nowhere afterwards, so it is shown on its own with a warning and **stays until dismissed**. Not a toast: a message that disappears by itself is the wrong shape for something unrecoverable, and the only remedy for missing it is issuing another key. There is a test for the persistence, not just the display.
+
+Revoking asks first, because there is no un-revoke and a pipeline stops working the moment it happens. A revoked key shows as revoked with no button, and a double revoke surfaces the backend's `409` rather than appearing to succeed.
+
+The lead time is a fixed set of choices — an hour up to a week — rather than a minutes field. The API accepts anything from 1 minute to 30 days, but "how much warning does the team want" has about six sensible answers, and a number box invites someone to type 90000 and collect a validation error. A value set outside the UI is kept and shown rather than silently replaced by the nearest option.
+
+`SettingsPage` now composes three sections (`IntegrationsSection`, `ApiKeysSection`, `OrganizationSection`), following the existing `CatalogSection` pattern — three inline would have made one component nobody wants to read. Each loads and fails independently, so a member sees three explanations rather than one blank page.
+
+Lists gained accessible names, which the existing test needed anyway once there were two of them.
+
+**Verified against a running backend**, comparing every response shape to the TypeScript types: `GET /api/api-keys` carries no `key` field, `POST` does, revoke returns the revoked row, and a member gets `403` on keys and on saving settings but `200` reading the organization — which is why this screen only reports forbidden on save.
+
 ## Milestone 4 — Notifications
 
 ### FZ-040 — Notification Model + Outbox

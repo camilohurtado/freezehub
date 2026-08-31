@@ -100,3 +100,30 @@ export interface Integration {
   createdAt: string
   updatedAt: string
 }
+
+/** A machine credential. Note the absence of the key itself — see `IssuedApiKey`. */
+export interface ApiKey {
+  id: number
+  name: string
+  keyPrefix: string
+  createdBy: number
+  createdAt: string
+  revokedAt: string | null
+  revoked: boolean
+}
+
+/** The creation response, and the only place the raw `key` ever appears. */
+export interface IssuedApiKey {
+  id: number
+  name: string
+  keyPrefix: string
+  key: string
+  createdBy: number
+  createdAt: string
+}
+
+export interface Organization {
+  id: number
+  name: string
+  startingSoonLeadTimeMinutes: number
+}

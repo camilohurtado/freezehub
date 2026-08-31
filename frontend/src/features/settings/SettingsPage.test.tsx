@@ -45,7 +45,7 @@ describe('SettingsPage', () => {
     expect(await screen.findByText('hooks.slack.com')).toBeInTheDocument()
     expect(screen.getByText('2 recipients')).toBeInTheDocument()
 
-    const list = screen.getByRole('list')
+    const list = screen.getByRole('list', { name: 'Notification destinations' })
     expect(within(list).getByText('Slack')).toBeInTheDocument()
     expect(within(list).getByText('Email')).toBeInTheDocument()
   })
