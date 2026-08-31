@@ -31,6 +31,8 @@ public final class NotificationMessage {
 
         return switch (event) {
             case SCHEDULED -> "Deployment freeze scheduled: " + restriction.getName();
+            case STARTING_SOON -> "Deployment freeze starts soon: " + restriction.getName()
+                    + " — " + blocking + " from " + UTC.format(restriction.getStartsAt()) + " UTC";
             case ACTIVATED -> "Deployment freeze is now active: " + restriction.getName()
                     + " — " + blocking;
             case COMPLETED -> "Deployment freeze finished: " + restriction.getName();
@@ -54,6 +56,10 @@ public final class NotificationMessage {
 
         if (event == NotificationEvent.CANCELLED) {
             text.append("\nThis restriction no longer applies.");
+        }
+        if (event == NotificationEvent.STARTING_SOON) {
+            // The point of warning ahead: there is still time to act on it.
+            text.append("\nMerge or deploy anything you need to before it begins.");
         }
 
         return text.toString();

@@ -34,20 +34,35 @@ public class RestrictionLifecycleScheduler {
     private static final Logger log = LoggerFactory.getLogger(RestrictionLifecycleScheduler.class);
 
     private final RestrictionLifecycleService restrictionLifecycleService;
+    private final StartingSoonNotifier startingSoonNotifier;
 
-    public RestrictionLifecycleScheduler(RestrictionLifecycleService restrictionLifecycleService) {
+    public RestrictionLifecycleScheduler(RestrictionLifecycleService restrictionLifecycleService,
+                                         StartingSoonNotifier startingSoonNotifier) {
         this.restrictionLifecycleService = restrictionLifecycleService;
+        this.startingSoonNotifier = startingSoonNotifier;
     }
 
     @EventListener(ApplicationReadyEvent.class)
     public void reconcileOnStartup() {
         log.info("Reconciling restriction lifecycle on startup");
-        restrictionLifecycleService.reconcile(Instant.now());
+        sweep();
     }
 
     @Scheduled(fixedDelayString = "${freezehub.lifecycle.interval:PT1M}")
     public void reconcilePeriodically() {
-        restrictionLifecycleService.reconcile(Instant.now());
+        sweep();
+    }
+
+    /**
+     * Both time-driven sweeps, on the same tick.
+     *
+     * <p>Status reconciliation first: it is what makes a restriction that has already
+     * begun stop being a candidate for "starting soon" (FZ-047).
+     */
+    private void sweep() {
+        Instant now = Instant.now();
+        restrictionLifecycleService.reconcile(now);
+        startingSoonNotifier.announceApproaching(now);
     }
 
 }

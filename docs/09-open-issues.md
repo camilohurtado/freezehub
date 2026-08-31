@@ -31,12 +31,12 @@ Not silently broken: without the `local` profile the application refuses to star
 
 Depends on a Cognito user pool existing (`FZ-063`), so the adapter and that infrastructure should be sequenced together.
 
-### OI-3 — "Restriction starting soon" notification is not implemented
-**Severity:** Gap · **Owner:** needs a story · **Found in:** `FZ-040`
+### OI-11 — Organization settings have no UI
+**Severity:** Gap · **Owner:** needs a story · **Found in:** `FZ-047`
 
-`00-product.md` lists it among the lifecycle notifications; nothing implements it. It is unlike every other event in two ways: it needs a **lead time** that no document specifies (how soon is "soon" — and is it per organization?), and it is triggered by the passage of time rather than by a state transition, so the outbox is written by a scheduled check rather than by a domain change.
+`FZ-047` added a per-organization "starting soon" lead time, settable through `PATCH /api/organization/settings` and nowhere else. `05-frontend.md` specifies no settings screen, so an administrator cannot change it without calling the API directly.
 
-Needs the lead-time decision before it can be specified.
+Small and low-risk, but it means a setting exists that the product cannot actually be configured through. Likely to grow: it is the first organization-level setting, and it will not be the last.
 
 ### OI-6 — `docs/07-decisions.md` is not backfilled
 **Severity:** Gap · **Owner:** needs a story · **Found in:** ongoing
@@ -61,6 +61,7 @@ Each is still recorded only in the backlog entry of the story that made it, whic
 | **The Policy API had no machine credential** — `FZ-051` was ordered before API keys, so the endpoint deciding whether deployments are blocked would have shipped with nothing able to authenticate to it | `FZ-050` | `FZ-052`, taken out of order |
 | Any error behind the machine chain came back as `401` — the forward to `/error` is re-filtered and does not match `/api/policy/**`, so it fell through to the human chain and reported a credential failure instead of the real one | `FZ-052` | `FZ-052` |
 | Testing Library's DOM cleanup never registered, leaking rendered DOM between tests | `FZ-031` | `FZ-031` |
+| **The "restriction starting soon" notification was never implemented**, though `00-product.md` lists it — it needed a lead-time decision nobody had made | `FZ-040` | `FZ-047` — per organization, defaulting to 24 hours |
 | **Destination credentials and webhook signing secrets were stored in plain text**, readable to anyone with a database connection or a backup | `FZ-040`, `FZ-045`, `FZ-048` | `FZ-049` — decided (`D-3`): AES-256-GCM in the application, behind a port that keeps the Secrets Manager lane open |
 | Frontend tests finished with three unhandled rejections — the test router had no route for where the page navigates on success, so React Router threw while unmounting | `FZ-052` | `FZ-037` |
 | **Mutable restrictions had no change history** — editing overwrote the previous state with no record of what changed or who changed it | `FZ-023` | decided (`D-1`): audit events with before/after, implemented by `FZ-060` |
