@@ -706,6 +706,17 @@ Implement the minimum AWS/Terraform deployment architecture required for beta.
 
 Build/test/deploy automation for backend and frontend.
 
+### FZ-066 — Decision Log Backfill
+**Status:** DONE
+
+**Fixes `OI-6`.** `02-architecture.md` asked for `docs/07-decisions.md` "when meaningful architectural decisions accumulate". They had — a dozen of them, each recorded only in the backlog entry of the story that made it, which is not where anyone looks for "why is it like this".
+
+`FZ-048` created the file for `D-1` and `D-2`; this backfills `D-5` to `D-16` and adds `D-4`, recording the decision to sequence the Cognito adapter with `FZ-063` rather than build it against a service nothing can reach (`OI-2`).
+
+**Numbering is by when a decision was written down, not when it was made.** `D-1` to `D-3` are already referenced from `SecretProtector`, `AesGcmSecretProtector` and three documents, so renumbering into chronological order would have broken those references for a cosmetic gain. Each entry carries the story that made it instead.
+
+Every entry states a **cost**. That is the part worth keeping: a decision recorded without what it gave up reads as a justification rather than a decision, and is no help to whoever revisits it.
+
 ### FZ-065 — Beta Hardening
 **Status:** TODO
 

@@ -6,9 +6,11 @@ Why the system is the way it is, for decisions that were genuinely open and whos
 
 `02-architecture.md` asks for this file "when meaningful architectural decisions accumulate". They had. Until now each decision lived only in the backlog entry of the story that made it, which is not where anyone looks for "why is it like this".
 
-**This file is not complete.** It starts with the two decisions taken deliberately, in isolation, rather than as a side effect of implementing something. Backfilling the decisions already made inside stories — Maven over Gradle, `BIGINT` keys over UUIDs, scope AND/OR/wildcard semantics, reconciliation rather than timers, CSS Modules with no UI framework, the outbox's per-destination grain, the unsalted API key hash, `POST` rather than `GET` for policy evaluation — remains `OI-6`.
+`D-1` to `D-4` were taken deliberately, in isolation, rather than as a side effect of implementing something. `D-5` onwards were backfilled by `FZ-066` from the stories that made them.
 
-Format: what was decided, what else was considered, and what it costs. A decision with no stated cost has not been thought about hard enough.
+Format: what was decided, what else was considered, and what it costs. **A decision with no stated cost has not been thought about hard enough.**
+
+Not everything belongs here. A decision earns an entry when it was genuinely open and its answer shapes work beyond the story that made it — not for every choice a story had to make.
 
 ---
 
@@ -104,3 +106,173 @@ GCM rather than CBC because it authenticates as well as encrypts: a row edited d
 The stored form carries a `fzenc1:` scheme prefix, and anything without it is treated as pre-`FZ-049` plaintext and returned as-is. So **existing rows are not migrated**; they are encrypted the next time they are written. No bulk re-encryption task exists, which is acceptable because no deployed environment does — if one ever ships before this, it needs one.
 
 Key rotation is not implemented. The scheme prefix is what makes it addable later without a flag day.
+
+---
+
+## D-4 — The Cognito identity adapter is sequenced with the infrastructure that provisions the pool
+
+**Date:** 2026-08-30 · **Concerns:** `OI-2` · **Implemented by:** `FZ-046` together with `FZ-063`
+
+### Decision
+
+`FZ-046` (a real `AdminCreateUser` implementation of the `IdentityProvider` port) is not built ahead of `FZ-063`. The two ship together, and `OI-2` stays open until they do.
+
+### Why
+
+Writing the adapter now means writing it against a service nothing can reach: no AWS account is provisioned, so it could not be executed even once, and its first real run would happen during infrastructure work anyway. An adapter verified only against a mock, sitting unexercised for months, is a liability rather than a head start.
+
+The alarming-sounding consequence of leaving it — **the backend cannot start at all outside the `local` profile**, because no `IdentityProvider` bean exists — bites exactly when the first deployed environment appears, which is `FZ-063` itself. That fail-fast is deliberate (`FZ-016`) and is doing its job.
+
+### Cost
+
+`OI-2` stays open, and `FZ-063` carries more work than pure infrastructure. Accepted: the alternative front-loads the same work with none of the verification.
+
+---
+
+# Backfilled decisions
+
+Everything below was decided inside the story that needed it and recorded only in `08-backlog.md`, which is not where anyone looks for "why is it like this". Recorded here by `FZ-066`.
+
+**Numbering is by when a decision was written down, not when it was made**, because `D-1` to `D-3` are already referenced from code and renumbering would break those references. Each entry carries the story that made it.
+
+---
+
+## D-5 — Maven, not Gradle
+
+**Made by:** `FZ-002`
+
+Spring Boot's own documentation, most Stack Overflow answers, and every Spring Initializr default assume Maven. For a modular monolith with no unusual build requirements, the ceiling on Gradle's flexibility is never approached, and the floor — a build file anyone can read without learning Groovy or Kotlin DSL — matters more.
+
+**Cost:** slower builds on a large codebase, and no incremental compilation. Neither is felt at this size.
+
+---
+
+## D-6 — Amazon Cognito, on the Lite tier
+
+**Made by:** `FZ-010`
+
+Confirms `02-architecture.md`, which named Cognito "subject to security-step confirmation". Lite because `00-product.md` requires none of what Essentials adds — no passwordless login, passkeys, or advanced threat protection — and Lite is roughly a third of the per-user price beyond the free tier.
+
+**Cost:** revisit if a documented requirement later needs an Essentials-only feature. Moving up a tier is a configuration change, not a migration.
+
+---
+
+## D-7 — `BIGINT` identity keys, not UUIDs
+
+**Made by:** `FZ-011`, at the user's direction
+
+Cheaper to index and join, smaller on every foreign key, and readable in a log or a support conversation.
+
+Sequential ids being guessable is not a tenant-isolation risk here, and that is a property of the design rather than luck: authorization is never derived from an id. Every request's `organization_id` comes from the authenticated principal, and every tenant-owned lookup is scoped by it — so guessing a neighbour's id yields a `404`, not their data.
+
+**Cost:** ids are not globally unique, so they cannot be minted client-side or merged across databases. Neither is needed.
+
+---
+
+## D-8 — Scope matches with OR inside a dimension, AND across dimensions, and an empty dimension is a wildcard
+
+**Made by:** `FZ-020`, at the user's direction · **Implemented by:** `FZ-051`
+
+Teams, applications and environments are independent dimensions. Naming a team *and* an application therefore **narrows** — "this application, and only while it belongs to this team" — rather than widening to a union.
+
+An empty dimension places no constraint, which is what lets "freeze every deployment to production" be expressed by naming only an environment. Invariant 3 keeps that safe: a restriction with no targets in any dimension is rejected, so a scope can never mean "everything, everywhere".
+
+**Cost:** a scope naming a team and an application outside it matches nothing. Deliberately not rejected at creation, because membership is mutable — a scope that matches nothing today may match tomorrow.
+
+---
+
+## D-9 — Scope is an `@ElementCollection`, not an entity
+
+**Made by:** `FZ-020`
+
+Scope rows have no identity of their own and are owned parts of the restriction, so they are persisted and removed with it. Contrast `TeamApplication`, which joins two *independent* aggregates and is therefore an entity.
+
+**Cost:** scope rows cannot be queried or referenced independently. Nothing needs to.
+
+---
+
+## D-10 — Scope collections are `LAZY`, initialised explicitly
+
+**Made by:** `FZ-021`, revisited by `FZ-051`
+
+`EAGER` made every list call issue 3N+1 queries. `LAZY` plus a deliberate `Hibernate.initialize` where scope is actually needed keeps listing to a single query regardless of row count.
+
+`FZ-051` added `@BatchSize` on top, because policy evaluation touches the scope of a whole candidate set and is asked once per deployment: 20 in-force restrictions cost three scope queries rather than sixty.
+
+**Cost:** touching scope outside a transaction throws. That is caught by tests, and the explicit initialisation is what makes the intent visible.
+
+---
+
+## D-11 — Restriction lifecycle is reconciled, not scheduled
+
+**Made by:** `FZ-025`
+
+No timers and no in-memory state. Each run compares persisted timestamps against a supplied instant and corrects the stored status with set-based updates, so it is idempotent, safe to run concurrently with itself, and recovers by itself after a restart or an outage of any length.
+
+Triggered on startup as well as periodically, because a periodic tick alone would leave statuses stale for however long the process was down.
+
+**Cost:** the stored `status` can lag by up to one interval — which is exactly why `D-13` exists.
+
+---
+
+## D-12 — The notification outbox is per (event × destination)
+
+**Made by:** `FZ-040`
+
+Slack succeeding while a webhook fails is a normal outcome, and one status per event could not express it. Retry (`FZ-044`) has to be per destination for the same reason.
+
+Rows are written **in the same transaction as the domain change**, which is what makes the intent survive a crash between "restriction activated" and "notification queued" — the job a message broker would otherwise do, which `02-architecture.md` rules out for the MVP.
+
+The unique constraint on (restriction, integration, event) is the load-bearing part: it makes enqueueing idempotent, so a reconciliation that runs twice cannot notify anyone twice. `FZ-047` later depended on exactly that, and needed no new machinery.
+
+**Cost:** more rows than a per-event design, and fan-out happens at enqueue time, so a destination added later does not receive past events.
+
+---
+
+## D-13 — "In force" is derived from timestamps, never from the `status` column
+
+**Made by:** `FZ-050`, implemented by `FZ-051`
+
+A restriction is in force when `startsAt <= now < endsAt` and it is not `CANCELLED`. `status` is a materialised convenience maintained by the reconciler in `D-11` and can lag by up to one interval.
+
+Reading `status == ACTIVE` would allow a deployment during a freeze whose activation tick had not yet run — a silent enforcement hole appearing only under load or right after a restart, and very hard to diagnose.
+
+**Cost:** the decision cannot be answered by an index-only lookup on `status`. Irrelevant at this scale, and correctness is not negotiable on the enforcement path.
+
+---
+
+## D-14 — Policy evaluation is a `POST`, and an unregistered name blocks
+
+**Made by:** `FZ-050` and `FZ-051`, the second at the user's direction · **Resolves:** `OI-8`
+
+`POST` despite being a read: a `GET` is cacheable, and a cached `ALLOW` served during a freeze is precisely the failure the endpoint exists to prevent.
+
+An application or environment name the catalog does not recognise returns `BLOCK`, naming what was not recognised. An unrecognised name matches no scope list, so evaluating it normally tends toward `ALLOW` — making a misspelt environment a route to deploying straight through a freeze with a legitimate-looking permission in the pipeline log.
+
+Returned as a `200` carrying `BLOCK` rather than a `4xx`, because an error status lands in the pipeline's error branch, which is where clients choose fail-open or fail-closed for themselves — a rejection expressed as an error can be configured away, a decision cannot.
+
+**Cost:** FreezeHub becomes a gate on catalog completeness. An unregistered application cannot deploy at all, even with no freeze anywhere, so registering applications and environments is part of onboarding.
+
+---
+
+## D-15 — API keys are stored as an unsalted SHA-256 hash
+
+**Made by:** `FZ-052`
+
+`06-security.md` originally said "salted hash". A salt defeats rainbow tables and offline brute force against *low-entropy* secrets; against 256 bits of `SecureRandom` there is nothing to guess.
+
+A per-key salt would also stop the hash of an incoming key from identifying its row, forcing either a second lookup handle inside the token or hashing every stored row on every call — on an endpoint asked once per deployment.
+
+Note the contrast with `D-3`: a webhook signing secret cannot be hashed at all, because HMAC needs the key itself. Different problems, different storage.
+
+**Cost:** a documented divergence from the original wording of the security specification, which was updated with this reasoning rather than left to contradict the code.
+
+---
+
+## D-16 — CSS Modules and native form controls, with no UI framework
+
+**Made by:** `FZ-030`, extended by `FZ-032`
+
+No styling dependency and no component library (`CLAUDE.md`: no dependencies without a concrete need). `<input type="datetime-local">` and `<select multiple>` cover the create-restriction form. Forms are hand-rolled rather than using React Hook Form and Zod, because the backend is the authoritative validator and the frontend only needs enough to be pleasant.
+
+**Cost:** multi-select UX is basic, and each new form repeats a little wiring. Accepted deliberately; revisit if the form count grows.
