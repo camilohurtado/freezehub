@@ -23,6 +23,12 @@ export function AppLayout() {
             Restrictions
           </NavLink>
           <NavLink
+            to="/deployment-checks"
+            className={({ isActive }) => (isActive ? styles.linkActive : styles.link)}
+          >
+            Checks
+          </NavLink>
+          <NavLink
             to="/catalog"
             className={({ isActive }) => (isActive ? styles.linkActive : styles.link)}
           >
