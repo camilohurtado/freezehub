@@ -17,6 +17,30 @@ public enum AuditAction {
     RESTRICTION_ACTIVATED,
     RESTRICTION_COMPLETED,
 
+    /**
+     * A team, application or environment was added, renamed or removed (FZ-072).
+     *
+     * <p>{@code CATALOG_RENAMED} is the one that earns its place. Because an unrecognised
+     * name blocks (decision {@code D-14}), renaming an application turns every pipeline
+     * still using the old name into a refusal — a wall of red in the console with, until
+     * this existed, nothing anywhere explaining why it started.
+     *
+     * <p>Which kind of thing it was is {@code resourceType}, so three actions cover nine
+     * cases without nine enum values that would only ever be read together.
+     */
+    CATALOG_CREATED,
+    CATALOG_RENAMED,
+    CATALOG_DELETED,
+
+    /**
+     * An application joined or left a team (FZ-072).
+     *
+     * <p>Audit-worthy because it silently changes what a team-scoped freeze covers,
+     * without anybody touching the freeze.
+     */
+    APPLICATION_TEAM_ASSIGNED,
+    APPLICATION_TEAM_UNASSIGNED,
+
     API_KEY_ISSUED,
     API_KEY_REVOKED,
 

@@ -33,16 +33,6 @@ Not silently broken: without the `local` profile the application refuses to star
 
 The "cannot start outside `local`" consequence bites exactly when the first deployed environment appears, which is `FZ-063` itself. Stays open until the pair ships.
 
-### OI-12 — Catalog changes are not audited
-**Severity:** Gap · **Owner:** needs a story · **Found in:** `FZ-060`
-
-`FZ-060` records restriction, API key, user and settings changes. Catalog changes are not recorded, and two of them are audit-worthy for exactly the reasons restrictions are:
-
-- **Renaming an application or environment** breaks every pipeline referencing the old name, and — because an unregistered name now blocks (`D-14`) — turns those deployments into refusals. "Why did every deploy start failing at 14:00?" has no answer in the trail.
-- **Changing team membership** silently changes what a team-scoped freeze covers, without touching the freeze.
-
-Deliberately left out of `FZ-060`, which was scoped to what `00-product.md` names. The machinery is already there: `AuditTrail`, the actions enum, and the read API all extend to it.
-
 ### OI-11 — The audit trail has no UI
 **Severity:** Gap · **Owner:** needs a story · **Found in:** `FZ-047`, narrowed by `FZ-038`
 
@@ -66,6 +56,7 @@ A log view is a different shape from the settings screens: keyset pagination (`?
 | **The Policy API had no machine credential** — `FZ-051` was ordered before API keys, so the endpoint deciding whether deployments are blocked would have shipped with nothing able to authenticate to it | `FZ-050` | `FZ-052`, taken out of order |
 | Any error behind the machine chain came back as `401` — the forward to `/error` is re-filtered and does not match `/api/policy/**`, so it fell through to the human chain and reported a credential failure instead of the real one | `FZ-052` | `FZ-052` |
 | Testing Library's DOM cleanup never registered, leaking rendered DOM between tests | `FZ-031` | `FZ-031` |
+| **Catalog changes were not audited** — renaming an application turned every pipeline using the old name into a refusal, with nothing in the trail explaining when it started or who caused it | `FZ-060` | `FZ-072` |
 | **`docs/07-decisions.md` did not exist**, so every architectural decision was recorded only in the backlog entry of the story that made it | ongoing | `FZ-048` created it; `FZ-066` backfilled the rest |
 | **The "restriction starting soon" notification was never implemented**, though `00-product.md` lists it — it needed a lead-time decision nobody had made | `FZ-040` | `FZ-047` — per organization, defaulting to 24 hours |
 | **Destination credentials and webhook signing secrets were stored in plain text**, readable to anyone with a database connection or a backup | `FZ-040`, `FZ-045`, `FZ-048` | `FZ-049` — decided (`D-3`): AES-256-GCM in the application, behind a port that keeps the Secrets Manager lane open |

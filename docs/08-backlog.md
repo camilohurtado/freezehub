@@ -713,7 +713,7 @@ Design points worth keeping:
 
 **Corrected during the story:** a comment claimed the scope collections had to be copied because `replaceEditableState` refills them in place. Removing the copy and re-running the tests showed they still passed — `FieldChanges.compare` evaluates eagerly, so it is the *ordering* that makes the diff correct, not the copy. The comment now says that; the copies are kept as cheap insurance, not presented as the thing that saves it.
 
-**Not recorded, and worth knowing:** catalog changes. Renaming an application breaks every pipeline referencing the old name (`D-14`), and changing team membership silently changes what a team-scoped freeze covers — both are audit-worthy for the same reasons restrictions are. Left out to keep this story to what `00-product.md` asks for; tracked as `OI-12`.
+**Not recorded by this story:** catalog changes, left out to keep it to what `00-product.md` asks for and tracked as `OI-12`. Added by `FZ-072`.
 
 **No frontend.** `05-frontend.md` specifies no audit screen; the trail is readable through the API. Folded into `OI-11`.
 
@@ -849,6 +849,26 @@ FZ-013...
 ```
 
 Parallel work is allowed only when dependencies are clear and the changes do not create conflicting architectural decisions.
+
+### FZ-072 — Catalog Changes in the Audit Trail
+**Status:** DONE
+
+**Fixes `OI-12`.** `FZ-060` recorded restriction, API key, user and settings changes but not catalog ones. That gap grew teeth once `FZ-071` shipped: because an unrecognised name blocks (`D-14`), renaming an application turns every pipeline still sending the old name into a refusal — so the console fills with red and nothing anywhere says when it started or who caused it.
+
+Recorded now: `CATALOG_CREATED`, `CATALOG_RENAMED` and `CATALOG_DELETED` for teams, applications and environments, plus `APPLICATION_TEAM_ASSIGNED` and `APPLICATION_TEAM_UNASSIGNED` — the latter because moving an application between teams silently changes what a team-scoped freeze covers without anybody touching the freeze.
+
+**Three actions rather than nine.** Which kind of thing it was is already `resourceType`, so `CATALOG_RENAMED` + `APPLICATION` says everything `APPLICATION_RENAMED` would, without nine enum values that would only ever be read together.
+
+**No migration.** `FZ-060` put a `CHECK` on `actor_type` and deliberately not on `action` or `resource_type`, so new values cost nothing.
+
+Nothing is recorded when nothing happened: a rename to the same name, a repeated assignment, or a deletion refused because a restriction still references the entry (`409`). Each has a test.
+
+**Verified live by reproducing the scenario that motivated it** — a pipeline deploying happily, an administrator renaming the application, and the same unchanged pipeline refused a second later. The trail now reads as the story it is:
+
+```text
+07:12:05  dev@acme.test  CATALOG_RENAMED  APPLICATION  {"name":{"from":"payments-api","to":"payments-service"}}
+07:12:05  gitlab-ci      POLICY_BLOCKED_UNREGISTERED   {"application":"payments-api","unregistered":"[APPLICATION]"}
+```
 
 ## Milestone 7 — Deployment Visibility
 

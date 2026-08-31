@@ -3,6 +3,9 @@ package com.freezhub.audit;
 /** What the action was done to. */
 public enum AuditResourceType {
     RESTRICTION,
+    TEAM,
+    APPLICATION,
+    ENVIRONMENT,
     API_KEY,
     USER,
     ORGANIZATION,
