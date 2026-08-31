@@ -185,7 +185,7 @@ class ApiKeyControllerTest {
         mockMvc.perform(post("/api/api-keys/" + keyId + "/revoke")
                         .header("Authorization", "Bearer " + admin.token()))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.message", containsString("already revoked")));
+                .andExpect(jsonPath("$.detail", containsString("already revoked")));
     }
 
     @Test

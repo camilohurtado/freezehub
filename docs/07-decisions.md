@@ -276,3 +276,31 @@ Note the contrast with `D-3`: a webhook signing secret cannot be hashed at all, 
 No styling dependency and no component library (`CLAUDE.md`: no dependencies without a concrete need). `<input type="datetime-local">` and `<select multiple>` cover the create-restriction form. Forms are hand-rolled rather than using React Hook Form and Zod, because the backend is the authoritative validator and the frontend only needs enough to be pleasant.
 
 **Cost:** multi-select UX is basic, and each new form repeats a little wiring. Accepted deliberately; revisit if the form count grows.
+
+---
+
+## D-17 — Errors are RFC 9457 Problem Details
+
+**Date:** 2026-08-31 · **Implemented by:** `FZ-061`
+
+### Decision
+
+Every error response is `application/problem+json` with `type`, `title`, `status`, `detail` and `instance`, plus two extensions: `timestamp`, and `errors` naming the fields that failed validation.
+
+### Why
+
+There were two shapes before — one for deliberate rejections, Spring's default for everything else — and a validation failure carried no information at all beyond `400`. A form cannot highlight a field it was never told about.
+
+Problem Details rather than a house format because it is the standard, Spring supports it natively, and FreezeHub already has a machine-facing API where a caller may well have a library that understands it.
+
+`type` is `about:blank` throughout: a URI pointing at documentation that does not exist would be worse than none. Typed error codes are a later addition if a client ever needs to branch on something finer than the status.
+
+### Alternatives
+
+- **Keep the existing ad-hoc shape and apply it everywhere.** Less churn for the frontend, but it would have been inventing a format where a standard exists, and it still had nowhere to put field errors.
+
+### Cost
+
+A breaking change to the response body — anticipated by this backlog entry since `FZ-030`, and cheaper than expected because the frontend wrapper already read `detail` as a fallback. Status codes are unchanged, which is what the UI actually branches on.
+
+The invariant that survives from the previous handler, and matters more than the format: **a deliberate rejection explains itself, an unexpected failure never does.** A `500` always reads "The request could not be completed."; the real exception is logged. A catch-all handler makes that easy to get wrong, so there is a test that throws a deliberately identifiable message and asserts it appears nowhere in the response.

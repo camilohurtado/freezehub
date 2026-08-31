@@ -701,13 +701,23 @@ Design points worth keeping:
 **No frontend.** `05-frontend.md` specifies no audit screen; the trail is readable through the API. Folded into `OI-11`.
 
 ### FZ-061 — Error Handling
-**Status:** TODO
+**Status:** DONE
 
 Standardize API error responses and frontend handling.
 
 Note added during `FZ-030`: this milestone lands **after** the frontend is built, so Milestone 3 ships against unstandardised error bodies. `05-frontend.md` therefore requires the fetch wrapper to tolerate a body it cannot parse and fall back to a status-derived message. When this item is implemented, revisit that wrapper and the per-page error states rather than assuming they still match — the status codes the UI branches on (`400`/`401`/`403`/`404`/`409`) are already established by the endpoints and should not change, but the body shape will.
 
-The backend currently returns errors via `ResponseStatusException` and Spring's defaults; no custom error contract exists yet.
+**Decision `D-17`: RFC 9457 Problem Details**, `application/problem+json`, one shape for the whole API. Status codes are unchanged, as this entry required.
+
+What actually improved, beyond consistency:
+
+- **A validation failure now names the fields.** Previously a `400` said only "400" — a form could not highlight what it was never told about. The `errors` extension lists each field with its message, and where there is exactly one, `detail` names it directly so a client ignoring extensions still gets something actionable.
+- **The invariant is preserved and now stated:** a deliberate rejection explains itself, an unexpected failure never does. Every `500` reads "The request could not be completed."; the real exception is logged. There is a test that throws a deliberately identifiable message and asserts it appears nowhere in the response.
+- Jackson's own message is not returned for a malformed body, because it quotes the offending JSON and names the Java types it tried to bind.
+
+**A regression this story introduced and its own test caught:** adding a catch-all `@ExceptionHandler(Exception.class)` swallowed Spring's `NoResourceFoundException`, turning an unmapped path from `404` into `500`. `ApiKeyErrorDispatchTest` — written in `FZ-052` against a real servlet container for a completely different reason — failed immediately. The fix checks for the `ErrorResponse` interface rather than a list of exception types, so a Spring exception this code has never heard of is still answered with its own status.
+
+Frontend: the wrapper reads `detail`, exposes `fieldErrors`, and composes them into the message. It still tolerates an unparseable body — deliberately, since a `401` from the security chain has no body and a proxy in front of the API is outside the backend's control.
 
 ### FZ-062 — Observability Baseline
 **Status:** TODO

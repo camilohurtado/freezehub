@@ -84,7 +84,9 @@ Full representation from `GET /api/restrictions/{id}`, including scope. Shows st
 | `404` | unknown **or another tenant's** resource | "not found" — never implies existence |
 | `409` | state conflict (edit non-scheduled, re-cancel, duplicate name) | surface the backend's message; refetch, as the state has moved |
 
-Error-response **bodies** are not yet standardised — that is `FZ-061`. Until then the wrapper must tolerate a body it cannot parse and fall back to a status-derived message.
+Error bodies are **RFC 9457 Problem Details** (`FZ-061`), so the wrapper reads `detail` and exposes `fieldErrors` from the `errors` extension. Where a response names specific fields, the wrapper composes them into the message — "the request has 2 invalid fields" tells someone staring at a form nothing about which two.
+
+It still tolerates a body it cannot parse, and that is not leftover caution: a `401` from the security chain has no body at all, and anything served by a proxy in front of the API is outside the backend's control entirely.
 
 ## Time zone convention
 
@@ -135,7 +137,7 @@ Each gap this specification surfaced now has an owner in `08-backlog.md`, rather
 | No way to obtain a token in development until a Cognito pool exists | **`FZ-035`** — Development Sign-In Token | before `FZ-031` |
 | No UI creates the catalog data `FZ-033`'s scope pickers need | **`FZ-036`** — Catalog Management UI | before `FZ-033` |
 | UTC conversion of `datetime-local` values | acceptance criterion on **`FZ-033`** | within `FZ-033` |
-| Error response bodies are not standardised until after this milestone | note on **`FZ-061`** | revisit the fetch wrapper then |
+| ~~Error response bodies are not standardised until after this milestone~~ | **`FZ-061`** | done — the wrapper now reads Problem Details and surfaces field errors |
 
 `FZ-036` carries an explicit alternative: deferring it and accepting catalog setup as an API-only onboarding operation is a legitimate product choice — the same posture already taken for provisioning an organization's first user. What must not happen is `FZ-033` being built on the unexamined assumption that the data is there.
 
