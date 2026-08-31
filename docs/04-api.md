@@ -41,14 +41,38 @@ A resource belonging to another organization returns **`404`, not `403`** — ex
 | `404` | unknown **or** another organization's resource |
 | `409` | state conflict — the resource has moved on; refetch |
 
-Errors carry the reason in a `message` field:
+Every error is **RFC 9457 Problem Details**, served as `application/problem+json` (`FZ-061`):
 
 ```jsonc
-{ "timestamp": "…", "status": 409, "error": "Conflict",
-  "message": "A team with this name already exists", "path": "/api/teams" }
+{ "type": "about:blank", "title": "Conflict", "status": 409,
+  "detail": "A team with this name already exists",
+  "instance": "/api/teams", "timestamp": "2026-08-31T04:21:48Z" }
 ```
 
-Only deliberately-thrown rejections include `message`; unexpected failures fall back to Spring's default body without one, so a `500` never leaks internals. Standardising this shape further is `FZ-061`.
+`detail` is the sentence worth showing a person. `timestamp` is an extension, kept because it is what correlates a support conversation with a log line.
+
+**A validation failure names the offending fields**, in an `errors` extension:
+
+```jsonc
+{ "type": "about:blank", "title": "Bad Request", "status": 400,
+  "detail": "The request has 2 invalid fields.",
+  "instance": "/api/restrictions", "timestamp": "…",
+  "errors": [
+    { "field": "reason", "message": "must not be blank" },
+    { "field": "name",   "message": "must not be blank" }
+  ] }
+```
+
+With a single bad field, `detail` names it directly ("name must not be blank"), so a client that ignores extensions still gets something actionable.
+
+**The rule underneath all of it: a deliberate rejection explains itself; an unexpected failure never does.** Anything the API chose to reject carries its reason. A `500` always reads *"The request could not be completed."* — the text of an unexpected exception is internal detail, and the real one is logged instead.
+
+**Two responses carry no body**, by design rather than omission:
+
+- `401` from the security chain, which answers before any handler runs.
+- `204`, which has nothing to say.
+
+A client must therefore not assume a body is present on failure. `type` is `about:blank` throughout: a URI pointing at documentation that does not exist would be worse than none. Typed error codes are a later addition if a client ever needs to branch on something finer than the status.
 
 ### Time
 

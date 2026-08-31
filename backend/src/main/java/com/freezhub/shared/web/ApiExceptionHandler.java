@@ -1,50 +1,171 @@
 package com.freezhub.shared.web;
 
 import jakarta.servlet.http.HttpServletRequest;
+import java.net.URI;
 import java.time.Instant;
+import java.util.List;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.ProblemDetail;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.web.ErrorResponse;
+import org.springframework.validation.FieldError;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
- * Returns the reason attached to a {@link ResponseStatusException} so the client can say
- * what actually went wrong.
+ * One error shape for the whole API (FZ-061): RFC 9457 Problem Details, served as
+ * {@code application/problem+json}.
  *
- * <p>Spring omits {@code message} from its default error body unless
- * {@code server.error.include-message} is enabled, which would also expose the text of
- * *unexpected* exceptions — a 500 would start leaking internals. This is narrower on
- * purpose: only reasons the application deliberately wrote are returned, and anything
- * unhandled still falls through to Spring's default handling with no message.
+ * <p>Before this, a client saw two different shapes and a great deal of nothing. Reasons
+ * the API had deliberately written — "a team with this name already exists" — arrived as a
+ * bare status code, and a validation failure said only {@code 400} without naming the
+ * field that caused it.
  *
- * <p>Without this every carefully worded conflict — "a team with this name already
- * exists", "referenced by one or more change restrictions" — reaches the UI as nothing
- * more than "409".
- *
- * <p>A complete error contract is `FZ-061`; this is the minimum that makes the messages
- * the API already produces actually usable.
+ * <p><strong>The rule that matters here: a deliberate rejection explains itself; an
+ * unexpected failure never does.</strong> Anything the application chose to reject carries
+ * its reason to the client. Anything else is logged in full and answered with a fixed
+ * sentence, because the text of an unexpected exception is a stack of internal detail —
+ * table names, class names, occasionally values — that a caller must never receive.
  */
 @RestControllerAdvice
 public class ApiExceptionHandler {
 
-    @ExceptionHandler(ResponseStatusException.class)
-    ResponseEntity<ApiErrorBody> handleResponseStatusException(ResponseStatusException exception,
-                                                              HttpServletRequest request) {
-        HttpStatus status = HttpStatus.resolve(exception.getStatusCode().value());
-        String error = status != null ? status.getReasonPhrase() : "Error";
+    private static final Logger log = LoggerFactory.getLogger(ApiExceptionHandler.class);
 
-        return ResponseEntity.status(exception.getStatusCode())
-                .body(new ApiErrorBody(
-                        Instant.now(),
-                        exception.getStatusCode().value(),
-                        error,
-                        exception.getReason(),
-                        request.getRequestURI()));
+    /** Deliberately not a link to documentation that does not exist. */
+    private static final URI NO_TYPE = URI.create("about:blank");
+
+    @ExceptionHandler(ResponseStatusException.class)
+    ProblemDetail handleResponseStatus(ResponseStatusException exception, HttpServletRequest request) {
+        HttpStatus status = HttpStatus.resolve(exception.getStatusCode().value());
+        String detail = exception.getReason() != null
+                ? exception.getReason()
+                : (status != null ? status.getReasonPhrase() : "Request failed");
+
+        return problem(exception.getStatusCode().value(), detail, request);
     }
 
-    /** Mirrors the shape of Spring's default error body, plus the message. */
-    public record ApiErrorBody(Instant timestamp, int status, String error, String message, String path) {
+    /**
+     * Bean Validation failures, with the offending fields named.
+     *
+     * <p>The {@code errors} extension is the point: "request validation failed" tells a
+     * caller nothing they can act on, and a form cannot highlight a field it was not told
+     * about. {@code detail} stays readable on its own for clients that ignore extensions.
+     */
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    ProblemDetail handleValidation(MethodArgumentNotValidException exception, HttpServletRequest request) {
+        List<ApiFieldError> errors = exception.getBindingResult().getFieldErrors().stream()
+                .map(error -> new ApiFieldError(error.getField(), messageOf(error)))
+                .toList();
+
+        String detail = errors.size() == 1
+                ? errors.getFirst().field() + " " + errors.getFirst().message()
+                : "The request has " + errors.size() + " invalid fields.";
+
+        ProblemDetail problem = problem(HttpStatus.BAD_REQUEST.value(), detail, request);
+        problem.setProperty("errors", errors);
+        return problem;
+    }
+
+    /**
+     * A body Jackson could not read: malformed JSON, or a value outside an enum — an
+     * unsupported {@code action} on the Policy API arrives here.
+     *
+     * <p>The exception's own message is not returned. It quotes the offending JSON and
+     * names the Java types it tried to bind, which is internal detail.
+     */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    ProblemDetail handleUnreadableBody(HttpMessageNotReadableException exception,
+                                       HttpServletRequest request) {
+        log.debug("Rejected an unreadable request body on {}", request.getRequestURI(), exception);
+        return problem(HttpStatus.BAD_REQUEST.value(),
+                "The request body is malformed, or a field holds an unsupported value.", request);
+    }
+
+    /** A query parameter that will not convert — a repeated {@code ?status=} with a bad value. */
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    ProblemDetail handleTypeMismatch(MethodArgumentTypeMismatchException exception,
+                                     HttpServletRequest request) {
+        return problem(HttpStatus.BAD_REQUEST.value(),
+                "'" + exception.getName() + "' holds an unsupported value.", request);
+    }
+
+    /** Authenticated but not permitted — currently only the Administrator-only endpoints. */
+    @ExceptionHandler(AccessDeniedException.class)
+    ProblemDetail handleAccessDenied(AccessDeniedException exception, HttpServletRequest request) {
+        return problem(HttpStatus.FORBIDDEN.value(),
+                "This action requires an administrator.", request);
+    }
+
+    /**
+     * Everything unforeseen.
+     *
+     * <p>Logged in full with the path, so it is diagnosable; answered with a fixed
+     * sentence, so nothing internal reaches the caller. This is the one handler where the
+     * exception's message must never become {@code detail}.
+     *
+     * <p>Spring's own web exceptions are the exception to "everything is a 500", and the
+     * reason for the {@link ErrorResponse} check: an unmapped path, a method that is not
+     * allowed and an unsupported content type all arrive here, and every one of them
+     * carries the status it should be answered with. Reporting {@code 500} instead sends
+     * whoever is debugging it looking for a fault that is not there — which is exactly
+     * what happened when this handler was first added, caught by the machine-chain test
+     * asserting a valid API key against an unmapped policy path gets a {@code 404}.
+     *
+     * <p>The check is on the interface rather than on a list of exception types, so a
+     * Spring exception this code has never heard of is still answered correctly.
+     */
+    @ExceptionHandler(Exception.class)
+    ProblemDetail handleUnexpected(Exception exception, HttpServletRequest request) {
+        int status = exception instanceof ErrorResponse errorResponse
+                ? errorResponse.getStatusCode().value()
+                : HttpStatus.INTERNAL_SERVER_ERROR.value();
+
+        // Only a genuine fault is worth an ERROR line; a 404 is a client mistake.
+        if (status >= 500) {
+            log.error("Unhandled exception on {} {}", request.getMethod(), request.getRequestURI(), exception);
+        } else {
+            log.debug("Rejected {} {} with {}", request.getMethod(), request.getRequestURI(), status, exception);
+        }
+
+        HttpStatus resolved = HttpStatus.resolve(status);
+        // The status is taken from the exception; the wording never is.
+        String detail = status >= 500 || resolved == null
+                ? "The request could not be completed."
+                : resolved.getReasonPhrase();
+
+        return problem(status, detail, request);
+    }
+
+    private ProblemDetail problem(int status, String detail, HttpServletRequest request) {
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.valueOf(status), detail);
+        problem.setType(NO_TYPE);
+        problem.setInstance(URI.create(request.getRequestURI()));
+
+        HttpStatus resolved = HttpStatus.resolve(status);
+        if (resolved != null) {
+            problem.setTitle(resolved.getReasonPhrase());
+        }
+
+        // An RFC 9457 extension, kept because it is what correlates a support
+        // conversation with a log line. Request ids are FZ-062.
+        problem.setProperty("timestamp", Instant.now());
+        return problem;
+    }
+
+    /** Bean Validation's own message, which reads as a sentence fragment: "must not be blank". */
+    private String messageOf(FieldError error) {
+        return error.getDefaultMessage() == null ? "is invalid" : error.getDefaultMessage();
+    }
+
+    /** One invalid field, named so a form can point at it. */
+    public record ApiFieldError(String field, String message) {
     }
 
 }
