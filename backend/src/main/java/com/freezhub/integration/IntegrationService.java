@@ -42,6 +42,27 @@ public class IntegrationService {
     }
 
     /**
+     * Issues a new webhook signing secret, invalidating the previous one at once
+     * (FZ-048).
+     *
+     * <p>Only meaningful for a webhook: nothing else signs anything, so asking for a
+     * secret on a Slack or email destination is a mistake worth reporting rather than
+     * silently ignoring.
+     */
+    @Transactional
+    public Integration rotateSigningSecret(Long organizationId, Long integrationId) {
+        Integration integration = findOwned(organizationId, integrationId);
+
+        if (integration.getType() != IntegrationType.WEBHOOK) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Only a WEBHOOK integration has a signing secret; this one is " + integration.getType());
+        }
+
+        integration.rotateSigningSecret(WebhookSigning.generateSecret());
+        return integration;
+    }
+
+    /**
      * Removes a destination entirely.
      *
      * <p>Queued notifications for it are discarded with it — the schema cascades, because

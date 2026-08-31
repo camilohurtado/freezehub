@@ -41,12 +41,24 @@ public class IntegrationController {
                 .toList();
     }
 
+    /**
+     * Creates a destination. For a WEBHOOK the response carries the {@code signingSecret},
+     * which is shown here and nowhere else (FZ-048).
+     */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public IntegrationResponse create(@AuthenticationPrincipal AuthenticatedUser caller,
-                                      @Valid @RequestBody IntegrationRequest request) {
-        return IntegrationResponse.from(
+    public IssuedIntegrationResponse create(@AuthenticationPrincipal AuthenticatedUser caller,
+                                            @Valid @RequestBody IntegrationRequest request) {
+        return IssuedIntegrationResponse.from(
                 integrationService.create(caller.organizationId(), request.type(), request.config()));
+    }
+
+    /** Issues a new webhook signing secret and returns it once. 409 for any other type. */
+    @PostMapping("/{integrationId}/signing-secret")
+    public IssuedIntegrationResponse rotateSigningSecret(@AuthenticationPrincipal AuthenticatedUser caller,
+                                                         @PathVariable Long integrationId) {
+        return IssuedIntegrationResponse.from(
+                integrationService.rotateSigningSecret(caller.organizationId(), integrationId));
     }
 
     @PatchMapping("/{integrationId}")

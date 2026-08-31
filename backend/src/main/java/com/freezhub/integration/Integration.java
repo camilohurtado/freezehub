@@ -39,6 +39,16 @@ public class Integration {
     @Column(nullable = false)
     private String config;
 
+    /**
+     * Shared secret a webhook receiver uses to verify a delivery came from FreezeHub
+     * (FZ-048). Null for every other channel, and for webhooks created before that
+     * story until they are rotated.
+     *
+     * <p>Held recoverable rather than hashed, because signing needs the key itself.
+     */
+    @Column(name = "signing_secret")
+    private String signingSecret;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -53,6 +63,11 @@ public class Integration {
         this.type = type;
         this.config = config;
         this.enabled = true;
+        // Enforced here rather than in the service so a webhook cannot be created
+        // without one by any code path, present or future (FZ-048).
+        if (type == IntegrationType.WEBHOOK) {
+            this.signingSecret = WebhookSigning.generateSecret();
+        }
     }
 
     @PrePersist
@@ -85,6 +100,22 @@ public class Integration {
 
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;
+    }
+
+    public String getSigningSecret() {
+        return signingSecret;
+    }
+
+    /**
+     * Issues a new signing secret, invalidating the previous one immediately.
+     *
+     * <p>Deliberately abrupt: there is no overlap window in which both secrets are
+     * accepted, so a rotation is a coordinated change with the receiver. Supporting two
+     * live secrets would mean a leaked one keeps working for the length of the window,
+     * which is the opposite of why anyone rotates.
+     */
+    void rotateSigningSecret(String signingSecret) {
+        this.signingSecret = signingSecret;
     }
 
     public String getConfig() {

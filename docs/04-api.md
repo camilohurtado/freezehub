@@ -67,7 +67,8 @@ Authenticated with a JWT; all tenant-scoped.
 | `POST GET` | `/api/restrictions` | create; list with repeatable `?status=` |
 | `GET PUT` | `/api/restrictions/{id}` | detail; full replacement, `SCHEDULED` only |
 | `POST` | `/api/restrictions/{id}/cancel` | `SCHEDULED` or `ACTIVE` only |
-| `GET POST PATCH DELETE` | `/api/integrations` | **ADMINISTRATOR only**; stored credentials are never returned |
+| `GET POST PATCH DELETE` | `/api/integrations` | **ADMINISTRATOR only**; stored credentials are never returned. Creating a `WEBHOOK` returns its `signingSecret` once |
+| `POST` | `/api/integrations/{id}/signing-secret` | **ADMINISTRATOR only**; rotates a webhook signing secret, `409` for any other channel |
 | `GET POST` | `/api/api-keys` | **ADMINISTRATOR only**; `POST` returns the raw key once |
 | `POST` | `/api/api-keys/{id}/revoke` | **ADMINISTRATOR only**; permanent, `409` if already revoked |
 

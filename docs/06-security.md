@@ -61,6 +61,26 @@ A separate header (rather than reusing `Authorization`) keeps human (JWT) and ma
 
 **Resolved by `FZ-052` — the hash is not salted.** This document originally said "salted hash (e.g. SHA-256)". A salt defeats rainbow tables and offline brute force against *low-entropy* secrets; neither attack applies to a 256-bit random value, because there is nothing to guess. A per-key salt would also mean the hash of an incoming key no longer identifies its row, forcing either a second lookup handle inside the token or hashing every stored row on every call — and the Policy API is asked on every deployment. What this section actually requires is unchanged and holds exactly: the raw key is never stored, and lookup is by hash.
 
+## Outbound Authentication (Webhook Signing)
+
+Everything above is about authenticating what reaches FreezeHub. This is the other direction: letting a customer's receiver verify that a webhook delivery actually came from FreezeHub (`FZ-048`, decision `D-2` in `07-decisions.md`).
+
+Without it, anyone who learns a customer's endpoint URL can post a forged event to it — and a forged `CANCELLED`, telling an automated consumer that a freeze has been lifted, is the one worth forging.
+
+- **Secret:** `whsec_` followed by 256 bits of `SecureRandom` entropy, generated per webhook integration and returned **once** at creation. Stored recoverable rather than hashed, because signing requires the key itself — see the note under Secrets Management.
+- **Headers on every delivery:**
+
+  ```text
+  X-FreezeHub-Timestamp: 1700000000
+  X-FreezeHub-Signature: sha256=<hex>
+  ```
+
+- **Signed string:** `"<timestamp>.<body>"`, HMAC-SHA256 with the shared secret, hex-encoded. The timestamp is signed *with* the body deliberately: it is what stops a captured delivery being replayed with a different body, and it lets a receiver reject deliveries that are too old.
+- **Verification, receiver side:** recompute the HMAC over `timestamp + "." + raw body` and compare in constant time. Reject if the timestamp is outside an acceptable window (300 seconds is a reasonable default). Compare against the **raw** body, before any JSON reformatting — re-serialising changes the bytes and the signature will not match.
+- **Rotation:** `POST /api/integrations/{id}/signing-secret` issues a new secret and invalidates the previous one immediately. There is no overlap window, so rotation is coordinated with the receiver — an overlap would keep a leaked secret working for exactly as long as it lasted.
+
+Integrations created before `FZ-048` have no secret and are delivered unsigned, with a warning logged, until rotated.
+
 ## Authorization
 
 MVP does not implement advanced RBAC (`00-product.md`, Out of Scope). Role checks are deliberately few, and each one guards something that decides what the organization itself can do rather than a resource within it. `role = ADMINISTRATOR` is required to:
@@ -81,6 +101,7 @@ Every other authenticated action is available to any user within their own organ
 
 - Cognito app client configuration: environment-specific configuration values (issuer URI, client ID), not secrets by themselves. Any actual secret material uses AWS Secrets Manager in deployed environments (`02-architecture.md`), and environment variables locally.
 - API key raw secrets: never stored, anywhere, after creation.
+- **Webhook signing secrets are the exception, and a deliberate one**: HMAC requires the key itself, so there is nothing to compare a hash against. They are stored recoverable in `integration.signing_secret`, which is exactly the exposure `OI-4` tracks and a reason to settle it before beta.
 
 ## Out of Scope for MVP
 
