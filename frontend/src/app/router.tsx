@@ -6,6 +6,7 @@ import { SignInPage } from '../features/auth/SignInPage'
 import { DashboardPage } from '../features/dashboard/DashboardPage'
 import { RestrictionsPage } from '../features/restrictions/RestrictionsPage'
 import { CatalogPage } from '../features/catalog/CatalogPage'
+import { DeploymentChecksPage } from '../features/deployments/DeploymentChecksPage'
 import { SettingsPage } from '../features/settings/SettingsPage'
 import { CreateRestrictionPage } from '../features/restrictions/CreateRestrictionPage'
 import { RestrictionDetailPage } from '../features/restrictions/RestrictionDetailPage'
@@ -31,6 +32,7 @@ export const routes = [
       { path: 'restrictions/new', element: <CreateRestrictionPage /> },
       { path: 'restrictions/:restrictionId', element: <RestrictionDetailPage /> },
       { path: 'restrictions/:restrictionId/edit', element: <EditRestrictionPage /> },
+      { path: 'deployment-checks', element: <DeploymentChecksPage /> },
       { path: 'catalog', element: <CatalogPage /> },
       { path: 'settings', element: <SettingsPage /> },
     ],

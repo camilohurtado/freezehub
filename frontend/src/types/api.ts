@@ -127,3 +127,30 @@ export interface Organization {
   name: string
   startingSoonLeadTimeMinutes: number
 }
+
+/** A restriction as it was when a check happened — denormalised, immune to a later rename. */
+export interface MatchedRestrictionSummary {
+  id: number
+  name: string
+  level: RestrictionLevel
+}
+
+/**
+ * A record that somebody asked whether they could deploy, and what they were told.
+ *
+ * A check, not a deployment: FreezeHub sees the question and nothing after it.
+ */
+export interface DeploymentCheck {
+  id: number
+  application: string
+  environment: string
+  decision: 'ALLOW' | 'BLOCK'
+  blockedReason: 'RESTRICTION' | 'UNREGISTERED' | null
+  matchedRestrictions: MatchedRestrictionSummary[] | null
+  actor: string | null
+  reference: string | null
+  source: string | null
+  /** The credential that asked — a pipeline, never a person. `actor` is the person. */
+  checkedBy: string
+  checkedAt: string
+}

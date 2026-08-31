@@ -878,8 +878,14 @@ Acceptance:
 - **Data handling:** `actor` and `reference` are customer PII arriving on every deploy. They are never logged, and the retention setting is what bounds them.
 
 ### FZ-071 — Deployment Console
-**Status:** TODO
+**Status:** DONE
 
-The screen teams actually look at: recent deployment checks, what each was told, and — the view worth selling — every attempt refused while a freeze was in force.
+`/deployment-checks`, open to **any member** rather than administrators only — it is where a team looks to see whether their own deployment got through, and making them ask an administrator would defeat the point.
 
-Depends on `FZ-070`.
+Each row answers who tried what: application → environment, the person (from `actor`, falling back to the credential when the pipeline did not say), a truncated commit reference, when, and a link to the run. A refusal names **what refused it** — the hard freezes only, since an advisory that merely rode along did not stop anything and naming it would be wrong.
+
+**The unregistered case reads differently from a real freeze**, deliberately: one is the product working, the other is a pipeline misconfigured or somebody trying a misspelling to get through (`D-14`).
+
+**The page says in words that these are questions, not deployments**, and there is a test for that sentence. Decision `D-19` has to reach the person reading the screen, not just whoever reads the code — believing these are deployments would mislead in exactly the audit the screen exists to serve.
+
+Filter state lives in the URL, so *"everything we refused"* is a link someone can send. Paging is by cursor, and "load older" appears only when a page came back full — otherwise it would be a button that does nothing.

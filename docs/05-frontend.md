@@ -28,12 +28,18 @@ Accepted trade-off: multi-select UX is basic. Revisit if usability testing shows
 /restrictions              -> Restriction list     (FZ-032)
 /restrictions/new          -> Create restriction   (FZ-033)
 /restrictions/:id          -> Restriction detail   (FZ-034)
+/restrictions/:id/edit     -> Edit restriction     (FZ-034)
+/catalog                   -> Catalog management   (FZ-036)
+/settings                  -> Integrations, API keys, advance warning (FZ-045, FZ-038)
+/deployment-checks         -> Deployment checks    (FZ-071)
 *                          -> Not found
 ```
 
 Every route except the dev sign-in is authenticated: without a token the app redirects to sign-in rather than rendering an empty page.
 
-Deliberately **not** in Milestone 3, and not to be built ahead of a backlog item: catalog management (teams/applications/environments), integrations, audit, API keys, organization settings.
+Added after Milestone 3, each with its own backlog item: catalog management (`FZ-036`), integrations (`FZ-045`), API keys and organization settings (`FZ-038`), and the deployment checks console (`FZ-071`). **Audit remains without a screen** — `OI-11`.
+
+The checks console is the one route open to any member rather than administrators only: it is where a team looks to see whether their own deployment got through, and making them ask an administrator would defeat the point.
 
 ## Page responsibilities
 
