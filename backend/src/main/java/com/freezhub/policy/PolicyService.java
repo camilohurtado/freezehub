@@ -51,17 +51,20 @@ public class PolicyService {
     private final EnvironmentRepository environmentRepository;
     private final TeamApplicationRepository teamApplicationRepository;
     private final AuditTrail auditTrail;
+    private final PolicyMetrics metrics;
 
     public PolicyService(ChangeRestrictionRepository changeRestrictionRepository,
                          ApplicationRepository applicationRepository,
                          EnvironmentRepository environmentRepository,
                          TeamApplicationRepository teamApplicationRepository,
-                         AuditTrail auditTrail) {
+                         AuditTrail auditTrail,
+                         PolicyMetrics metrics) {
         this.changeRestrictionRepository = changeRestrictionRepository;
         this.applicationRepository = applicationRepository;
         this.environmentRepository = environmentRepository;
         this.teamApplicationRepository = teamApplicationRepository;
         this.auditTrail = auditTrail;
+        this.metrics = metrics;
     }
 
     /**
@@ -96,6 +99,7 @@ public class PolicyService {
                             .with("unregistered", unregistered.toString())
                             .toJson());
 
+            metrics.blockedUnregistered();
             return blockUnregistered(request, now, unregistered);
         }
 
@@ -109,6 +113,12 @@ public class PolicyService {
 
         boolean blocked = matched.stream()
                 .anyMatch(restriction -> restriction.getLevel() == RestrictionLevel.HARD_FREEZE);
+
+        if (blocked) {
+            metrics.blockedByRestriction();
+        } else {
+            metrics.allowed();
+        }
 
         return new PolicyEvaluationResponse(
                 blocked ? PolicyDecision.BLOCK : PolicyDecision.ALLOW,

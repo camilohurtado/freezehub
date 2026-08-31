@@ -304,3 +304,23 @@ Problem Details rather than a house format because it is the standard, Spring su
 A breaking change to the response body — anticipated by this backlog entry since `FZ-030`, and cheaper than expected because the frontend wrapper already read `detail` as a fallback. Status codes are unchanged, which is what the UI actually branches on.
 
 The invariant that survives from the previous handler, and matters more than the format: **a deliberate rejection explains itself, an unexpected failure never does.** A `500` always reads "The request could not be completed."; the real exception is logged. A catch-all handler makes that easy to get wrong, so there is a test that throws a deliberately identifiable message and asserts it appears nowhere in the response.
+
+---
+
+## D-18 — Notification failures are metrics, never a health indicator
+
+**Date:** 2026-08-31 · **Implemented by:** `FZ-062`
+
+### Decision
+
+Failing or abandoned notifications are counted (`freezehub.notifications{outcome}`) and logged. They never affect `/actuator/health`.
+
+### Why
+
+A custom health indicator is the obvious way to surface "notifications are failing", and it is the wrong one. The load balancer reads health, and ECS replaces tasks that fail it — so reporting DOWN because a customer's Slack webhook is unreachable would take the **API** down over a problem the API does not have. Deployments would then be blocked by a freeze nobody could cancel, which is the worst available outcome.
+
+Health answers one question: should this instance receive traffic. Anything else belongs in metrics, where it can be alerted on without being acted on automatically.
+
+### Cost
+
+Nothing surfaces a delivery problem on its own. It shows up on a dashboard or an alert rule that does not exist yet, so until an exporter is wired up (a deployment concern, once `FZ-063` is applied) the counters have to be looked at deliberately. Accepted: the alternative trades a silent notification failure for a loud outage.

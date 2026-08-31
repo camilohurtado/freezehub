@@ -35,16 +35,19 @@ public class NotificationDelivery {
     private final NotificationRepository notificationRepository;
     private final IntegrationRepository integrationRepository;
     private final ChangeRestrictionRepository changeRestrictionRepository;
+    private final NotificationMetrics metrics;
     private final Map<IntegrationType, NotificationSender> sendersByType =
             new EnumMap<>(IntegrationType.class);
 
     public NotificationDelivery(NotificationRepository notificationRepository,
                                 IntegrationRepository integrationRepository,
                                 ChangeRestrictionRepository changeRestrictionRepository,
-                                List<NotificationSender> senders) {
+                                List<NotificationSender> senders,
+                                NotificationMetrics metrics) {
         this.notificationRepository = notificationRepository;
         this.integrationRepository = integrationRepository;
         this.changeRestrictionRepository = changeRestrictionRepository;
+        this.metrics = metrics;
         senders.forEach(sender -> sendersByType.put(sender.type(), sender));
     }
 
@@ -75,6 +78,7 @@ public class NotificationDelivery {
             // Both cascade on delete, so this means a concurrent removal. Retrying cannot
             // fix that, so it is abandoned rather than left to burn attempts.
             notification.abandon("Destination or restriction no longer exists");
+            metrics.abandoned();
             return false;
         }
 
@@ -84,6 +88,7 @@ public class NotificationDelivery {
             // is not a delivery failure.
             notification.deferUntil("Destination is disabled",
                     RetryPolicy.nextAttemptAfter(0, now));
+            metrics.deferred();
             return false;
         }
 
@@ -95,18 +100,31 @@ public class NotificationDelivery {
             notification.deferUntil(
                     "No sender configured for channel " + destination.get().getType(),
                     RetryPolicy.nextAttemptAfter(0, now));
+            metrics.deferred();
             return false;
         }
 
         try {
             sender.send(notification, restriction.get(), destination.get());
             notification.markSent();
+            metrics.sent();
             return true;
         } catch (RuntimeException failure) {
             notification.markAttemptFailed(failure.getMessage(), now);
-            log.warn("Notification {} to {} failed (attempt {}): {}",
-                    notification.getId(), destination.get().getType(),
-                    notification.getAttempts(), failure.getMessage());
+            // Counted as abandoned rather than failed once the attempt limit is spent:
+            // "will be retried" and "will never arrive" are different problems, and only
+            // the second is worth waking someone for (FZ-062).
+            if (notification.getStatus() == NotificationStatus.FAILED) {
+                metrics.abandoned();
+                log.error("Notification {} to {} abandoned after {} attempts: {}",
+                        notification.getId(), destination.get().getType(),
+                        notification.getAttempts(), failure.getMessage());
+            } else {
+                metrics.failed();
+                log.warn("Notification {} to {} failed (attempt {}): {}",
+                        notification.getId(), destination.get().getType(),
+                        notification.getAttempts(), failure.getMessage());
+            }
             return false;
         }
     }

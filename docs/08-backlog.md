@@ -720,9 +720,26 @@ What actually improved, beyond consistency:
 Frontend: the wrapper reads `detail`, exposes `fieldErrors`, and composes them into the message. It still tolerates an unparseable body — deliberately, since a `401` from the security chain has no body and a proxy in front of the API is outside the backend's control.
 
 ### FZ-062 — Observability Baseline
-**Status:** TODO
+**Status:** DONE
 
 Add production-appropriate logs, health checks, and visibility for notification/policy failures.
+
+**Request correlation.** Every request gets an id — an incoming `X-Request-Id` is honoured so a load balancer's or a caller's own tracing survives, otherwise one is generated. It goes into the MDC, onto every log line, into the response header, and into the error body (`FZ-061`). A user quoting the `requestId` from a failed response is now an exact log lookup rather than "it failed at about three".
+
+The supplied header is **sanitised before it reaches a log file**: an unbounded value is somebody else's newline injected into the logs, and a forged log line is worse than a missing one. The MDC is cleared in a `finally`, because threads are pooled and inheriting the previous request's id is confidently wrong rather than merely absent.
+
+**A gap the live check exposed:** the id had almost nothing to correlate with. Nothing logged a completed request — a validation failure logs nothing at all — so the id appeared only on the rare line the application chose to write. Grepping for a real request id found zero lines. The filter now writes one line per request (method, path, status, duration), excluding health probes, which the load balancer asks for every thirty seconds and which would bury everything else. No headers and no body: one carries credentials, the other carries customer data.
+
+**Health checks.** Liveness and readiness probes are enabled and the load balancer now reads **readiness** rather than the aggregate endpoint — readiness reports false while Liquibase is still migrating, which is exactly when a task must not be sent traffic and exactly when the aggregate endpoint already says UP. The security chain needed `/actuator/health/**`, not an exact match, or the probes would have answered the load balancer with a `401`; there is a test for it.
+
+**Visibility.** Micrometer counters, no new dependency:
+
+- `freezehub.notifications{outcome=sent|failed|abandoned|deferred}`
+- `freezehub.policy.evaluations{decision, reason}`
+
+`abandoned` is the one worth alerting on — an announcement that will now never arrive — and it is logged at ERROR rather than WARN for the same reason. Policy blocks are counted separately by *why*: a block by a real freeze is the product working, while a rise in `unregistered` is a pipeline misconfigured or somebody probing for a way through (`D-14`). All series are registered at startup so a dashboard has a line to draw before the first deployment rather than a gap.
+
+**Deliberately not a health indicator** — see `D-18`. Metrics are exposed behind authentication and `health` is public; moving actuator to an internal port is the next step once there is real traffic, and exporting to CloudWatch or Prometheus is a deployment concern for when the infrastructure is actually applied.
 
 ### FZ-063 — Production Infrastructure
 **Status:** DONE (written and validated; **never applied**)
