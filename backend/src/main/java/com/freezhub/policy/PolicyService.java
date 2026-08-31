@@ -1,5 +1,10 @@
 package com.freezhub.policy;
 
+import com.freezhub.audit.AuditAction;
+import com.freezhub.audit.AuditActor;
+import com.freezhub.audit.AuditDetails;
+import com.freezhub.audit.AuditResourceType;
+import com.freezhub.audit.AuditTrail;
 import com.freezhub.catalog.Application;
 import com.freezhub.catalog.ApplicationRepository;
 import com.freezhub.catalog.Environment;
@@ -11,6 +16,7 @@ import com.freezhub.restriction.ChangeRestriction;
 import com.freezhub.restriction.ChangeRestrictionRepository;
 import com.freezhub.restriction.RestrictionLevel;
 import com.freezhub.restriction.RestrictionStatus;
+import com.freezhub.shared.security.ApiKeyPrincipal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -44,19 +50,27 @@ public class PolicyService {
     private final ApplicationRepository applicationRepository;
     private final EnvironmentRepository environmentRepository;
     private final TeamApplicationRepository teamApplicationRepository;
+    private final AuditTrail auditTrail;
 
     public PolicyService(ChangeRestrictionRepository changeRestrictionRepository,
                          ApplicationRepository applicationRepository,
                          EnvironmentRepository environmentRepository,
-                         TeamApplicationRepository teamApplicationRepository) {
+                         TeamApplicationRepository teamApplicationRepository,
+                         AuditTrail auditTrail) {
         this.changeRestrictionRepository = changeRestrictionRepository;
         this.applicationRepository = applicationRepository;
         this.environmentRepository = environmentRepository;
         this.teamApplicationRepository = teamApplicationRepository;
+        this.auditTrail = auditTrail;
     }
 
-    @Transactional(readOnly = true)
-    public PolicyEvaluationResponse evaluate(Long organizationId, PolicyEvaluationRequest request, Instant now) {
+    /**
+     * Not {@code readOnly}: a refusal caused by an unregistered name writes an audit
+     * entry (FZ-060), and it has to commit with the decision that produced it.
+     */
+    @Transactional
+    public PolicyEvaluationResponse evaluate(Long organizationId, ApiKeyPrincipal caller,
+                                             PolicyEvaluationRequest request, Instant now) {
         // Exact names. A near miss is a miss: the catalog's uniqueness is case-sensitive,
         // so treating "Prod" as "prod" here would make this endpoint disagree with the
         // registry it is reading from.
@@ -74,6 +88,14 @@ public class PolicyService {
         }
 
         if (!unregistered.isEmpty()) {
+            auditTrail.record(organizationId, AuditActor.of(caller),
+                    AuditAction.POLICY_BLOCKED_UNREGISTERED, AuditResourceType.POLICY, null,
+                    AuditDetails.builder()
+                            .with("application", request.application())
+                            .with("environment", request.environment())
+                            .with("unregistered", unregistered.toString())
+                            .toJson());
+
             return blockUnregistered(request, now, unregistered);
         }
 

@@ -668,7 +668,7 @@ Do not build a native plugin yet.
 ## Milestone 6 — Audit and Beta Readiness
 
 ### FZ-060 — Audit Events
-**Status:** TODO
+**Status:** DONE
 
 Record important administrative and restriction lifecycle actions.
 
@@ -681,6 +681,24 @@ Record important administrative and restriction lifecycle actions.
 `FZ-023` already refuses edits once a restriction is `ACTIVE`, `COMPLETED` or `CANCELLED`, so this covers the window before a freeze takes effect — which is the only window in which a restriction can change at all.
 
 Not in scope, and the accepted cost of `D-1`: point-in-time reconstruction. If that becomes a real requirement, an append-only revision table is the upgrade and these events are not wasted.
+
+**Recorded:** restriction created / updated / cancelled (by a user) and activated / completed (by the system); API key issued and revoked; organization settings changed; and a policy evaluation refused because it named an unregistered application or environment.
+
+That last one closes the thread `D-14` left open. Only *refusals* are recorded — an ordinary evaluation happens on every deployment and would bury the trail it belongs to — and it is the one entry attributed to an `API_KEY` actor rather than a person. One occurrence is a typo; twenty is a pattern, and the pattern is only visible if each one is written down.
+
+Design points worth keeping:
+
+- **`AuditTrail` uses `Propagation.MANDATORY`**, exactly like `NotificationOutbox`. The entry commits in the same transaction as the change it describes, so no entry can claim a change that rolled back and none is missing for one that did not. Calling it outside a transaction fails loudly rather than silently reintroducing the gap.
+- **The actor's label is denormalised and there is no foreign key to `users`.** An audit trail that breaks — or is rewritten — when a user is renamed or removed is not an audit trail.
+- **Only changed fields are recorded**, with before and after. A diff listing every field buries the one thing the reader came for. An update that changed nothing succeeds and records nothing.
+- **`AuditDetails` exists so nothing builds that JSON by concatenation.** The first version of the API-key entry did, and an API key named `ci "quoted" name` would have produced a row no reader could parse. Verified live with exactly that name.
+- **Keyset pagination on `id`, not an offset.** The trail is append-only, so with an offset every entry written between two page requests shifts the window and the reader silently skips some.
+
+**Corrected during the story:** a comment claimed the scope collections had to be copied because `replaceEditableState` refills them in place. Removing the copy and re-running the tests showed they still passed — `FieldChanges.compare` evaluates eagerly, so it is the *ordering* that makes the diff correct, not the copy. The comment now says that; the copies are kept as cheap insurance, not presented as the thing that saves it.
+
+**Not recorded, and worth knowing:** catalog changes. Renaming an application breaks every pipeline referencing the old name (`D-14`), and changing team membership silently changes what a team-scoped freeze covers — both are audit-worthy for the same reasons restrictions are. Left out to keep this story to what `00-product.md` asks for; tracked as `OI-12`.
+
+**No frontend.** `05-frontend.md` specifies no audit screen; the trail is readable through the API. Folded into `OI-11`.
 
 ### FZ-061 — Error Handling
 **Status:** TODO

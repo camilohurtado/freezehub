@@ -33,6 +33,16 @@ Not silently broken: without the `local` profile the application refuses to star
 
 The "cannot start outside `local`" consequence bites exactly when the first deployed environment appears, which is `FZ-063` itself. Stays open until the pair ships.
 
+### OI-12 — Catalog changes are not audited
+**Severity:** Gap · **Owner:** needs a story · **Found in:** `FZ-060`
+
+`FZ-060` records restriction, API key, user and settings changes. Catalog changes are not recorded, and two of them are audit-worthy for exactly the reasons restrictions are:
+
+- **Renaming an application or environment** breaks every pipeline referencing the old name, and — because an unregistered name now blocks (`D-14`) — turns those deployments into refusals. "Why did every deploy start failing at 14:00?" has no answer in the trail.
+- **Changing team membership** silently changes what a team-scoped freeze covers, without touching the freeze.
+
+Deliberately left out of `FZ-060`, which was scoped to what `00-product.md` names. The machinery is already there: `AuditTrail`, the actions enum, and the read API all extend to it.
+
 ### OI-11 — Two administrator features exist only in the API
 **Severity:** Gap · **Owner:** needs a story · **Found in:** `FZ-047`, widened during the beta-readiness audit
 
@@ -40,6 +50,7 @@ The Settings page manages notification destinations and nothing else. Two things
 
 - **API keys (`FZ-052`)** — no UI at all. This is the more serious of the two: issuing a CI credential is how a customer connects the Policy API, which is the product's core value. Requiring a hand-written HTTP call for the primary integration step is not a viable onboarding path.
 - **The "starting soon" lead time (`FZ-047`)** — `PATCH /api/organization/settings` and nowhere else. The first organization-level setting, and unlikely to be the last.
+- **The audit trail (`FZ-060`)** — readable only through `GET /api/audit`. The trail answers "who changed this freeze", which is a question an administrator asks under pressure, not one they want to curl.
 
 Neither is hard; both block being able to hand the product to a customer administrator and walk away.
 

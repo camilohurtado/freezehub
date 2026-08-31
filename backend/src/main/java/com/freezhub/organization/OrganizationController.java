@@ -1,5 +1,10 @@
 package com.freezhub.organization;
 
+import com.freezhub.audit.AuditAction;
+import com.freezhub.audit.AuditActor;
+import com.freezhub.audit.AuditResourceType;
+import com.freezhub.audit.AuditTrail;
+import com.freezhub.audit.FieldChanges;
 import com.freezhub.shared.security.AuthenticatedUser;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
@@ -12,6 +17,7 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 /**
@@ -29,9 +35,11 @@ import org.springframework.web.server.ResponseStatusException;
 public class OrganizationController {
 
     private final OrganizationRepository organizationRepository;
+    private final AuditTrail auditTrail;
 
-    public OrganizationController(OrganizationRepository organizationRepository) {
+    public OrganizationController(OrganizationRepository organizationRepository, AuditTrail auditTrail) {
         this.organizationRepository = organizationRepository;
+        this.auditTrail = auditTrail;
     }
 
     @GetMapping
@@ -41,11 +49,28 @@ public class OrganizationController {
 
     @PatchMapping("/settings")
     @PreAuthorize("hasRole('ADMINISTRATOR')")
+    @Transactional
     public OrganizationResponse updateSettings(@AuthenticationPrincipal AuthenticatedUser caller,
                                                @Valid @RequestBody SettingsRequest request) {
         Organization organization = owned(caller);
+
+        FieldChanges changes = FieldChanges.builder().compare(
+                "startingSoonLeadTimeMinutes",
+                organization.getStartingSoonLeadTimeMinutes(),
+                request.startingSoonLeadTimeMinutes());
+
         organization.setStartingSoonLeadTimeMinutes(request.startingSoonLeadTimeMinutes());
-        return OrganizationResponse.from(organizationRepository.save(organization));
+        Organization saved = organizationRepository.save(organization);
+
+        // Transactional so the change and its record commit together, which is the whole
+        // contract of AuditTrail (FZ-060).
+        if (!changes.isEmpty()) {
+            auditTrail.record(caller.organizationId(), AuditActor.of(caller),
+                    AuditAction.ORGANIZATION_SETTINGS_CHANGED, AuditResourceType.ORGANIZATION,
+                    organization.getId(), changes.toJson());
+        }
+
+        return OrganizationResponse.from(saved);
     }
 
     private Organization owned(AuthenticatedUser caller) {

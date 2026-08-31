@@ -1,5 +1,6 @@
 package com.freezhub.policy;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.containsString;
@@ -12,6 +13,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.freezhub.ContainersConfig;
 import com.freezhub.apikey.ApiKeyService;
+import com.freezhub.audit.AuditAction;
+import com.freezhub.audit.AuditActor;
+import com.freezhub.audit.AuditEvent;
+import com.freezhub.audit.AuditRepository;
 import com.freezhub.catalog.Application;
 import com.freezhub.catalog.ApplicationRepository;
 import com.freezhub.catalog.Environment;
@@ -25,6 +30,7 @@ import com.freezhub.organization.OrganizationRepository;
 import com.freezhub.organization.User;
 import com.freezhub.organization.UserRepository;
 import com.freezhub.organization.UserRole;
+import com.freezhub.shared.security.AuthenticatedUser;
 import com.freezhub.restriction.ChangeRestriction;
 import com.freezhub.restriction.ChangeRestrictionRepository;
 import com.freezhub.restriction.ChangeRestrictionService;
@@ -78,11 +84,15 @@ class PolicyEvaluationTest {
     private ApiKeyService apiKeyService;
 
     @Autowired
+    private AuditRepository auditRepository;
+
+    @Autowired
     private ChangeRestrictionService changeRestrictionService;
 
     private Long organizationId;
     private Long userId;
     private String apiKey;
+    private AuditActor actor;
     private Application paymentsApi;
     private Environment production;
 
@@ -96,11 +106,14 @@ class PolicyEvaluationTest {
         User admin = userRepository.saveAndFlush(
                 new User(organizationId, subject, subject + "@acme.test", UserRole.ADMINISTRATOR));
         userId = admin.getId();
+        // The actor a controller would build from this administrator.
+        actor = AuditActor.of(new AuthenticatedUser(
+                admin.getId(), organizationId, admin.getEmail(), admin.getRole()));
 
         paymentsApi = applicationRepository.saveAndFlush(new Application(organizationId, "payments-api"));
         production = environmentRepository.saveAndFlush(new Environment(organizationId, "production"));
 
-        apiKey = apiKeyService.create(organizationId, userId, "gitlab-ci").rawKey();
+        apiKey = apiKeyService.create(organizationId, actor, "gitlab-ci").rawKey();
     }
 
     private ChangeRestriction givenRestriction(RestrictionLevel level, Instant startsAt, Instant endsAt,
@@ -218,7 +231,7 @@ class PolicyEvaluationTest {
     void ignoresACancelledRestriction() throws Exception {
         ChangeRestriction freeze = givenProductionFreezeInForce();
         // Cancelled through the real path rather than by poking the entity.
-        changeRestrictionService.cancel(organizationId, freeze.getId());
+        changeRestrictionService.cancel(organizationId, actor, freeze.getId());
 
         evaluate("payments-api", "production")
                 .andExpect(jsonPath("$.decision", is("ALLOW")))
@@ -352,6 +365,37 @@ class PolicyEvaluationTest {
         evaluate("their-api", "production")
                 .andExpect(jsonPath("$.decision", is("BLOCK")))
                 .andExpect(jsonPath("$.unregistered", contains("APPLICATION")));
+    }
+
+    @Test
+    void recordsARefusalCausedByAnUnregisteredName() throws Exception {
+        // Refusing it in the moment is only half the answer (decision D-14). A misspelt
+        // environment is a way to *attempt* deploying through a freeze, and one
+        // occurrence is a typo while twenty is a pattern — which is only visible if each
+        // one is written down.
+        evaluate("payments-api", "prod").andExpect(jsonPath("$.decision", is("BLOCK")));
+
+        AuditEvent recorded = auditRepository.findAll().stream()
+                .filter(event -> event.getOrganizationId().equals(organizationId))
+                .filter(event -> event.getAction() == AuditAction.POLICY_BLOCKED_UNREGISTERED)
+                .findFirst().orElseThrow();
+
+        // Attributed to the key, not to a person — nobody was signed in.
+        assertThat(recorded.getActorType()).isEqualTo(AuditActor.AuditActorType.API_KEY);
+        assertThat(recorded.getActorLabel()).isEqualTo("gitlab-ci");
+        assertThat(recorded.getDetails()).contains("prod").contains("ENVIRONMENT");
+    }
+
+    @Test
+    void doesNotRecordAnOrdinaryEvaluation() throws Exception {
+        // A normal evaluation happens on every deployment. Recording those would bury the
+        // trail they belong to.
+        evaluate("payments-api", "production").andExpect(jsonPath("$.decision", is("ALLOW")));
+
+        assertThat(auditRepository.findAll().stream()
+                .filter(event -> event.getOrganizationId().equals(organizationId))
+                .filter(event -> event.getAction() == AuditAction.POLICY_BLOCKED_UNREGISTERED)
+                .toList()).isEmpty();
     }
 
     @Test

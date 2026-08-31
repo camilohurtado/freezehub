@@ -33,7 +33,7 @@ public class PolicyController {
     @PostMapping("/evaluate")
     public PolicyEvaluationResponse evaluate(@AuthenticationPrincipal ApiKeyPrincipal caller,
                                              @Valid @RequestBody PolicyEvaluationRequest request) {
-        return policyService.evaluate(caller.organizationId(), request, Instant.now());
+        return policyService.evaluate(caller.organizationId(), caller, request, Instant.now());
     }
 
 }

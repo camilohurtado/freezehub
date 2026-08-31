@@ -69,6 +69,8 @@ Authenticated with a JWT; all tenant-scoped.
 | `POST GET` | `/api/restrictions` | create; list with repeatable `?status=` |
 | `GET PUT` | `/api/restrictions/{id}` | detail; full replacement, `SCHEDULED` only |
 | `POST` | `/api/restrictions/{id}/cancel` | `SCHEDULED` or `ACTIVE` only |
+| `GET` | `/api/audit` | **ADMINISTRATOR only**; newest first, `?beforeId=` cursor, `?limit=` capped at 200 |
+| `GET` | `/api/audit/resource` | **ADMINISTRATOR only**; everything that happened to one `resourceType`/`resourceId` |
 | `GET POST PATCH DELETE` | `/api/integrations` | **ADMINISTRATOR only**; stored credentials are never returned. Creating a `WEBHOOK` returns its `signingSecret` once |
 | `POST` | `/api/integrations/{id}/signing-secret` | **ADMINISTRATOR only**; rotates a webhook signing secret, `409` for any other channel |
 | `GET POST` | `/api/api-keys` | **ADMINISTRATOR only**; `POST` returns the raw key once |

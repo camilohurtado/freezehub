@@ -1,5 +1,6 @@
 package com.freezhub.restriction;
 
+import com.freezhub.audit.AuditActor;
 import com.freezhub.shared.security.AuthenticatedUser;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -30,7 +31,7 @@ public class ChangeRestrictionController {
     public RestrictionResponse create(@AuthenticationPrincipal AuthenticatedUser caller,
                                       @Valid @RequestBody RestrictionRequest request) {
         ChangeRestriction created =
-                changeRestrictionService.create(caller.organizationId(), caller.userId(), request);
+                changeRestrictionService.create(caller.organizationId(), AuditActor.of(caller), request);
         return RestrictionResponse.from(created);
     }
 
@@ -42,7 +43,7 @@ public class ChangeRestrictionController {
     @PostMapping("/{restrictionId}/cancel")
     public RestrictionResponse cancel(@AuthenticationPrincipal AuthenticatedUser caller,
                                       @PathVariable Long restrictionId) {
-        return RestrictionResponse.from(changeRestrictionService.cancel(caller.organizationId(), restrictionId));
+        return RestrictionResponse.from(changeRestrictionService.cancel(caller.organizationId(), AuditActor.of(caller), restrictionId));
     }
 
     /**
@@ -54,7 +55,7 @@ public class ChangeRestrictionController {
                                       @PathVariable Long restrictionId,
                                       @Valid @RequestBody RestrictionRequest request) {
         return RestrictionResponse.from(
-                changeRestrictionService.update(caller.organizationId(), restrictionId, request));
+                changeRestrictionService.update(caller.organizationId(), AuditActor.of(caller), restrictionId, request));
     }
 
     /** One restriction with its scope. 404 if unknown or owned by another organization. */

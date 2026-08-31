@@ -1,5 +1,6 @@
 package com.freezhub.apikey;
 
+import com.freezhub.audit.AuditActor;
 import com.freezhub.shared.security.AuthenticatedUser;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -49,14 +50,14 @@ public class ApiKeyController {
     public IssuedApiKeyResponse create(@AuthenticationPrincipal AuthenticatedUser caller,
                                        @Valid @RequestBody ApiKeyRequest request) {
         return IssuedApiKeyResponse.from(
-                apiKeyService.create(caller.organizationId(), caller.userId(), request.name()));
+                apiKeyService.create(caller.organizationId(), AuditActor.of(caller), request.name()));
     }
 
     /** 409 if already revoked, 404 if unknown or owned by another organization. */
     @PostMapping("/{apiKeyId}/revoke")
     public ApiKeyResponse revoke(@AuthenticationPrincipal AuthenticatedUser caller,
                                  @PathVariable Long apiKeyId) {
-        return ApiKeyResponse.from(apiKeyService.revoke(caller.organizationId(), apiKeyId));
+        return ApiKeyResponse.from(apiKeyService.revoke(caller.organizationId(), AuditActor.of(caller), apiKeyId));
     }
 
 }

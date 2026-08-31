@@ -15,11 +15,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.freezhub.ContainersConfig;
+import com.freezhub.audit.AuditActor;
 import com.freezhub.organization.Organization;
 import com.freezhub.organization.OrganizationRepository;
 import com.freezhub.organization.User;
 import com.freezhub.organization.UserRepository;
 import com.freezhub.organization.UserRole;
+import com.freezhub.shared.security.AuthenticatedUser;
 import com.freezhub.shared.security.TestTokens;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -69,6 +71,12 @@ class ApiKeyControllerTest {
         User user = userRepository.saveAndFlush(
                 new User(organization.getId(), subject, subject + "@acme.test", role));
         return new Caller(organization.getId(), user.getId(), TestTokens.forSubject(jwtEncoder, subject));
+    }
+
+    /** The actor a controller would have built from this caller. */
+    private AuditActor adminActor(Caller caller) {
+        return AuditActor.of(new AuthenticatedUser(
+                caller.userId(), caller.organizationId(), "admin@acme.test", UserRole.ADMINISTRATOR));
     }
 
     private JsonNode createKey(Caller caller, String name) throws Exception {
@@ -172,7 +180,7 @@ class ApiKeyControllerTest {
         // means the caller believed the key was still live, which is worth telling them.
         Caller admin = callerWith(UserRole.ADMINISTRATOR);
         long keyId = createKey(admin, "gitlab-ci").get("id").asLong();
-        apiKeyService.revoke(admin.organizationId(), keyId);
+        apiKeyService.revoke(admin.organizationId(), adminActor(admin), keyId);
 
         mockMvc.perform(post("/api/api-keys/" + keyId + "/revoke")
                         .header("Authorization", "Bearer " + admin.token()))

@@ -3,11 +3,13 @@ package com.freezhub.apikey;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.freezhub.ContainersConfig;
+import com.freezhub.audit.AuditActor;
 import com.freezhub.organization.Organization;
 import com.freezhub.organization.OrganizationRepository;
 import com.freezhub.organization.User;
 import com.freezhub.organization.UserRepository;
 import com.freezhub.organization.UserRole;
+import com.freezhub.shared.security.AuthenticatedUser;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -51,6 +53,12 @@ class ApiKeyErrorDispatchTest {
     @Autowired
     private ApiKeyService apiKeyService;
 
+    /** The actor a controller would have built from the signed-in administrator. */
+    private AuditActor actorFor(User user) {
+        return AuditActor.of(new AuthenticatedUser(
+                user.getId(), user.getOrganizationId(), user.getEmail(), user.getRole()));
+    }
+
     private String givenAKey() {
         Organization organization =
                 organizationRepository.saveAndFlush(new Organization("Acme " + System.nanoTime()));
@@ -58,7 +66,7 @@ class ApiKeyErrorDispatchTest {
         User admin = userRepository.saveAndFlush(new User(
                 organization.getId(), subject, subject + "@acme.test", UserRole.ADMINISTRATOR));
 
-        return apiKeyService.create(organization.getId(), admin.getId(), "gitlab-ci").rawKey();
+        return apiKeyService.create(organization.getId(), actorFor(admin), "gitlab-ci").rawKey();
     }
 
     private ResponseEntity<String> policyRequest(String apiKey) {

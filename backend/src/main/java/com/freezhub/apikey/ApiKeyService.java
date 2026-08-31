@@ -1,5 +1,10 @@
 package com.freezhub.apikey;
 
+import com.freezhub.audit.AuditAction;
+import com.freezhub.audit.AuditDetails;
+import com.freezhub.audit.AuditActor;
+import com.freezhub.audit.AuditResourceType;
+import com.freezhub.audit.AuditTrail;
 import com.freezhub.shared.security.ApiKeyPrincipal;
 import java.util.List;
 import java.util.Optional;
@@ -12,9 +17,11 @@ import org.springframework.web.server.ResponseStatusException;
 public class ApiKeyService {
 
     private final ApiKeyRepository apiKeyRepository;
+    private final AuditTrail auditTrail;
 
-    public ApiKeyService(ApiKeyRepository apiKeyRepository) {
+    public ApiKeyService(ApiKeyRepository apiKeyRepository, AuditTrail auditTrail) {
         this.apiKeyRepository = apiKeyRepository;
+        this.auditTrail = auditTrail;
     }
 
     public List<ApiKey> list(Long organizationId) {
@@ -28,11 +35,20 @@ public class ApiKeyService {
      * logged, and cannot be read back. Losing it means issuing a new one.
      */
     @Transactional
-    public IssuedApiKey create(Long organizationId, Long createdBy, String name) {
+    public IssuedApiKey create(Long organizationId, AuditActor actor, String name) {
         String rawKey = ApiKeySecret.generate();
 
         ApiKey apiKey = apiKeyRepository.save(new ApiKey(
-                organizationId, name, ApiKeySecret.prefixOf(rawKey), ApiKeySecret.hash(rawKey), createdBy));
+                organizationId, name, ApiKeySecret.prefixOf(rawKey), ApiKeySecret.hash(rawKey), actor.id()));
+
+        // Who granted machine access, and when. The key itself is never recorded — only
+        // its non-secret prefix, which is what identifies it in the trail (FZ-060).
+        auditTrail.record(organizationId, actor, AuditAction.API_KEY_ISSUED,
+                AuditResourceType.API_KEY, apiKey.getId(),
+                AuditDetails.builder()
+                        .with("name", name)
+                        .with("keyPrefix", apiKey.getKeyPrefix())
+                        .toJson());
 
         return new IssuedApiKey(apiKey, rawKey);
     }
@@ -43,7 +59,7 @@ public class ApiKeyService {
      * still live, which is worth telling them.
      */
     @Transactional
-    public ApiKey revoke(Long organizationId, Long apiKeyId) {
+    public ApiKey revoke(Long organizationId, AuditActor actor, Long apiKeyId) {
         ApiKey apiKey = findOwned(organizationId, apiKeyId);
 
         if (apiKey.isRevoked()) {
@@ -51,6 +67,9 @@ public class ApiKeyService {
         }
 
         apiKey.revoke();
+        auditTrail.record(organizationId, actor, AuditAction.API_KEY_REVOKED,
+                AuditResourceType.API_KEY, apiKey.getId());
+
         return apiKey;
     }
 
