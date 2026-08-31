@@ -361,6 +361,19 @@ Verified live through the exact endpoints the UI calls: `GET` → `PUT` (200 whi
 
 **This completes Milestone 3.**
 
+### FZ-037 — Frontend Test Stability
+**Status:** DONE
+
+**Fixes `OI-10`.** `npm run test` passed 64 tests and simultaneously reported "Vitest caught 3 unhandled errors", which Vitest itself flags as a possible source of false positives.
+
+Cause: `renderRoute` builds a memory router containing only the route under test and `/signin`. `CreateRestrictionPage` navigates to `/restrictions/{id}` on success, nothing matches it, and React Router dereferences the missing match while the test is unmounting.
+
+Fixed by giving `renderRoute`'s memory router a catch-all route, so anywhere a component navigates lands somewhere. Generic rather than specific to this page: every future test gets it, and tests assert where they ended up through the returned `router`, so navigation is observable rather than swallowed.
+
+The suite now reports **zero** unhandled errors, and two tests were added for behaviour that had never been asserted — the redirect to the new restriction (which proves the server-assigned id is read from the response rather than the form state reused), and staying put on a failed creation so a filled-in form is not lost. Changing the redirect target fails the first of them.
+
+Worth noting how it hid: the suite passed all 64 tests *and* reported the errors, so nothing failed. That is exactly the state in which a real unhandled rejection goes unnoticed.
+
 ## Milestone 4 — Notifications
 
 ### FZ-040 — Notification Model + Outbox

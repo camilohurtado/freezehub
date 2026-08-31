@@ -74,6 +74,36 @@ describe('CreateRestrictionPage', () => {
     expect(postedBody(spy).endsAt).toBe('2026-12-02T14:00:00.000Z')
   })
 
+  test('goes to the new restriction once it is created', async () => {
+    // Untested until now, and not by oversight: the navigation was throwing into an
+    // unhandled rejection that the suite reported and then passed anyway (OI-10). The
+    // server decides the id, so this is also what proves the response is read rather
+    // than the form state reused.
+    const user = userEvent.setup()
+    stubApi(created)
+    const { router } = renderRoute(<CreateRestrictionPage />, { path: '/restrictions/new' })
+
+    await fillValidForm(user)
+    await user.click(screen.getByRole('button', { name: /create restriction/i }))
+
+    await waitFor(() => expect(router.state.location.pathname).toBe('/restrictions/99'))
+  })
+
+  test('stays put when creation fails, so the filled-in form is not lost', async () => {
+    const user = userEvent.setup()
+    stubApi(() => new Response(JSON.stringify({ message: 'Name already used' }), {
+      status: 409,
+      headers: { 'Content-Type': 'application/json' },
+    }))
+    const { router } = renderRoute(<CreateRestrictionPage />, { path: '/restrictions/new' })
+
+    await fillValidForm(user)
+    await user.click(screen.getByRole('button', { name: /create restriction/i }))
+
+    expect(await screen.findByText(/name already used/i)).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe('/restrictions/new')
+  })
+
   test('submits the whole restriction, with scope', async () => {
     const user = userEvent.setup()
     const spy = stubApi(created)

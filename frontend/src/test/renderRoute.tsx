@@ -41,6 +41,18 @@ export function renderRoute(
     [
       { path: pattern, element },
       { path: '/signin', element: <div>Sign in screen</div> },
+      /*
+       * A catch-all, so anywhere the component navigates lands somewhere. Without it a
+       * page that redirects on success — CreateRestrictionPage goes to the new
+       * restriction — sends the router to a path nothing matches, and it throws while
+       * the test is unmounting. That surfaced as three unhandled rejections that passed
+       * the suite anyway, which is exactly the state in which a real one would hide
+       * (OI-10).
+       *
+       * Tests assert where they ended up through the returned `router`, so this makes
+       * navigation observable rather than swallowing it.
+       */
+      { path: '*', element: <div>Navigated away</div> },
     ],
     { initialEntries: [path] },
   )

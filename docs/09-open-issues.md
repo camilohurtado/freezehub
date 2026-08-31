@@ -47,17 +47,6 @@ Partly mitigated already — the API never reads a credential back, and it is ke
 
 **Sharpened by `FZ-048`:** webhook signing added a second recoverable secret (`integration.signing_secret`), and unlike a channel credential it cannot be stored hashed — HMAC needs the key itself, so there is nothing to compare a hash against. Two kinds of plaintext credential now sit in one table.
 
-### OI-10 — Frontend tests finish with three unhandled rejections
-**Severity:** Defect · **Owner:** needs a story · **Found in:** `FZ-052`
-
-`npm run test` reports 64 passing tests **and** "Vitest caught 3 unhandled errors during the test run", which Vitest itself flags as a possible source of false positives.
-
-All three are the same thing: `CreateRestrictionPage` navigates in its mutation `onSuccess`, and the test's router is torn down before that navigation settles, so React Router dereferences a route that no longer exists (`Cannot read properties of undefined (reading 'element')`).
-
-The product code is not implicated — this is the test harness not awaiting the navigation it triggers. It still matters, because a suite that always ends with unhandled rejections is a suite where a *real* one goes unnoticed.
-
-Not touched by `FZ-052`, which changed no frontend file; found while running the frontend suite for its Definition of Done.
-
 ### OI-6 — `docs/07-decisions.md` is not backfilled
 **Severity:** Gap · **Owner:** needs a story · **Found in:** ongoing
 
@@ -81,6 +70,7 @@ Each is still recorded only in the backlog entry of the story that made it, whic
 | **The Policy API had no machine credential** — `FZ-051` was ordered before API keys, so the endpoint deciding whether deployments are blocked would have shipped with nothing able to authenticate to it | `FZ-050` | `FZ-052`, taken out of order |
 | Any error behind the machine chain came back as `401` — the forward to `/error` is re-filtered and does not match `/api/policy/**`, so it fell through to the human chain and reported a credential failure instead of the real one | `FZ-052` | `FZ-052` |
 | Testing Library's DOM cleanup never registered, leaking rendered DOM between tests | `FZ-031` | `FZ-031` |
+| Frontend tests finished with three unhandled rejections — the test router had no route for where the page navigates on success, so React Router threw while unmounting | `FZ-052` | `FZ-037` |
 | **Mutable restrictions had no change history** — editing overwrote the previous state with no record of what changed or who changed it | `FZ-023` | decided (`D-1`): audit events with before/after, implemented by `FZ-060` |
 | **Webhook deliveries were unauthenticated** — a receiver could not tell a FreezeHub delivery from a forged one, and a forged `CANCELLED` announces that a freeze has been lifted | `FZ-043` | `FZ-048` |
 | **An unrecognised application or environment name could bypass a freeze** — it matches no scope list, so evaluating it normally tended toward `ALLOW`; misspelling the environment was a deliberate route to deploying during a freeze | `FZ-050` | `FZ-051` — decided: it blocks, and the response names what was not recognised |
