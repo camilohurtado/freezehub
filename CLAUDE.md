@@ -192,6 +192,21 @@ npm run lint      # oxlint
 npm run test      # vitest run
 ```
 
+### Infrastructure (`infra/`)
+
+Requires Terraform >= 1.6 and AWS credentials. See `infra/README.md` for the full runbook
+and what must exist first.
+
+```bash
+cd infra
+terraform fmt -check -recursive
+terraform init -backend=false && terraform validate   # no AWS credentials needed
+terraform plan                                        # read-only, needs credentials
+```
+
+Nothing here has been applied. `terraform apply` creates billable resources and is a
+human decision.
+
 ### Complete local startup
 
 ```bash

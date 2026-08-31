@@ -697,9 +697,26 @@ The backend currently returns errors via `ResponseStatusException` and Spring's 
 Add production-appropriate logs, health checks, and visibility for notification/policy failures.
 
 ### FZ-063 — Production Infrastructure
-**Status:** TODO
+**Status:** DONE (written and validated; **never applied**)
 
-Implement the minimum AWS/Terraform deployment architecture required for beta.
+The minimum AWS/Terraform deployment architecture for beta, matching `02-architecture.md`'s target: ECS Fargate behind an HTTPS ALB, RDS PostgreSQL in private subnets, S3 + CloudFront for the frontend, Cognito for human authentication, ECR for images, and Secrets Manager for the database password and the application encryption key.
+
+Deliberate choices, each with its cost stated in `infra/README.md`:
+
+- **One NAT gateway, not one per AZ**, and **single-AZ RDS**. Both trade availability for roughly half the monthly bill at a scale with no availability commitment. The NAT gateway is a third of the total cost on its own; it earns that by keeping the application and database off the public internet.
+- **Security groups reference each other rather than CIDR ranges**, so the chain is explicit and reviewable: internet → ALB → application → database, and nothing skips a step.
+- **Immutable ECR tags, never `latest`.** A rollback is a tag change, not a rebuild and hope.
+- **ARM64 Fargate**, cheaper per vCPU-hour, which the build must match.
+- **`SPRING_PROFILES_ACTIVE` is the environment name, never `local`.** Its absence is what makes the self-signing `JwtDecoder` and the development sign-in endpoint impossible in a deployed environment — the guard `FZ-035` built, honoured here.
+- **A 120-second health-check grace period**, because Liquibase runs at startup; without it the ALB marks a migrating task unhealthy and ECS replaces it in a loop that looks like a crash.
+- **`prevent_destroy` on the encryption key** and its secret. Losing it makes every stored credential permanently unreadable (`D-3`), and key rotation is not implemented, so `terraform taint` there would destroy customer data rather than refresh a key.
+- **State lives in S3 with a DynamoDB lock**, created by `infra/bootstrap` with local state. Not optional: state holds the database password and the encryption key.
+
+**Verified:** `terraform validate` passes and `terraform fmt -check` is clean for both the main configuration and the bootstrap, with providers pinned by a committed `.terraform.lock.hcl` (aws 5.100.0, random 3.9.0).
+
+**Not verified, and this matters:** `terraform plan` and `terraform apply` have never been run. `validate` checks syntax and internal references; it does not check provider-side constraints, so an invalid argument value or an unsupported combination would surface only at plan or apply time. Terraform is also not installed on the development machine — the binary used here was fetched to a scratch directory.
+
+**This does not make the product deployable on its own.** `FZ-046` is still outstanding, so the backend refuses to start outside the `local` profile: the infrastructure can be created, and the service will not come up. That pairing is decision `D-4`, not an oversight.
 
 ### FZ-064 — CI/CD
 **Status:** TODO
