@@ -6,6 +6,9 @@ import com.freezhub.audit.AuditDetails;
 import com.freezhub.audit.AuditResourceType;
 import com.freezhub.audit.AuditTrail;
 import com.freezhub.catalog.Application;
+import com.freezhub.deployment.BlockedReason;
+import com.freezhub.deployment.DeploymentCheckRecorder;
+import com.freezhub.deployment.DeploymentCheckRecorder.CheckMetadata;
 import com.freezhub.catalog.ApplicationRepository;
 import com.freezhub.catalog.Environment;
 import com.freezhub.catalog.EnvironmentRepository;
@@ -52,19 +55,22 @@ public class PolicyService {
     private final TeamApplicationRepository teamApplicationRepository;
     private final AuditTrail auditTrail;
     private final PolicyMetrics metrics;
+    private final DeploymentCheckRecorder deploymentChecks;
 
     public PolicyService(ChangeRestrictionRepository changeRestrictionRepository,
                          ApplicationRepository applicationRepository,
                          EnvironmentRepository environmentRepository,
                          TeamApplicationRepository teamApplicationRepository,
                          AuditTrail auditTrail,
-                         PolicyMetrics metrics) {
+                         PolicyMetrics metrics,
+                         DeploymentCheckRecorder deploymentChecks) {
         this.changeRestrictionRepository = changeRestrictionRepository;
         this.applicationRepository = applicationRepository;
         this.environmentRepository = environmentRepository;
         this.teamApplicationRepository = teamApplicationRepository;
         this.auditTrail = auditTrail;
         this.metrics = metrics;
+        this.deploymentChecks = deploymentChecks;
     }
 
     /**
@@ -100,6 +106,8 @@ public class PolicyService {
                             .toJson());
 
             metrics.blockedUnregistered();
+            deploymentChecks.record(caller, request.application(), request.environment(),
+                    PolicyDecision.BLOCK, BlockedReason.UNREGISTERED, List.of(), metadataOf(request));
             return blockUnregistered(request, now, unregistered);
         }
 
@@ -120,6 +128,20 @@ public class PolicyService {
             metrics.allowed();
         }
 
+        // Every evaluation, not only the refusals FZ-060 records: a console showing only
+        // what was refused cannot answer "did my deployment get through?", which is the
+        // question the team asking has (FZ-070).
+        deploymentChecks.record(caller, request.application(), request.environment(),
+                blocked ? PolicyDecision.BLOCK : PolicyDecision.ALLOW,
+                blocked ? BlockedReason.RESTRICTION : null,
+                matched.stream()
+                        // Qualified: PolicyEvaluationResponse has its own MatchedRestriction,
+                        // and the two are different things — one is the answer, one is the record.
+                        .map(restriction -> new DeploymentCheckRecorder.MatchedRestriction(
+                                restriction.getId(), restriction.getName(), restriction.getLevel().name()))
+                        .toList(),
+                metadataOf(request));
+
         return new PolicyEvaluationResponse(
                 blocked ? PolicyDecision.BLOCK : PolicyDecision.ALLOW,
                 request.action(),
@@ -129,6 +151,18 @@ public class PolicyService {
                 describe(blocked, matched),
                 List.of(),
                 matched.stream().map(MatchedRestriction::from).toList());
+    }
+
+    /** Blank is the same as absent: an unset CI variable arrives as an empty string. */
+    private CheckMetadata metadataOf(PolicyEvaluationRequest request) {
+        return new CheckMetadata(
+                blankToNull(request.actor()),
+                blankToNull(request.reference()),
+                blankToNull(request.source()));
+    }
+
+    private String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value;
     }
 
     private List<ChangeRestriction> matching(Long organizationId, Instant now, Long applicationId,

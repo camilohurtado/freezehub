@@ -324,3 +324,27 @@ Health answers one question: should this instance receive traffic. Anything else
 ### Cost
 
 Nothing surfaces a delivery problem on its own. It shows up on a dashboard or an alert rule that does not exist yet, so until an exporter is wired up (a deployment concern, once `FZ-063` is applied) the counters have to be looked at deliberately. Accepted: the alternative trades a silent notification failure for a loud outage.
+
+---
+
+## D-19 — Deployment checks are recorded as checks, in their own table
+
+**Date:** 2026-08-31 · **Implemented by:** `FZ-070`
+
+### Decision
+
+Every policy evaluation is recorded in `deployment_check` — not in `audit_event` — and the concept is named a **check**, never a deployment.
+
+### Why
+
+Two separate things, both easy to get wrong.
+
+**Its own table.** `FZ-060` deliberately kept ordinary evaluations out of the audit trail: one happens per deployment, and they would bury the administrative record they sat in. That reasoning did not stop being true when this feature was wanted, so the answer was a second table rather than a reversal — different volume, different retention, different reader, different question.
+
+**Named a check.** FreezeHub observes the question and nothing after it. A pipeline told `ALLOW` may fail for its own reasons; one told `BLOCK` may deploy anyway, because enforcement is voluntary and lives in the customer's pipeline. A console labelled "Deployments" would therefore be wrong — and wrong in exactly the audit the feature exists to serve, which is the worst moment to be found out. The word is not cosmetic.
+
+### Cost
+
+The record cannot answer "did it actually deploy". Closing that gap needs the pipeline to report back afterwards, which is unverifiable — a half-populated "deployed" column is worse than no column, because it looks like data. Left out deliberately; revisit only with a customer willing to wire it up.
+
+Recording every evaluation also puts a write on the hot path, once per deployment, and makes FreezeHub a holder of customer PII (the deploying engineer's identity) where it previously held only names a customer typed. Retention is per organization for that reason, and is the only thing bounding either.

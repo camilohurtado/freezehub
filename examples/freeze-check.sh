@@ -57,10 +57,30 @@ esac
 body=$(mktemp)
 trap 'rm -f "$body"' EXIT
 
+# Who is deploying, what, and where the run can be found. FreezeHub cannot discover any
+# of this — the API key says which pipeline asked, never who pushed the button — so it is
+# sent or it is missing from the record (FZ-070).
+#
+# Detected from whichever CI system is running, and overridable. Every one is optional:
+# on a runner that exposes none of them the check still works, it is just less useful
+# afterwards.
+FREEZEHUB_ACTOR="${FREEZEHUB_ACTOR:-${GITLAB_USER_EMAIL:-${GITHUB_ACTOR:-}}}"
+FREEZEHUB_REFERENCE="${FREEZEHUB_REFERENCE:-${CI_COMMIT_SHA:-${GITHUB_SHA:-}}}"
+FREEZEHUB_SOURCE="${FREEZEHUB_SOURCE:-${CI_PIPELINE_URL:-}}"
+if [ -z "$FREEZEHUB_SOURCE" ] && [ -n "${GITHUB_SERVER_URL:-}" ] && [ -n "${GITHUB_RUN_ID:-}" ]; then
+    FREEZEHUB_SOURCE="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY:-}/actions/runs/${GITHUB_RUN_ID}"
+fi
+
+# Built with jq rather than by hand: a branch name or an email with a quote in it would
+# otherwise produce a body the server cannot parse.
 request=$(jq -nc \
     --arg application "$FREEZEHUB_APPLICATION" \
     --arg environment "$FREEZEHUB_ENVIRONMENT" \
-    '{action: "DEPLOY", application: $application, environment: $environment}')
+    --arg actor "$FREEZEHUB_ACTOR" \
+    --arg reference "$FREEZEHUB_REFERENCE" \
+    --arg source "$FREEZEHUB_SOURCE" \
+    '{action: "DEPLOY", application: $application, environment: $environment,
+      actor: $actor, reference: $reference, source: $source}')
 
 echo "freeze-check: asking FreezeHub about $FREEZEHUB_APPLICATION -> $FREEZEHUB_ENVIRONMENT"
 

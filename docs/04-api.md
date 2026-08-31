@@ -93,6 +93,7 @@ Authenticated with a JWT; all tenant-scoped.
 | `POST GET` | `/api/restrictions` | create; list with repeatable `?status=` |
 | `GET PUT` | `/api/restrictions/{id}` | detail; full replacement, `SCHEDULED` only |
 | `POST` | `/api/restrictions/{id}/cancel` | `SCHEDULED` or `ACTIVE` only |
+| `GET` | `/api/deployment-checks` | any member; every check and its answer, newest first, `?decision=BLOCK` for refusals, `?beforeId=` cursor |
 | `GET` | `/api/audit` | **ADMINISTRATOR only**; newest first, `?beforeId=` cursor, `?limit=` capped at 200 |
 | `GET` | `/api/audit/resource` | **ADMINISTRATOR only**; everything that happened to one `resourceType`/`resourceId` |
 | `GET POST PATCH DELETE` | `/api/integrations` | **ADMINISTRATOR only**; stored credentials are never returned. Creating a `WEBHOOK` returns its `signingSecret` once |
@@ -127,9 +128,17 @@ Content-Type: application/json
 {
   "action": "DEPLOY",
   "application": "payments-api",
-  "environment": "production"
+  "environment": "production",
+
+  "actor": "alice@acme.test",
+  "reference": "a1b2c3d4e5f6",
+  "source": "https://gitlab.acme.test/acme/payments-api/-/pipelines/9182"
 }
 ```
+
+The last three are **optional** and exist to make the record worth reading (`FZ-070`): who is deploying, what, and where the run can be found. FreezeHub cannot discover any of them — the API key identifies the pipeline, never the person — so they are supplied or absent. `freeze-check.sh` fills them from whatever the CI system exposes; a request without them still succeeds and a pipeline written before they existed keeps working.
+
+They are customer PII, held for as long as `deployment_check_retention_days` and never logged.
 
 **Identified by name, not id.** A pipeline knows `payments-api` and `production`; it does not know FreezeHub's internal numeric ids and should not have to discover them — `00-product.md` asks for simple integration. Names are already unique per organization.
 

@@ -17,6 +17,12 @@ public class Organization {
     /** 24 hours: a day's notice is how far ahead teams actually plan around a freeze. */
     public static final int DEFAULT_STARTING_SOON_LEAD_TIME_MINUTES = 1440;
 
+    /** A year: long enough for an audit to look back over one, which is what asks. */
+    public static final int DEFAULT_DEPLOYMENT_CHECK_RETENTION_DAYS = 365;
+
+    public static final int MIN_DEPLOYMENT_CHECK_RETENTION_DAYS = 7;
+    public static final int MAX_DEPLOYMENT_CHECK_RETENTION_DAYS = 3650;
+
     /** Matches the database CHECK, so the two cannot drift. */
     public static final int MIN_STARTING_SOON_LEAD_TIME_MINUTES = 1;
     public static final int MAX_STARTING_SOON_LEAD_TIME_MINUTES = 30 * 24 * 60;
@@ -37,6 +43,16 @@ public class Organization {
      */
     @Column(name = "starting_soon_lead_time_minutes", nullable = false)
     private int startingSoonLeadTimeMinutes = DEFAULT_STARTING_SOON_LEAD_TIME_MINUTES;
+
+    /**
+     * How long this organization's deployment checks are kept, in days (FZ-070).
+     *
+     * <p>One year by default — the window most compliance regimes assume. It is also what
+     * bounds how long the deploying engineer's identity is held, so it is a data-handling
+     * setting as much as a storage one.
+     */
+    @Column(name = "deployment_check_retention_days", nullable = false)
+    private int deploymentCheckRetentionDays = DEFAULT_DEPLOYMENT_CHECK_RETENTION_DAYS;
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
@@ -73,6 +89,20 @@ public class Organization {
 
     public void setName(String name) {
         this.name = name;
+    }
+
+    public int getDeploymentCheckRetentionDays() {
+        return deploymentCheckRetentionDays;
+    }
+
+    /** Bounded here as well as in the database, so a bad value is a 400 rather than a 500. */
+    public void setDeploymentCheckRetentionDays(int days) {
+        if (days < MIN_DEPLOYMENT_CHECK_RETENTION_DAYS || days > MAX_DEPLOYMENT_CHECK_RETENTION_DAYS) {
+            throw new IllegalArgumentException("Retention must be between "
+                    + MIN_DEPLOYMENT_CHECK_RETENTION_DAYS + " and "
+                    + MAX_DEPLOYMENT_CHECK_RETENTION_DAYS + " days");
+        }
+        this.deploymentCheckRetentionDays = days;
     }
 
     public int getStartingSoonLeadTimeMinutes() {
