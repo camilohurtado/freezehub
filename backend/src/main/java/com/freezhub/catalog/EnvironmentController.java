@@ -1,5 +1,6 @@
 package com.freezhub.catalog;
 
+import com.freezhub.audit.AuditActor;
 import com.freezhub.shared.security.AuthenticatedUser;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -29,7 +30,7 @@ public class EnvironmentController {
     @ResponseStatus(HttpStatus.CREATED)
     public EnvironmentResponse create(@AuthenticationPrincipal AuthenticatedUser caller,
                                        @Valid @RequestBody EnvironmentRequest request) {
-        return EnvironmentResponse.from(environmentService.create(caller.organizationId(), request.name()));
+        return EnvironmentResponse.from(environmentService.create(caller.organizationId(), AuditActor.of(caller), request.name()));
     }
 
     @GetMapping
@@ -45,13 +46,13 @@ public class EnvironmentController {
     @PatchMapping("/{environmentId}")
     public EnvironmentResponse rename(@AuthenticationPrincipal AuthenticatedUser caller, @PathVariable Long environmentId,
                                        @Valid @RequestBody EnvironmentRequest request) {
-        return EnvironmentResponse.from(environmentService.rename(caller.organizationId(), environmentId, request.name()));
+        return EnvironmentResponse.from(environmentService.rename(caller.organizationId(), AuditActor.of(caller), environmentId, request.name()));
     }
 
     @DeleteMapping("/{environmentId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@AuthenticationPrincipal AuthenticatedUser caller, @PathVariable Long environmentId) {
-        environmentService.delete(caller.organizationId(), environmentId);
+        environmentService.delete(caller.organizationId(), AuditActor.of(caller), environmentId);
     }
 
 }

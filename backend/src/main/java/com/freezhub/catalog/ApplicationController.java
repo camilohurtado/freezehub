@@ -1,5 +1,6 @@
 package com.freezhub.catalog;
 
+import com.freezhub.audit.AuditActor;
 import com.freezhub.shared.security.AuthenticatedUser;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -30,7 +31,7 @@ public class ApplicationController {
     @ResponseStatus(HttpStatus.CREATED)
     public ApplicationResponse create(@AuthenticationPrincipal AuthenticatedUser caller,
                                        @Valid @RequestBody ApplicationRequest request) {
-        Application application = applicationService.create(caller.organizationId(), request.name());
+        Application application = applicationService.create(caller.organizationId(), AuditActor.of(caller), request.name());
         return ApplicationResponse.from(application, List.of());
     }
 
@@ -50,28 +51,28 @@ public class ApplicationController {
     @PatchMapping("/{applicationId}")
     public ApplicationResponse rename(@AuthenticationPrincipal AuthenticatedUser caller, @PathVariable Long applicationId,
                                        @Valid @RequestBody ApplicationRequest request) {
-        Application application = applicationService.rename(caller.organizationId(), applicationId, request.name());
+        Application application = applicationService.rename(caller.organizationId(), AuditActor.of(caller), applicationId, request.name());
         return ApplicationResponse.from(application, applicationService.teamIds(applicationId));
     }
 
     @DeleteMapping("/{applicationId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@AuthenticationPrincipal AuthenticatedUser caller, @PathVariable Long applicationId) {
-        applicationService.delete(caller.organizationId(), applicationId);
+        applicationService.delete(caller.organizationId(), AuditActor.of(caller), applicationId);
     }
 
     @PutMapping("/{applicationId}/teams/{teamId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void associateTeam(@AuthenticationPrincipal AuthenticatedUser caller,
                                @PathVariable Long applicationId, @PathVariable Long teamId) {
-        applicationService.associateTeam(caller.organizationId(), applicationId, teamId);
+        applicationService.associateTeam(caller.organizationId(), AuditActor.of(caller), applicationId, teamId);
     }
 
     @DeleteMapping("/{applicationId}/teams/{teamId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void disassociateTeam(@AuthenticationPrincipal AuthenticatedUser caller,
                                   @PathVariable Long applicationId, @PathVariable Long teamId) {
-        applicationService.disassociateTeam(caller.organizationId(), applicationId, teamId);
+        applicationService.disassociateTeam(caller.organizationId(), AuditActor.of(caller), applicationId, teamId);
     }
 
 }

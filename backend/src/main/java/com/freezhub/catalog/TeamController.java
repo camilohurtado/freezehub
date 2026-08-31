@@ -1,5 +1,6 @@
 package com.freezhub.catalog;
 
+import com.freezhub.audit.AuditActor;
 import com.freezhub.shared.security.AuthenticatedUser;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -28,7 +29,7 @@ public class TeamController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public TeamResponse create(@AuthenticationPrincipal AuthenticatedUser caller, @Valid @RequestBody TeamRequest request) {
-        return TeamResponse.from(teamService.create(caller.organizationId(), request.name()));
+        return TeamResponse.from(teamService.create(caller.organizationId(), AuditActor.of(caller), request.name()));
     }
 
     @GetMapping
@@ -44,13 +45,13 @@ public class TeamController {
     @PatchMapping("/{teamId}")
     public TeamResponse rename(@AuthenticationPrincipal AuthenticatedUser caller, @PathVariable Long teamId,
                                 @Valid @RequestBody TeamRequest request) {
-        return TeamResponse.from(teamService.rename(caller.organizationId(), teamId, request.name()));
+        return TeamResponse.from(teamService.rename(caller.organizationId(), AuditActor.of(caller), teamId, request.name()));
     }
 
     @DeleteMapping("/{teamId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void delete(@AuthenticationPrincipal AuthenticatedUser caller, @PathVariable Long teamId) {
-        teamService.delete(caller.organizationId(), teamId);
+        teamService.delete(caller.organizationId(), AuditActor.of(caller), teamId);
     }
 
 }
