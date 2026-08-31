@@ -33,12 +33,15 @@ Not silently broken: without the `local` profile the application refuses to star
 
 The "cannot start outside `local`" consequence bites exactly when the first deployed environment appears, which is `FZ-063` itself. Stays open until the pair ships.
 
-### OI-11 — Organization settings have no UI
-**Severity:** Gap · **Owner:** needs a story · **Found in:** `FZ-047`
+### OI-11 — Two administrator features exist only in the API
+**Severity:** Gap · **Owner:** needs a story · **Found in:** `FZ-047`, widened during the beta-readiness audit
 
-`FZ-047` added a per-organization "starting soon" lead time, settable through `PATCH /api/organization/settings` and nowhere else. `05-frontend.md` specifies no settings screen, so an administrator cannot change it without calling the API directly.
+The Settings page manages notification destinations and nothing else. Two things an administrator needs are reachable only with `curl`:
 
-Small and low-risk, but it means a setting exists that the product cannot actually be configured through. Likely to grow: it is the first organization-level setting, and it will not be the last.
+- **API keys (`FZ-052`)** — no UI at all. This is the more serious of the two: issuing a CI credential is how a customer connects the Policy API, which is the product's core value. Requiring a hand-written HTTP call for the primary integration step is not a viable onboarding path.
+- **The "starting soon" lead time (`FZ-047`)** — `PATCH /api/organization/settings` and nowhere else. The first organization-level setting, and unlikely to be the last.
+
+Neither is hard; both block being able to hand the product to a customer administrator and walk away.
 
 ## Resolved
 
