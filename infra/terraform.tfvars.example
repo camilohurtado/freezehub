@@ -1,0 +1,11 @@
+# Copy to terraform.tfvars and fill in. Everything else has a working default.
+
+# The domain the product is served from. The API is served from api.<domain_name>.
+domain_name = "freezehub.example.com"
+
+# A Route 53 hosted zone that already delegates that domain. Both certificates are
+# validated through it, so it must exist before the first apply.
+hosted_zone_id = "Z0123456789ABCDEFGHIJ"
+
+# region      = "us-east-1"
+# environment = "beta"
