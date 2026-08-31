@@ -542,6 +542,26 @@ A webhook created before this story has no secret and is delivered **unsigned wi
 
 **Cost, recorded in `D-2` and against `OI-4`:** this is a second credential that cannot be hashed at rest.
 
+### FZ-049 — Credential Encryption at Rest
+**Status:** DONE
+
+**Fixes `OI-4`.** `integration.config` (which holds a Slack webhook URL — itself a bearer credential) and `integration.signing_secret` were readable to anyone with a database connection, a dump, or a backup. Neither can be hashed instead: the channel needs the URL, and HMAC needs the key.
+
+**Decision `D-3`: AES-256-GCM in the application, behind a `SecretProtector` port.** The port is the point — the key already comes from configuration (Secrets Manager in a deployed environment), and delegating storage to a provider outright is a second implementation of the same interface rather than a rewrite of its callers.
+
+- **A JPA `AttributeConverter`, not explicit calls in services.** The entity field stays plaintext in Java, so nothing that reads or validates a config needed changing, and no code path can forget to encrypt. It is a Spring bean as well as a converter, which Hibernate resolves through Boot's `SpringBeanContainer`.
+- **GCM rather than CBC**: it authenticates as well as encrypts, so a row edited directly in the database fails loudly instead of quietly yielding different plaintext. A tampering test asserts that.
+- **No default key outside `local`.** An environment that forgets it fails to start, matching the existing `JwtDecoder` fail-fast. The committed local key protects a developer's own database and is worth nothing.
+- **Stored as `fzenc1:` + Base64.** The scheme prefix is what makes a later change — a new algorithm, key rotation, or delegation to a secrets manager — rolloutable rather than a flag day. A value without it is pre-`FZ-049` plaintext, read as-is and encrypted on its next write, so no bulk migration is needed.
+
+**Verified against the raw column through JDBC, deliberately bypassing JPA** — going through the repository would only prove the converter is symmetric and would pass just as happily if nothing were encrypted. Removing the `@Convert` annotations fails those tests.
+
+Also verified live: a new Slack destination's credential is `fzenc1:…` in the table with **zero** rows containing the plaintext, while the API still summarises its host correctly; a webhook created afterwards still produced deliveries that an independent receiver verified, proving decryption works on the delivery path; and a pre-existing plaintext row was readable and came back encrypted once it was rewritten.
+
+Known limits, recorded in `D-3`: no protection against a compromised application, which holds the key; and no key rotation yet.
+
+One test needed changing rather than the design: `OrganizationRepositoryTest` is a `@DataJpaTest` slice, which does not scan `@Component`, so it now imports the protector explicitly and supplies a key — the same thing a deployed environment must do.
+
 ## Milestone 5 — Policy Enforcement
 
 ### FZ-050 — API Contract

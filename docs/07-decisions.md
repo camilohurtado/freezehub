@@ -70,3 +70,37 @@ Signing the timestamp **together with** the body is what makes the signature non
 Rotation is abrupt: there is no window in which both the old and new secret are accepted, so rotating is a coordinated change with the receiver. Deliberate — an overlap window keeps a leaked secret alive for exactly as long as the window lasts.
 
 Webhook integrations created before `FZ-048` have no secret and are delivered **unsigned**, with a warning logged, until rotated. Refusing to deliver would silently stop announcements a customer relies on; that trade is revisited if any such integration ever exists in a deployed environment.
+
+---
+
+## D-3 — Secret material is encrypted in the application, behind a port
+
+**Date:** 2026-08-30 · **Resolves:** `OI-4` · **Implemented by:** `FZ-049`
+
+### Decision
+
+`integration.config` and `integration.signing_secret` are encrypted with **AES-256-GCM** before they reach the database, through a `SecretProtector` port with one implementation today. The key comes from `freezehub.secrets.encryption-key`, which a deployed environment sources from AWS Secrets Manager; there is no default outside the `local` profile, so an environment that forgets it fails to start.
+
+The port is the point. Two later moves are open without touching a single caller:
+
+- **Key management** — the AES key already comes from configuration, so pointing it at Secrets Manager, Vault, or a cloud KMS is configuration, not code.
+- **Full delegation** — storing the secret *in* a provider and keeping only a reference in the row is a second implementation of `SecretProtector`, not a rewrite.
+
+### Why this and not Secrets Manager outright
+
+Delegating now would put an external dependency on the notification delivery path and force every local developer to run against a real AWS account or a fake. Encrypting in the application is self-contained, testable locally, and closes the exposure the register actually names — a database connection, a dump, or a backup — today rather than after infrastructure exists.
+
+GCM rather than CBC because it authenticates as well as encrypts: a row edited directly in the database fails to decrypt instead of quietly yielding different plaintext.
+
+### Alternatives
+
+- **References to AWS Secrets Manager.** The most literal reading of `06-security.md`. Deferred, not rejected — it is the lane this decision deliberately keeps open.
+- **RDS encryption plus restricted database access.** Cheapest, and it does protect stolen disks and backups. Rejected as the *primary* control because it does nothing about the threat named in `OI-4`: someone who has a database connection reads plaintext.
+
+### Cost
+
+**It does not protect against a compromised application**, which holds the key. That is the accepted limit of encrypting in-process, and the reason the key belongs in a secrets manager rather than a config file.
+
+The stored form carries a `fzenc1:` scheme prefix, and anything without it is treated as pre-`FZ-049` plaintext and returned as-is. So **existing rows are not migrated**; they are encrypted the next time they are written. No bulk re-encryption task exists, which is acceptable because no deployed environment does — if one ever ships before this, it needs one.
+
+Key rotation is not implemented. The scheme prefix is what makes it addable later without a flag day.

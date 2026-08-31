@@ -135,6 +135,7 @@ Presenting either one where the other is expected is a `401`. A key leaked from 
 
 - **Local dev and tests always run with the `local` Spring profile active** (`-Dspring-boot.run.profiles=local`, or `@ActiveProfiles("local")` in tests). It self-issues/validates JWTs with a locally-generated key — no AWS dependency. Without it, the app has no `JwtDecoder` bean and **will not start**, since `spring.security.oauth2.resourceserver.jwt.issuer-uri` isn't set locally.
 - Any real/deployed environment must set `SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI` to the real Cognito user pool's issuer URI and must **not** activate the `local` profile.
+- Any real/deployed environment must also set **`FREEZEHUB_SECRETS_ENCRYPTION_KEY`** — 32 bytes, Base64 — which encrypts stored channel credentials and webhook signing secrets (`FZ-049`). There is no default outside `local` and the application will not start without it. Generate one with `openssl rand -base64 32`, and keep it in AWS Secrets Manager. **Losing it makes every stored credential unreadable**; changing it does the same, since key rotation is not implemented yet.
 - Minting a test token: use `com.freezhub.shared.security.TestTokens.forSubject(jwtEncoder, subject)` (test-only helper); see `MeControllerTest` for a full example.
 
 ### Signing in during development (`FZ-035`)
