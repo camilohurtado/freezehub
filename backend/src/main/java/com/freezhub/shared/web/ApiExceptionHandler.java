@@ -153,9 +153,14 @@ public class ApiExceptionHandler {
             problem.setTitle(resolved.getReasonPhrase());
         }
 
-        // An RFC 9457 extension, kept because it is what correlates a support
-        // conversation with a log line. Request ids are FZ-062.
+        // RFC 9457 extensions. The request id is the one that matters: it turns "it
+        // failed at about three o'clock" into an exact log lookup, and it is on every
+        // line the request produced (FZ-062).
         problem.setProperty("timestamp", Instant.now());
+        String requestId = RequestIdFilter.current();
+        if (requestId != null) {
+            problem.setProperty("requestId", requestId);
+        }
         return problem;
     }
 

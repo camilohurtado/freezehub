@@ -35,7 +35,10 @@ public class SecurityConfig {
                         // request was. Verified live; MockMvc does not forward to /error, so
                         // no controller test could have shown it (FZ-052).
                         .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
-                        .requestMatchers("/actuator/health").permitAll()
+                        // The sub-paths matter: with probes enabled the load balancer
+                        // reads /actuator/health/readiness, and an exact match on
+                        // /actuator/health would answer it with a 401 (FZ-062).
+                        .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.jwtAuthenticationConverter(converter)));
 

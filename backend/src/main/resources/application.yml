@@ -32,14 +32,38 @@ freezehub:
     # To enable email, set FREEZEHUB_NOTIFICATIONS_EMAIL_FROM plus spring.mail.* (SES
     # exposes an SMTP endpoint, so the same configuration works locally and deployed).
 
+# Every log line carries the request id set by RequestIdFilter, so a report of "it failed
+# around three" becomes an exact lookup — and so two concurrent requests can be told apart
+# in a single stream, which timestamps alone cannot do with two tasks running (FZ-062).
+logging:
+  pattern:
+    level: "%5p [%X{requestId:-no-request}]"
+  level:
+    # The application's own reasoning: reconciliation results, dispatch outcomes,
+    # abandoned notifications. Everything below stays at Spring's defaults.
+    com.freezhub: INFO
+
 management:
   endpoints:
     web:
       exposure:
-        include: health
+        # health is public (the load balancer reads it); the rest require authentication,
+        # since aggregate counters are not tenant-scoped. Moving actuator to an internal
+        # port is the next step once there is real traffic — see FZ-062 in the backlog.
+        include: health,info,metrics
   endpoint:
     health:
       show-details: never
+      # Liveness answers "is this process wedged"; readiness answers "can it serve yet".
+      # They are different questions, and answering the second with the first is what
+      # makes a container get killed mid-migration.
+      probes:
+        enabled: true
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
 
 ---
 # Local development only. Kept in this file as a profile document rather than a separate

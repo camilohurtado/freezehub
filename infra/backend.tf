@@ -92,8 +92,11 @@ resource "aws_lb_target_group" "backend" {
   target_type = "ip"
 
   health_check {
-    path = "/actuator/health"
-    # The only unauthenticated endpoint (04-api.md), which is what makes it usable here.
+    # Readiness, not the aggregate health endpoint: readiness reports false while
+    # Liquibase is still migrating, which is exactly when a task must not be sent
+    # traffic — and exactly when the aggregate endpoint would already say UP (FZ-062).
+    path = "/actuator/health/readiness"
+    # Unauthenticated, which is what makes it usable from the load balancer (04-api.md).
     matcher             = "200"
     interval            = 30
     timeout             = 5

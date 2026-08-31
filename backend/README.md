@@ -122,6 +122,19 @@ Requires Docker running for `./mvnw clean verify` (Testcontainers) and for `spri
 - Migrations live in `src/main/resources/db/changelog/`, run by Liquibase on startup (`db.changelog-master.yaml`).
 - Integration tests get a real PostgreSQL via Testcontainers (`src/test/java/com/freezhub/ContainersConfig.java`, `@ServiceConnection`) — see `FreezeHubApplicationTests`.
 
+## Observability
+
+Every request carries an `X-Request-Id` — supplied by the caller or generated — which appears on each log line, in the response header, and in the `requestId` field of any error body. Quote it when reporting a failure; it is what makes the log searchable.
+
+```bash
+curl http://localhost:8080/actuator/health            # public
+curl http://localhost:8080/actuator/health/readiness  # public; what the load balancer reads
+curl http://localhost:8080/actuator/metrics/freezehub.notifications -H "Authorization: Bearer $TOKEN"
+curl http://localhost:8080/actuator/metrics/freezehub.policy.evaluations -H "Authorization: Bearer $TOKEN"
+```
+
+`freezehub.notifications{outcome=abandoned}` is the counter worth alerting on: an announcement that will never arrive means engineers may deploy during a freeze nobody told them about.
+
 ## Authentication
 
 Every endpoint except `/actuator/health` requires a credential, and there are two of them (`../docs/06-security.md`):

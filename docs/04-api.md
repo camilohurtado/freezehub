@@ -17,7 +17,7 @@ Two mechanisms, deliberately distinct (`06-security.md`):
 | Human (browser) | Cognito JWT | `Authorization: Bearer <token>` |
 | Machine (CI/CD) | API key | `X-API-Key: <key>` |
 
-`/actuator/health` is the only unauthenticated endpoint. Under the `local` profile only, `POST /api/dev/token` mints a development JWT (`FZ-035`).
+`/actuator/health` and its `liveness` / `readiness` probes are the only unauthenticated endpoints. Other actuator endpoints (`info`, `metrics`) require a JWT — their counters are aggregate and not tenant-scoped. Under the `local` profile only, `POST /api/dev/token` mints a development JWT (`FZ-035`).
 
 The two credentials do not overlap, and that is enforced rather than merely intended (`FZ-052`):
 
