@@ -52,3 +52,9 @@ spring:
 freezehub:
   cors:
     allowed-origins: ${FREEZEHUB_CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:5174}
+  secrets:
+    # A fixed development key, committed on purpose and worth exactly nothing: it protects
+    # only a local database. It exists under this profile alone so that a deployed
+    # environment MUST supply its own — there is deliberately no default outside `local`,
+    # and the application refuses to start without one (FZ-049).
+    encryption-key: ZGV2ZWxvcG1lbnQtb25seS1rZXktbm90LXNlY3JldCE=

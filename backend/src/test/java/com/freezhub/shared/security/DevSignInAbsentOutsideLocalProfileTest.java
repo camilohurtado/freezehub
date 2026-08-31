@@ -27,7 +27,13 @@ import org.springframework.test.web.servlet.MockMvc;
  * fail-fast behaviour documented in 06-security.md - so both are stubbed here purely to
  * get a deployed-shaped context to boot. Nothing else about the application changes.
  */
-@SpringBootTest(properties = "freezehub.lifecycle.enabled=false")
+@SpringBootTest(properties = {
+        "freezehub.lifecycle.enabled=false",
+        // Supplied here for the same reason a deployed environment must supply it: outside
+        // the local profile there is no default key, and the context will not start
+        // without one (FZ-049).
+        "freezehub.secrets.encryption-key=ZGV2ZWxvcG1lbnQtb25seS1rZXktbm90LXNlY3JldCE="
+})
 @AutoConfigureMockMvc
 @Import({ContainersConfig.class, DevSignInAbsentOutsideLocalProfileTest.DeployedShapedStubs.class})
 class DevSignInAbsentOutsideLocalProfileTest {

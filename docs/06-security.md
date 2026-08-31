@@ -101,7 +101,10 @@ Every other authenticated action is available to any user within their own organ
 
 - Cognito app client configuration: environment-specific configuration values (issuer URI, client ID), not secrets by themselves. Any actual secret material uses AWS Secrets Manager in deployed environments (`02-architecture.md`), and environment variables locally.
 - API key raw secrets: never stored, anywhere, after creation.
-- **Webhook signing secrets are the exception, and a deliberate one**: HMAC requires the key itself, so there is nothing to compare a hash against. They are stored recoverable in `integration.signing_secret`, which is exactly the exposure `OI-4` tracks and a reason to settle it before beta.
+- **Webhook signing secrets are the exception, and a deliberate one**: HMAC requires the key itself, so there is nothing to compare a hash against. They are stored recoverable in `integration.signing_secret`.
+- **Recoverable secret material is encrypted at rest** (`FZ-049`, decision `D-3`). `integration.config` and `integration.signing_secret` are AES-256-GCM encrypted in the application before they reach the database, so a database connection, a dump or a backup yields ciphertext. It does **not** protect against a compromised application, which holds the key.
+- **The encryption key** comes from `freezehub.secrets.encryption-key` — 32 bytes, Base64. A deployed environment sources it from AWS Secrets Manager and **must** supply it: there is no default outside the `local` profile, and the application refuses to start without one, the same fail-fast as the missing `JwtDecoder`. The committed local key protects a developer's own database and is worth nothing.
+- Encryption sits behind a `SecretProtector` port, so storing secrets *in* a provider and keeping only a reference is a second implementation rather than a rewrite. See `D-3`.
 
 ## Out of Scope for MVP
 

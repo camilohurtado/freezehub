@@ -1,6 +1,8 @@
 package com.freezhub.integration;
 
+import com.freezhub.shared.security.EncryptedStringConverter;
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -36,6 +38,10 @@ public class Integration {
     @Column(nullable = false)
     private boolean enabled;
 
+    // Holds a bearer credential for most channels (a Slack webhook URL is one), so it is
+    // encrypted at rest rather than sitting readable to anyone with a database connection
+    // or a backup (FZ-049, OI-4).
+    @Convert(converter = EncryptedStringConverter.class)
     @Column(nullable = false)
     private String config;
 
@@ -46,6 +52,7 @@ public class Integration {
      *
      * <p>Held recoverable rather than hashed, because signing needs the key itself.
      */
+    @Convert(converter = EncryptedStringConverter.class)
     @Column(name = "signing_secret")
     private String signingSecret;
 
