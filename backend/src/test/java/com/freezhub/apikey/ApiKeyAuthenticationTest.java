@@ -6,12 +6,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.freezhub.ContainersConfig;
+import com.freezhub.audit.AuditActor;
 import com.freezhub.organization.Organization;
 import com.freezhub.organization.OrganizationRepository;
 import com.freezhub.organization.User;
 import com.freezhub.organization.UserRepository;
 import com.freezhub.organization.UserRole;
 import com.freezhub.shared.security.ApiKeyPrincipal;
+import com.freezhub.shared.security.AuthenticatedUser;
 import com.freezhub.shared.security.TestTokens;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -56,7 +58,13 @@ class ApiKeyAuthenticationTest {
     @Autowired
     private ApiKeyService apiKeyService;
 
-    private record Issued(Long organizationId, Long keyId, String rawKey, String jwt) {
+    private record Issued(Long organizationId, Long keyId, String rawKey, String jwt, AuditActor actor) {
+    }
+
+    /** The actor a controller would have built from the signed-in administrator. */
+    private AuditActor actorFor(User user) {
+        return AuditActor.of(new AuthenticatedUser(
+                user.getId(), user.getOrganizationId(), user.getEmail(), user.getRole()));
     }
 
     private Issued givenAKey() {
@@ -67,10 +75,10 @@ class ApiKeyAuthenticationTest {
                 organization.getId(), subject, subject + "@acme.test", UserRole.ADMINISTRATOR));
 
         ApiKeyService.IssuedApiKey issued =
-                apiKeyService.create(organization.getId(), admin.getId(), "gitlab-ci");
+                apiKeyService.create(organization.getId(), actorFor(admin), "gitlab-ci");
 
         return new Issued(organization.getId(), issued.apiKey().getId(), issued.rawKey(),
-                TestTokens.forSubject(jwtEncoder, subject));
+                TestTokens.forSubject(jwtEncoder, subject), actorFor(admin));
     }
 
     @Test
@@ -113,7 +121,7 @@ class ApiKeyAuthenticationTest {
         mockMvc.perform(get("/api/policy/ping").header("X-API-Key", issued.rawKey()))
                 .andExpect(status().isOk());
 
-        apiKeyService.revoke(issued.organizationId(), issued.keyId());
+        apiKeyService.revoke(issued.organizationId(), issued.actor(), issued.keyId());
 
         mockMvc.perform(get("/api/policy/ping").header("X-API-Key", issued.rawKey()))
                 .andExpect(status().isUnauthorized());

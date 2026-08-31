@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.freezhub.ContainersConfig;
+import com.freezhub.audit.AuditActor;
 import com.freezhub.catalog.Environment;
 import com.freezhub.catalog.EnvironmentRepository;
 import com.freezhub.integration.Integration;
@@ -63,6 +64,11 @@ class NotificationOutboxTest {
     private TransactionTemplate transactionTemplate;
 
     private record Fixture(Long organizationId, Long userId) {
+    }
+
+    /** Stands in for the actor a controller would build; this test is about the outbox. */
+    private AuditActor systemActorFor(Fixture fixture) {
+        return new AuditActor(AuditActor.AuditActorType.USER, fixture.userId(), "admin@acme.test");
     }
 
     private Fixture given() {
@@ -219,7 +225,7 @@ class NotificationOutboxTest {
 
         Instant startsAt = Instant.now().plus(3, ChronoUnit.DAYS);
         ChangeRestriction created = changeRestrictionService.create(
-                fixture.organizationId(), fixture.userId(),
+                fixture.organizationId(), systemActorFor(fixture),
                 new RestrictionRequest("Announced freeze", null, "Reason", RestrictionLevel.HARD_FREEZE,
                         startsAt, startsAt.plus(1, ChronoUnit.DAYS),
                         new RestrictionRequest.ScopeRequest(null, null, Set.of(environmentId))));
@@ -235,7 +241,7 @@ class NotificationOutboxTest {
         givenIntegration(fixture.organizationId(), IntegrationType.SLACK);
         ChangeRestriction restriction = givenRestriction(fixture);
 
-        changeRestrictionService.cancel(fixture.organizationId(), restriction.getId());
+        changeRestrictionService.cancel(fixture.organizationId(), systemActorFor(fixture), restriction.getId());
 
         assertThat(notificationsFor(restriction))
                 .extracting(Notification::getEvent)

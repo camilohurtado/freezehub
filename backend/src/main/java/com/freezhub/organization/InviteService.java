@@ -1,5 +1,10 @@
 package com.freezhub.organization;
 
+import com.freezhub.audit.AuditAction;
+import com.freezhub.audit.AuditActor;
+import com.freezhub.audit.AuditDetails;
+import com.freezhub.audit.AuditResourceType;
+import com.freezhub.audit.AuditTrail;
 import com.freezhub.shared.security.IdentityProvider;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;

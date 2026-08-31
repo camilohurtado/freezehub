@@ -1,5 +1,9 @@
 package com.freezhub.restriction;
 
+import com.freezhub.audit.AuditAction;
+import com.freezhub.audit.AuditActor;
+import com.freezhub.audit.AuditResourceType;
+import com.freezhub.audit.AuditTrail;
 import com.freezhub.notification.NotificationEvent;
 import com.freezhub.notification.NotificationOutbox;
 import java.time.Instant;
@@ -35,11 +39,14 @@ public class RestrictionLifecycleService {
 
     private final ChangeRestrictionRepository changeRestrictionRepository;
     private final NotificationOutbox notificationOutbox;
+    private final AuditTrail auditTrail;
 
     public RestrictionLifecycleService(ChangeRestrictionRepository changeRestrictionRepository,
-                                       NotificationOutbox notificationOutbox) {
+                                       NotificationOutbox notificationOutbox,
+                                      AuditTrail auditTrail) {
         this.changeRestrictionRepository = changeRestrictionRepository;
         this.notificationOutbox = notificationOutbox;
+        this.auditTrail = auditTrail;
     }
 
     /**
@@ -65,10 +72,22 @@ public class RestrictionLifecycleService {
 
         // Still inside the same transaction as the status change itself, so a crash cannot
         // leave a restriction activated with nobody ever told.
-        activating.forEach(restriction -> notificationOutbox.enqueue(
-                restriction.getOrganizationId(), restriction.getId(), NotificationEvent.ACTIVATED));
-        completing.forEach(restriction -> notificationOutbox.enqueue(
-                restriction.getOrganizationId(), restriction.getId(), NotificationEvent.COMPLETED));
+        // Recorded with a SYSTEM actor: nobody activated this, time did. Worth a trail
+        // entry anyway — "when did the freeze actually take effect" is the question asked
+        // after an incident, and the reconciler's interval means it is not exactly
+        // startsAt (FZ-060).
+        activating.forEach(restriction -> {
+            notificationOutbox.enqueue(
+                    restriction.getOrganizationId(), restriction.getId(), NotificationEvent.ACTIVATED);
+            auditTrail.record(restriction.getOrganizationId(), AuditActor.system(),
+                    AuditAction.RESTRICTION_ACTIVATED, AuditResourceType.RESTRICTION, restriction.getId());
+        });
+        completing.forEach(restriction -> {
+            notificationOutbox.enqueue(
+                    restriction.getOrganizationId(), restriction.getId(), NotificationEvent.COMPLETED);
+            auditTrail.record(restriction.getOrganizationId(), AuditActor.system(),
+                    AuditAction.RESTRICTION_COMPLETED, AuditResourceType.RESTRICTION, restriction.getId());
+        });
 
         if (activated > 0 || completed > 0) {
             log.info("Restriction lifecycle reconciled at {}: {} activated, {} completed",

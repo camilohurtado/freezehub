@@ -3,6 +3,11 @@ package com.freezhub.restriction;
 import com.freezhub.catalog.ApplicationRepository;
 import com.freezhub.catalog.EnvironmentRepository;
 import com.freezhub.catalog.TeamRepository;
+import com.freezhub.audit.AuditAction;
+import com.freezhub.audit.AuditActor;
+import com.freezhub.audit.AuditResourceType;
+import com.freezhub.audit.AuditTrail;
+import com.freezhub.audit.FieldChanges;
 import com.freezhub.notification.NotificationEvent;
 import com.freezhub.notification.NotificationOutbox;
 import java.time.Instant;
@@ -24,17 +29,20 @@ public class ChangeRestrictionService {
     private final ApplicationRepository applicationRepository;
     private final EnvironmentRepository environmentRepository;
     private final NotificationOutbox notificationOutbox;
+    private final AuditTrail auditTrail;
 
     public ChangeRestrictionService(ChangeRestrictionRepository changeRestrictionRepository,
                                     TeamRepository teamRepository,
                                     ApplicationRepository applicationRepository,
                                     EnvironmentRepository environmentRepository,
-                                    NotificationOutbox notificationOutbox) {
+                                    NotificationOutbox notificationOutbox,
+                                    AuditTrail auditTrail) {
         this.changeRestrictionRepository = changeRestrictionRepository;
         this.teamRepository = teamRepository;
         this.applicationRepository = applicationRepository;
         this.environmentRepository = environmentRepository;
         this.notificationOutbox = notificationOutbox;
+        this.auditTrail = auditTrail;
     }
 
     /**
@@ -83,7 +91,7 @@ public class ChangeRestrictionService {
     }
 
     @Transactional
-    public ChangeRestriction create(Long organizationId, Long createdBy, RestrictionRequest request) {
+    public ChangeRestriction create(Long organizationId, AuditActor actor, RestrictionRequest request) {
         validateRequest(organizationId, request);
 
         ChangeRestriction created = changeRestrictionRepository.save(new ChangeRestriction(
@@ -94,7 +102,7 @@ public class ChangeRestrictionService {
                 request.level(),
                 request.startsAt(),
                 request.endsAt(),
-                createdBy,
+                actor.id(),
                 request.scope().teamIds(),
                 request.scope().applicationIds(),
                 request.scope().environmentIds()));
@@ -102,6 +110,10 @@ public class ChangeRestrictionService {
         // Same transaction as the creation itself: the restriction and the intent to
         // announce it are committed together or not at all (FZ-040).
         notificationOutbox.enqueue(organizationId, created.getId(), NotificationEvent.SCHEDULED);
+        // Same transaction again: an audit entry must never claim a change that rolled
+        // back, nor be missing for one that did not (FZ-060).
+        auditTrail.record(organizationId, actor, AuditAction.RESTRICTION_CREATED,
+                AuditResourceType.RESTRICTION, created.getId());
 
         return created;
     }
@@ -114,7 +126,8 @@ public class ChangeRestrictionService {
      * rejected.
      */
     @Transactional
-    public ChangeRestriction update(Long organizationId, Long restrictionId, RestrictionRequest request) {
+    public ChangeRestriction update(Long organizationId, AuditActor actor, Long restrictionId,
+                                    RestrictionRequest request) {
         ChangeRestriction restriction = findOwnedWithScope(organizationId, restrictionId);
 
         if (!restriction.isScheduled()) {
@@ -123,6 +136,24 @@ public class ChangeRestrictionService {
         }
 
         validateRequest(organizationId, request);
+
+        // Built BEFORE the replacement, which is what makes it a diff at all:
+        // replaceEditableState refills the scope collections in place, so building this
+        // afterwards would compare each collection with itself and report no change.
+        // The comparison is eager, so the copies are not what saves it — the ordering is.
+        // They are kept so the snapshot does not depend on that staying true.
+        FieldChanges changes = FieldChanges.builder()
+                .compare("name", restriction.getName(), request.name())
+                .compare("description", restriction.getDescription(), request.description())
+                .compare("reason", restriction.getReason(), request.reason())
+                .compare("level", restriction.getLevel(), request.level())
+                .compare("startsAt", restriction.getStartsAt(), request.startsAt())
+                .compare("endsAt", restriction.getEndsAt(), request.endsAt())
+                .compare("teamIds", Set.copyOf(restriction.getTeamIds()), request.scope().teamIds())
+                .compare("applicationIds", Set.copyOf(restriction.getApplicationIds()),
+                        request.scope().applicationIds())
+                .compare("environmentIds", Set.copyOf(restriction.getEnvironmentIds()),
+                        request.scope().environmentIds());
 
         restriction.replaceEditableState(
                 request.name(),
@@ -134,6 +165,13 @@ public class ChangeRestrictionService {
                 request.scope().teamIds(),
                 request.scope().applicationIds(),
                 request.scope().environmentIds());
+
+        // A request that changed nothing still succeeds — PUT is a replacement, not a
+        // diff — but it leaves no audit entry, because nothing happened worth recording.
+        if (!changes.isEmpty()) {
+            auditTrail.record(organizationId, actor, AuditAction.RESTRICTION_UPDATED,
+                    AuditResourceType.RESTRICTION, restriction.getId(), changes.toJson());
+        }
 
         return restriction;
     }
@@ -149,7 +187,7 @@ public class ChangeRestrictionService {
      * a repeat cancel signals the caller believed it was still live.
      */
     @Transactional
-    public ChangeRestriction cancel(Long organizationId, Long restrictionId) {
+    public ChangeRestriction cancel(Long organizationId, AuditActor actor, Long restrictionId) {
         ChangeRestriction restriction = findOwnedWithScope(organizationId, restrictionId);
 
         if (!restriction.isCancellable()) {
@@ -160,6 +198,8 @@ public class ChangeRestrictionService {
 
         restriction.cancel();
         notificationOutbox.enqueue(organizationId, restriction.getId(), NotificationEvent.CANCELLED);
+        auditTrail.record(organizationId, actor, AuditAction.RESTRICTION_CANCELLED,
+                AuditResourceType.RESTRICTION, restriction.getId());
 
         return restriction;
     }

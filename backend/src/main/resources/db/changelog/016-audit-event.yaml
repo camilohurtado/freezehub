@@ -1,0 +1,91 @@
+databaseChangeLog:
+  - changeSet:
+      id: 016-audit-event
+      author: freezehub
+      changes:
+        - createTable:
+            tableName: audit_event
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: organization_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+                    references: organization(id)
+                    foreignKeyName: fk_audit_event_organization
+              - column:
+                  name: actor_type
+                  type: varchar(20)
+                  constraints:
+                    nullable: false
+              # No foreign key to users, deliberately: an audit trail that breaks when a
+              # user row is removed is not an audit trail. The label below is what makes
+              # the record readable afterwards.
+              - column:
+                  name: actor_id
+                  type: bigint
+              # Denormalised on purpose — the actor's email or key name as it was at the
+              # time. Renaming or deleting the actor must not rewrite history.
+              - column:
+                  name: actor_label
+                  type: varchar(320)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: action
+                  type: varchar(50)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: resource_type
+                  type: varchar(30)
+                  constraints:
+                    nullable: false
+              # Null where the action is not about one stored row — a refused policy
+              # evaluation names something that does not exist.
+              - column:
+                  name: resource_id
+                  type: bigint
+              # JSON: for an update, the fields that changed with their before and after
+              # values (decision D-1). Null when the action carries no detail.
+              - column:
+                  name: details
+                  type: text
+              - column:
+                  name: occurred_at
+                  type: timestamptz
+                  defaultValueComputed: now()
+                  constraints:
+                    nullable: false
+        - sql:
+            sql: >
+              ALTER TABLE audit_event ADD CONSTRAINT chk_audit_event_actor_type
+              CHECK (actor_type IN ('USER', 'SYSTEM', 'API_KEY'))
+        # The read pattern: one organization's trail, newest first.
+        - createIndex:
+            tableName: audit_event
+            indexName: idx_audit_event_organization_id_desc
+            columns:
+              - column:
+                  name: organization_id
+              - column:
+                  name: id
+                  descending: true
+        # The other read pattern: everything that happened to one restriction.
+        - createIndex:
+            tableName: audit_event
+            indexName: idx_audit_event_resource
+            columns:
+              - column:
+                  name: organization_id
+              - column:
+                  name: resource_type
+              - column:
+                  name: resource_id

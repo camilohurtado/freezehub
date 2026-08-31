@@ -29,3 +29,5 @@ databaseChangeLog:
       file: db/changelog/014-integration-signing-secret.yaml
   - include:
       file: db/changelog/015-starting-soon.yaml
+  - include:
+      file: db/changelog/016-audit-event.yaml
