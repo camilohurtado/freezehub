@@ -43,16 +43,14 @@ The "cannot start outside `local`" consequence bites exactly when the first depl
 
 Deliberately left out of `FZ-060`, which was scoped to what `00-product.md` names. The machinery is already there: `AuditTrail`, the actions enum, and the read API all extend to it.
 
-### OI-11 — Two administrator features exist only in the API
-**Severity:** Gap · **Owner:** needs a story · **Found in:** `FZ-047`, widened during the beta-readiness audit
+### OI-11 — The audit trail has no UI
+**Severity:** Gap · **Owner:** needs a story · **Found in:** `FZ-047`, narrowed by `FZ-038`
 
-The Settings page manages notification destinations and nothing else. Two things an administrator needs are reachable only with `curl`:
+`FZ-038` gave API keys and the lead time a screen. The audit trail (`FZ-060`) is still readable only through `GET /api/audit`.
 
-- **API keys (`FZ-052`)** — no UI at all. This is the more serious of the two: issuing a CI credential is how a customer connects the Policy API, which is the product's core value. Requiring a hand-written HTTP call for the primary integration step is not a viable onboarding path.
-- **The "starting soon" lead time (`FZ-047`)** — `PATCH /api/organization/settings` and nowhere else. The first organization-level setting, and unlikely to be the last.
-- **The audit trail (`FZ-060`)** — readable only through `GET /api/audit`. The trail answers "who changed this freeze", which is a question an administrator asks under pressure, not one they want to curl.
+It answers "who changed this freeze, and to what" — a question an administrator asks under pressure, during or just after an incident, and not one they want to reach for `curl` to answer. It is also the part most likely to matter to a compliance-minded prospect, who will want to see it rather than be told it exists.
 
-Neither is hard; both block being able to hand the product to a customer administrator and walk away.
+A log view is a different shape from the settings screens: keyset pagination (`?beforeId=`), a mix of actor types, and JSON details that need rendering rather than printing. Worth its own story rather than a fourth section on the settings page.
 
 ## Resolved
 
