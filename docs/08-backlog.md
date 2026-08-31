@@ -849,3 +849,37 @@ FZ-013...
 ```
 
 Parallel work is allowed only when dependencies are clear and the changes do not create conflicting architectural decisions.
+
+## Milestone 7 — Deployment Visibility
+
+Turns FreezeHub from "we announced the freeze and recorded the decision" into "here is every attempt to deploy, and what we told each one". The difference matters commercially: today a `BLOCK` vanishes the instant it is returned, and nobody can answer *"did anyone try to ship during Black Friday?"*
+
+### FZ-070 — Deployment Check Record
+**Status:** DONE
+
+Record every policy evaluation — not just the refusals `FZ-060` records — with the metadata needed to say who tried what.
+
+**Its own table, not `audit_event`.** `FZ-060` excluded ordinary evaluations deliberately: one happens per deployment and they would bury the administrative trail they sat in. That reasoning is unchanged, so this is a separate table with its own volume profile, retention and reader.
+
+**"Checks", never "deployments".** What FreezeHub observes is a question, not an outcome — a pipeline can be told `ALLOW` and then fail for unrelated reasons, or be told `BLOCK` and deploy anyway. Naming these deployments would be a lie that surfaces during exactly the audit the feature exists to serve. Reporting the outcome afterwards is a possible later addition; it is not this.
+
+The valuable metadata — who, which commit, which pipeline run — reaches FreezeHub only if the caller sends it, so the request gains three **optional** fields (`actor`, `reference`, `source`) and `freeze-check.sh` fills them from whatever the CI system exposes. Optional because not every runner has them, and because an existing pipeline must keep working untouched.
+
+Matched restrictions are stored **denormalised** (id, name, level): the record must show what was true at check time, and a restriction can be renamed afterwards.
+
+**Retention: one year, configurable per organization.** Matches the window most compliance regimes assume and lets a regulated customer keep more. A scheduled purge, following the lifecycle reconciler's pattern.
+
+Acceptance:
+
+- Every evaluation is recorded with its decision, and why it was blocked.
+- Optional caller metadata is stored when supplied and absent when not; a request without it still succeeds.
+- Records are readable by any member of the organization, newest first, filterable, keyset-paginated.
+- Records older than the organization's retention are purged.
+- **Data handling:** `actor` and `reference` are customer PII arriving on every deploy. They are never logged, and the retention setting is what bounds them.
+
+### FZ-071 — Deployment Console
+**Status:** TODO
+
+The screen teams actually look at: recent deployment checks, what each was told, and — the view worth selling — every attempt refused while a freeze was in force.
+
+Depends on `FZ-070`.

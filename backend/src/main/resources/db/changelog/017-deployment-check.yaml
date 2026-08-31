@@ -1,0 +1,124 @@
+databaseChangeLog:
+  - changeSet:
+      id: 017-deployment-check-retention
+      author: freezehub
+      changes:
+        # One year by default (FZ-070). Per organization, because a regulated customer
+        # may need to keep more and most need considerably less.
+        - addColumn:
+            tableName: organization
+            columns:
+              - column:
+                  name: deployment_check_retention_days
+                  type: int
+                  defaultValueNumeric: 365
+                  constraints:
+                    nullable: false
+        - sql:
+            sql: >
+              ALTER TABLE organization ADD CONSTRAINT chk_organization_check_retention
+              CHECK (deployment_check_retention_days BETWEEN 7 AND 3650)
+
+  - changeSet:
+      id: 017-deployment-check
+      author: freezehub
+      changes:
+        - createTable:
+            tableName: deployment_check
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: organization_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+                    references: organization(id)
+                    foreignKeyName: fk_deployment_check_organization
+              # No foreign key to api_key, and the label is denormalised, for the same
+              # reason as audit_event: the record must stay readable and must not be
+              # rewritten by anything that happens to the credential afterwards.
+              - column:
+                  name: api_key_id
+                  type: bigint
+              - column:
+                  name: api_key_label
+                  type: varchar(255)
+                  constraints:
+                    nullable: false
+              # As supplied, not as resolved — an unregistered name is exactly what makes
+              # a record worth reading, so it cannot be normalised into a catalog id.
+              - column:
+                  name: application
+                  type: varchar(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: environment
+                  type: varchar(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: decision
+                  type: varchar(10)
+                  constraints:
+                    nullable: false
+              # Null on ALLOW. Distinguishes "a freeze stopped this" from "we did not
+              # recognise the name", which mean very different things to whoever reads it.
+              - column:
+                  name: blocked_reason
+                  type: varchar(20)
+              # What was true at check time: a restriction can be renamed afterwards, and
+              # this record must not change when it is.
+              - column:
+                  name: matched_restrictions
+                  type: text
+              # Supplied by the caller, and customer PII. Optional: not every runner has
+              # it, and an existing pipeline must keep working untouched.
+              - column:
+                  name: actor
+                  type: varchar(320)
+              - column:
+                  name: reference
+                  type: varchar(255)
+              - column:
+                  name: source
+                  type: varchar(1024)
+              - column:
+                  name: checked_at
+                  type: timestamptz
+                  defaultValueComputed: now()
+                  constraints:
+                    nullable: false
+        - sql:
+            sql: >
+              ALTER TABLE deployment_check ADD CONSTRAINT chk_deployment_check_decision
+              CHECK (decision IN ('ALLOW', 'BLOCK'))
+        - sql:
+            sql: >
+              ALTER TABLE deployment_check ADD CONSTRAINT chk_deployment_check_blocked_reason
+              CHECK (blocked_reason IS NULL OR blocked_reason IN ('RESTRICTION', 'UNREGISTERED'))
+        # The console's read pattern: one organization's checks, newest first.
+        - createIndex:
+            tableName: deployment_check
+            indexName: idx_deployment_check_organization_id_desc
+            columns:
+              - column:
+                  name: organization_id
+              - column:
+                  name: id
+                  descending: true
+        # The purge's pattern, and the "what happened during that freeze" query.
+        - createIndex:
+            tableName: deployment_check
+            indexName: idx_deployment_check_checked_at
+            columns:
+              - column:
+                  name: organization_id
+              - column:
+                  name: checked_at

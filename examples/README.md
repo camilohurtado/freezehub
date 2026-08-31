@@ -51,6 +51,20 @@ export FREEZEHUB_ENVIRONMENT=production
 
 `1` and `2` are separate on purpose: "you may not deploy" and "I could not find out" are different facts, and only the second one is your infrastructure's problem.
 
+## What gets recorded
+
+Every check is recorded, with whatever the script could tell FreezeHub about it — so afterwards you can answer *"who tried to deploy during the freeze?"*, which is a question nobody could answer before.
+
+The script detects these automatically and each can be overridden:
+
+| Sent as | From GitLab CI | From GitHub Actions |
+|---|---|---|
+| `actor` | `GITLAB_USER_EMAIL` | `GITHUB_ACTOR` |
+| `reference` | `CI_COMMIT_SHA` | `GITHUB_SHA` |
+| `source` | `CI_PIPELINE_URL` | the run URL |
+
+All optional. On a runner exposing none of them the check still works — the record is just less useful later. Note that `actor` and `reference` identify your engineers and your code, so they are held for as long as your organization's retention setting and no longer.
+
 ## The decision you have to make
 
 **FreezeHub cannot tell you what its own silence means.** Nothing in the API can express "I could not be asked", so the pipeline decides:
