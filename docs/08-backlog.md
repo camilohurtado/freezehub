@@ -510,13 +510,25 @@ Until this exists the backend **cannot start at all** without the `local` profil
 Depends on a Cognito user pool existing, so sequence with `FZ-063`. Acceptance: an implementation selected outside the `local` profile, configured per environment rather than hardcoded, that creates the identity and returns its `sub`; failures surface as a clear error rather than a half-created user.
 
 ### FZ-047 — "Starting Soon" Notification
-**Status:** TODO
+**Status:** DONE
 
 **Fixes `OI-3`.** `00-product.md` lists a "restriction starting soon" notification; nothing implements it.
 
 **Blocked on a product decision:** how soon is "soon", and is the lead time fixed, per organization, or per restriction? No document says.
 
 It also differs structurally from every other lifecycle event — it is triggered by the passage of time rather than by a state transition, so a scheduled check writes the outbox rather than a domain change doing so. That check must be idempotent in the same way the lifecycle reconciler is, or a restriction would be announced as "starting soon" on every pass.
+
+**Decision: the lead time is per organization, defaulting to 24 hours.** Release rhythms differ — a weekly train wants more notice than a shop deploying continuously — and defaulting rather than asking at sign-up means nobody answers a question they have no opinion about yet. Bounded between 1 minute and 30 days, in the database and in the API, so a bad value is a `400` rather than a `500`.
+
+**Idempotence was the whole difficulty**, and it needed no new machinery: a restriction stays inside its warning window for the entire lead time, so the sweep sees it again on every pass, and the outbox's existing unique constraint on (restriction, integration, event) is what makes it announce exactly once. Verified live at a three-second sweep interval — roughly five passes produced exactly one announcement.
+
+`StartingSoonNotifier` runs on the same tick as lifecycle reconciliation, and deliberately **after** it: reconciling status first is what stops a restriction that has just begun from also being announced as about to.
+
+The sweep is bounded by the largest lead time any organization has configured, so it examines a small window rather than every future restriction across every tenant.
+
+New: `GET /api/organization` (any member — knowing how much warning the team gets is not sensitive) and `PATCH /api/organization/settings` (Administrator only, like every other setting decided on the whole organization's behalf). Neither takes an organization id, because the organization comes from the credential.
+
+**No frontend.** `05-frontend.md` has no settings screen, and adding one is a larger change than this story. The lead time is set through the API for now — recorded as `OI-11`.
 
 ### FZ-048 — Webhook Signing
 **Status:** DONE

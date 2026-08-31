@@ -61,6 +61,8 @@ Authenticated with a JWT; all tenant-scoped.
 | Method | Path | Notes |
 |---|---|---|
 | `GET` | `/api/me` | resolved user and organization |
+| `GET` | `/api/organization` | the caller's own organization and its settings |
+| `PATCH` | `/api/organization/settings` | **ADMINISTRATOR only**; `startingSoonLeadTimeMinutes`, 1–43200 |
 | `POST` | `/api/invites` | **ADMINISTRATOR only** |
 | `GET POST PATCH DELETE` | `/api/teams`, `/api/applications`, `/api/environments` | catalog; duplicate name → `409` |
 | `PUT DELETE` | `/api/applications/{id}/teams/{teamId}` | team assignment, idempotent |

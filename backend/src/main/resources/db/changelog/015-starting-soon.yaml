@@ -1,0 +1,42 @@
+databaseChangeLog:
+  - changeSet:
+      id: 015-starting-soon-lead-time
+      author: freezehub
+      changes:
+        # How far ahead an organization wants warning that a freeze is about to start
+        # (FZ-047). Per-organization rather than global: a weekly release train wants more
+        # notice than a continuous-deployment shop. 1440 minutes = 24 hours.
+        - addColumn:
+            tableName: organization
+            columns:
+              - column:
+                  name: starting_soon_lead_time_minutes
+                  type: int
+                  defaultValueNumeric: 1440
+                  constraints:
+                    nullable: false
+        # Bounded at both ends: zero would mean the warning fires as the freeze begins,
+        # which the ACTIVATED event already covers, and 30 days is well past any window
+        # anyone plans a deployment freeze over.
+        - sql:
+            sql: >
+              ALTER TABLE organization ADD CONSTRAINT chk_organization_starting_soon_lead_time
+              CHECK (starting_soon_lead_time_minutes BETWEEN 1 AND 43200)
+
+  - changeSet:
+      id: 015-notification-starting-soon-event
+      author: freezehub
+      changes:
+        # STARTING_SOON is the fifth lifecycle event 00-product.md asks for, and the only
+        # one triggered by the passage of time rather than by a state transition.
+        #
+        # Only the CHECK changes. The unique constraint on
+        # (restriction_id, integration_id, event) is untouched, and it is what makes the
+        # repeated starting-soon sweep idempotent — the sweep can run every minute and
+        # still announce exactly once.
+        - sql:
+            sql: ALTER TABLE notification DROP CONSTRAINT chk_notification_event
+        - sql:
+            sql: >
+              ALTER TABLE notification ADD CONSTRAINT chk_notification_event
+              CHECK (event IN ('SCHEDULED', 'STARTING_SOON', 'ACTIVATED', 'COMPLETED', 'CANCELLED'))

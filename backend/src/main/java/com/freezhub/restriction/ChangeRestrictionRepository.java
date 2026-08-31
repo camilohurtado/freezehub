@@ -101,6 +101,30 @@ public interface ChangeRestrictionRepository extends JpaRepository<ChangeRestric
                                         @Param("now") Instant now,
                                         @Param("cancelled") RestrictionStatus cancelled);
 
+    /**
+     * Restrictions that have not started yet and could be near enough to warn about
+     * (FZ-047), paired with their organization's lead time in minutes.
+     *
+     * <p>Bounded by {@code horizon}, the largest lead time any organization has set, so
+     * the sweep considers a small window rather than every future restriction. Whether
+     * each one is actually due is then decided per organization, because the lead time
+     * differs between them.
+     *
+     * <p>Not tenant-scoped: this is a system sweep across the whole table, like the
+     * lifecycle reconciler.
+     */
+    @Query("""
+            select r, o.startingSoonLeadTimeMinutes
+              from ChangeRestriction r
+              join Organization o on o.id = r.organizationId
+             where r.status <> :cancelled
+               and r.startsAt > :now
+               and r.startsAt <= :horizon
+            """)
+    List<Object[]> findApproaching(@Param("now") Instant now,
+                                   @Param("horizon") Instant horizon,
+                                   @Param("cancelled") RestrictionStatus cancelled);
+
     /** Tenant-scoped lookup: a restriction owned by another organization is simply absent. */
     Optional<ChangeRestriction> findByIdAndOrganizationId(Long id, Long organizationId);
 
