@@ -283,6 +283,38 @@ class AuditTrailTest {
     }
 
     @Test
+    void filtersTheTrailByWhatWasChanged() throws Exception {
+        // Once the trail holds catalog changes, key issuance and policy refusals together
+        // (FZ-072), "what happened to our restrictions" is a different question from "who
+        // has been issued a key" — and scrolling past the other is not an answer.
+        createRestriction();
+        mockMvc.perform(post("/api/api-keys")
+                        .header("Authorization", auth())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"gitlab-ci\"}"))
+                .andExpect(status().isCreated());
+
+        mockMvc.perform(get("/api/audit")
+                        .header("Authorization", auth())
+                        .param("resourceType", "API_KEY"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()", is(1)))
+                .andExpect(jsonPath("$[0].action", is("API_KEY_ISSUED")));
+
+        mockMvc.perform(get("/api/audit")
+                        .header("Authorization", auth())
+                        .param("resourceType", "RESTRICTION"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].action", is("RESTRICTION_CREATED")));
+    }
+
+    @Test
+    void rejectsAResourceTypeItDoesNotKnow() throws Exception {
+        mockMvc.perform(get("/api/audit").header("Authorization", auth()).param("resourceType", "NONSENSE"))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void neverShowsAnotherOrganizationsTrail() throws Exception {
         createRestriction();
 

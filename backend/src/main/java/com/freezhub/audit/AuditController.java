@@ -44,9 +44,10 @@ public class AuditController {
     @GetMapping
     public List<AuditEventResponse> list(@AuthenticationPrincipal AuthenticatedUser caller,
                                          @RequestParam(required = false) Long beforeId,
+                                         @RequestParam(required = false) AuditResourceType resourceType,
                                          @RequestParam(required = false) Integer limit) {
         return auditRepository
-                .findPage(caller.organizationId(), beforeId, Limit.of(capped(limit)))
+                .findPage(caller.organizationId(), beforeId, resourceType, Limit.of(capped(limit)))
                 .stream()
                 .map(AuditEventResponse::from)
                 .toList();

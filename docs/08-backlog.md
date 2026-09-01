@@ -391,6 +391,23 @@ Lists gained accessible names, which the existing test needed anyway once there 
 
 **Verified against a running backend**, comparing every response shape to the TypeScript types: `GET /api/api-keys` carries no `key` field, `POST` does, revoke returns the revoked row, and a member gets `403` on keys and on saving settings but `200` reading the organization — which is why this screen only reports forbidden on save.
 
+### FZ-039 — Audit Screen
+**Status:** DONE
+
+**Closes `OI-11`.** `/audit`, Administrator only, matching the API — the trail names who did what.
+
+The companion to the deployment console: that one shows a pipeline being refused, this one shows why the rules it was judged against look the way they do. After `FZ-072` the two connect — a wall of refusals in the console and, in the trail, the rename a minute earlier that caused it.
+
+**The work here is making the record readable**, not fetching it:
+
+- `details` arrives in two shapes and both had to render: a before-and-after diff from an edit (`{"name": {"from": …, "to": …}}`) and a flat object from everything else. Showing raw JSON would push the parsing onto whoever is reading the screen during an incident.
+- A cleared field reads as *"description: Peak trading → nothing"* rather than as a blank half of an arrow.
+- Wording is composed from the action **and** `resourceType`, so `CATALOG_RENAMED` + `APPLICATION` reads "Renamed application". That is why `FZ-072` stored three catalog actions rather than nine.
+- An action this build has never heard of degrades to readable words instead of rendering as a blank row.
+- **The system's own work is not attributed to a person.** A restriction takes effect because time passed; `RESTRICTION_ACTIVATED` shows as *automatic*, and naming someone would be a fiction.
+
+Supporting backend change: `GET /api/audit` gained a `?resourceType=` filter. Once the trail holds catalog changes, key issuance and policy refusals together, "what happened to our restrictions" is a different question from "who has been issued a key", and scrolling past the other is not an answer. The UI ignores a resource type it does not offer, so a hand-edited URL cannot send the backend something it will reject.
+
 ## Milestone 4 — Notifications
 
 ### FZ-040 — Notification Model + Outbox

@@ -32,12 +32,13 @@ Accepted trade-off: multi-select UX is basic. Revisit if usability testing shows
 /catalog                   -> Catalog management   (FZ-036)
 /settings                  -> Integrations, API keys, advance warning (FZ-045, FZ-038)
 /deployment-checks         -> Deployment checks    (FZ-071)
+/audit                     -> Audit trail         (FZ-039)
 *                          -> Not found
 ```
 
 Every route except the dev sign-in is authenticated: without a token the app redirects to sign-in rather than rendering an empty page.
 
-Added after Milestone 3, each with its own backlog item: catalog management (`FZ-036`), integrations (`FZ-045`), API keys and organization settings (`FZ-038`), and the deployment checks console (`FZ-071`). **Audit remains without a screen** — `OI-11`.
+Added after Milestone 3, each with its own backlog item: catalog management (`FZ-036`), integrations (`FZ-045`), API keys and organization settings (`FZ-038`), the deployment checks console (`FZ-071`), and the audit screen (`FZ-039`).
 
 The checks console is the one route open to any member rather than administrators only: it is where a team looks to see whether their own deployment got through, and making them ask an administrator would defeat the point.
 

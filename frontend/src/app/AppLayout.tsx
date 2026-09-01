@@ -35,6 +35,12 @@ export function AppLayout() {
             Catalog
           </NavLink>
           <NavLink
+            to="/audit"
+            className={({ isActive }) => (isActive ? styles.linkActive : styles.link)}
+          >
+            Audit
+          </NavLink>
+          <NavLink
             to="/settings"
             className={({ isActive }) => (isActive ? styles.linkActive : styles.link)}
           >

@@ -33,15 +33,6 @@ Not silently broken: without the `local` profile the application refuses to star
 
 The "cannot start outside `local`" consequence bites exactly when the first deployed environment appears, which is `FZ-063` itself. Stays open until the pair ships.
 
-### OI-11 — The audit trail has no UI
-**Severity:** Gap · **Owner:** needs a story · **Found in:** `FZ-047`, narrowed by `FZ-038`
-
-`FZ-038` gave API keys and the lead time a screen. The audit trail (`FZ-060`) is still readable only through `GET /api/audit`.
-
-It answers "who changed this freeze, and to what" — a question an administrator asks under pressure, during or just after an incident, and not one they want to reach for `curl` to answer. It is also the part most likely to matter to a compliance-minded prospect, who will want to see it rather than be told it exists.
-
-A log view is a different shape from the settings screens: keyset pagination (`?beforeId=`), a mix of actor types, and JSON details that need rendering rather than printing. Worth its own story rather than a fourth section on the settings page.
-
 ## Resolved
 
 | Issue | Found in | Resolved by |
@@ -56,6 +47,7 @@ A log view is a different shape from the settings screens: keyset pagination (`?
 | **The Policy API had no machine credential** — `FZ-051` was ordered before API keys, so the endpoint deciding whether deployments are blocked would have shipped with nothing able to authenticate to it | `FZ-050` | `FZ-052`, taken out of order |
 | Any error behind the machine chain came back as `401` — the forward to `/error` is re-filtered and does not match `/api/policy/**`, so it fell through to the human chain and reported a credential failure instead of the real one | `FZ-052` | `FZ-052` |
 | Testing Library's DOM cleanup never registered, leaking rendered DOM between tests | `FZ-031` | `FZ-031` |
+| **Administrator features existed only in the API** — API keys, the advance-warning setting, and the audit trail could each be reached only with `curl` | `FZ-047`, beta-readiness audit | `FZ-038` and `FZ-039` |
 | **Catalog changes were not audited** — renaming an application turned every pipeline using the old name into a refusal, with nothing in the trail explaining when it started or who caused it | `FZ-060` | `FZ-072` |
 | **`docs/07-decisions.md` did not exist**, so every architectural decision was recorded only in the backlog entry of the story that made it | ongoing | `FZ-048` created it; `FZ-066` backfilled the rest |
 | **The "restriction starting soon" notification was never implemented**, though `00-product.md` lists it — it needed a lead-time decision nobody had made | `FZ-040` | `FZ-047` — per organization, defaulting to 24 hours |

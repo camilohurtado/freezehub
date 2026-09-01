@@ -5,6 +5,7 @@ import { RequireAuth } from '../features/auth/RequireAuth'
 import { SignInPage } from '../features/auth/SignInPage'
 import { DashboardPage } from '../features/dashboard/DashboardPage'
 import { RestrictionsPage } from '../features/restrictions/RestrictionsPage'
+import { AuditPage } from '../features/audit/AuditPage'
 import { CatalogPage } from '../features/catalog/CatalogPage'
 import { DeploymentChecksPage } from '../features/deployments/DeploymentChecksPage'
 import { SettingsPage } from '../features/settings/SettingsPage'
@@ -34,6 +35,7 @@ export const routes = [
       { path: 'restrictions/:restrictionId/edit', element: <EditRestrictionPage /> },
       { path: 'deployment-checks', element: <DeploymentChecksPage /> },
       { path: 'catalog', element: <CatalogPage /> },
+      { path: 'audit', element: <AuditPage /> },
       { path: 'settings', element: <SettingsPage /> },
     ],
   },
