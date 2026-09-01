@@ -55,3 +55,9 @@ variable "backend_memory" {
   type        = number
   default     = 1024
 }
+
+variable "github_repository" {
+  description = "owner/name of the repository allowed to deploy. The OIDC trust policy is scoped to it and to the master branch, so getting this wrong is the difference between only this repository deploying and anyone's doing so."
+  type        = string
+  default     = "acme/freezehub"
+}

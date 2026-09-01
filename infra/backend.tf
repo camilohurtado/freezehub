@@ -294,5 +294,17 @@ resource "aws_ecs_service" "backend" {
     rollback = true # a bad image rolls itself back rather than taking the service down
   }
 
+  # CI registers a new task definition revision on every deploy (FZ-064), so Terraform
+  # must stop trying to reset the service to whichever revision it last created —
+  # otherwise the next `terraform apply` silently rolls production back to the image
+  # named in var.backend_image_tag.
+  #
+  # The consequence to accept: the running image is no longer described by this file.
+  # It is described by the deploy that put it there, which is why image tags are
+  # immutable and named after the commit.
+  lifecycle {
+    ignore_changes = [task_definition]
+  }
+
   depends_on = [aws_lb_listener.https]
 }

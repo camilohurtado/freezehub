@@ -122,6 +122,27 @@ Requires Docker running for `./mvnw clean verify` (Testcontainers) and for `spri
 - Migrations live in `src/main/resources/db/changelog/`, run by Liquibase on startup (`db.changelog-master.yaml`).
 - Integration tests get a real PostgreSQL via Testcontainers (`src/test/java/com/freezhub/ContainersConfig.java`, `@ServiceConnection`) — see `FreezeHubApplicationTests`.
 
+## Container image
+
+`Dockerfile` is a multi-stage build, so this works with nothing installed but Docker and
+produces the same image CI pushes:
+
+```bash
+docker build -t freezehub-backend backend/
+docker run --rm -p 8080:8080 \
+  -e SPRING_PROFILES_ACTIVE=local \
+  -e SPRING_DATASOURCE_URL=jdbc:postgresql://host.docker.internal:5432/freezehub \
+  freezehub-backend
+```
+
+Tests are skipped inside the build on purpose: CI has already run the full suite against a
+real PostgreSQL, and Testcontainers cannot start a database inside a Docker build. The
+image runs as a non-root user and puts the JVM at PID 1, so it receives the SIGTERM ECS
+sends on a deployment rather than being killed after the timeout.
+
+CI builds it for **linux/arm64**, matching the Fargate task. An amd64 image will not start
+there.
+
 ## Observability
 
 Every request carries an `X-Request-Id` — supplied by the caller or generated — which appears on each log line, in the response header, and in the `requestId` field of any error body. Quote it when reporting a failure; it is what makes the log searchable.

@@ -1,0 +1,128 @@
+# Deploying a build to an environment (FZ-064).
+#
+# NOT YET RUN. There is no AWS account provisioned and no ECR repository to push to, so
+# this has never executed — see FZ-064 in docs/08-backlog.md for exactly what that leaves
+# unproven.
+#
+# Manual rather than automatic on merge: deploying is a decision, and the product this
+# repository builds exists because deploying at the wrong moment is a real problem.
+name: Deploy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Environment to deploy to
+        required: true
+        default: beta
+        type: choice
+        options: [beta]
+
+# id-token is what makes this work without storing AWS credentials in GitHub: the runner
+# exchanges a short-lived OIDC token for a role, so there is no long-lived secret to leak
+# and nothing to rotate. The trust policy in infra/github-oidc.tf is scoped to this
+# repository and this branch.
+permissions:
+  id-token: write
+  contents: read
+
+# Two deploys racing would leave the service on whichever image finished second, which is
+# not necessarily the newer one.
+concurrency:
+  group: deploy-${{ inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - uses: aws-actions/amazon-ecr-login@v2
+        id: ecr
+
+      # The commit, not `latest`: a tag always means one image, so a rollback is
+      # redeploying an older tag rather than rebuilding and hoping.
+      - name: Resolve the image tag
+        id: image
+        run: echo "tag=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      # linux/arm64 because the Fargate task runs ARM64 — cheaper per vCPU-hour, and an
+      # amd64 image would simply fail to start there.
+      - name: Build and push the image
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          platforms: linux/arm64
+          push: true
+          tags: ${{ steps.ecr.outputs.registry }}/${{ vars.ECR_REPOSITORY }}:${{ steps.image.outputs.tag }}
+
+      # A new task definition revision, not `--force-new-deployment`: forcing a
+      # deployment redeploys whatever revision the service currently has, and that one
+      # still names the *previous* image. It would look like a successful deploy and ship
+      # nothing.
+      - name: Describe the current task definition
+        id: current
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition "${{ vars.ECS_TASK_FAMILY }}" \
+            --query taskDefinition > task-definition.json
+
+      - name: Point it at the new image
+        id: rendered
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: task-definition.json
+          container-name: backend
+          image: ${{ steps.ecr.outputs.registry }}/${{ vars.ECR_REPOSITORY }}:${{ steps.image.outputs.tag }}
+
+      # Deliberately NOT `terraform apply`. Applying from CI would need a role able to
+      # change the database, the certificates and the user pool — far more than deploying
+      # needs. Terraform stays a human operation, and the service's task_definition is
+      # under lifecycle.ignore_changes so the two do not fight over the image tag.
+      #
+      # wait-for-service-stability turns a failing deploy into a failing job: ECS rolls
+      # back on its own (deployment_circuit_breaker), but without this the workflow would
+      # report success while the rollback was still happening.
+      - name: Deploy
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.rendered.outputs.task-definition }}
+          cluster: ${{ vars.ECS_CLUSTER }}
+          service: ${{ vars.ECS_SERVICE }}
+          wait-for-service-stability: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build the frontend
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      # --delete so a file removed from the build is removed from the bucket; otherwise a
+      # deleted page keeps being served indefinitely.
+      - name: Publish the frontend
+        run: aws s3 sync frontend/dist "s3://${{ vars.FRONTEND_BUCKET }}" --delete
+
+      # Without this, CloudFront keeps serving the previous build until the cache expires,
+      # and the deploy looks like it did nothing.
+      - name: Invalidate the cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id "${{ vars.CLOUDFRONT_DISTRIBUTION_ID }}" \
+            --paths '/*'
