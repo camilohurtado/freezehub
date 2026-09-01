@@ -51,14 +51,31 @@ distribution. Certificate validation blocks until the DNS records propagate.
 
 ## Deploying the application
 
-`FZ-064` automates this. By hand:
+`FZ-064` automates this in `.github/workflows/deploy.yml`, which assumes a role by OIDC rather than any stored key. After the first apply, set these as repository variables in GitHub — every one is a `terraform output`:
+
+```text
+AWS_DEPLOY_ROLE_ARN        github_deploy_role_arn
+AWS_REGION                 (your region)
+ECR_REPOSITORY             (the repository name from ecr_repository_url)
+ECS_CLUSTER                ecs_cluster_name
+ECS_SERVICE                ecs_service_name
+ECS_TASK_FAMILY            ecs_task_family
+FRONTEND_BUCKET            frontend_bucket
+CLOUDFRONT_DISTRIBUTION_ID cloudfront_distribution_id
+```
+
+Set `github_repository` in `terraform.tfvars` before applying: the OIDC trust policy is scoped to it, and getting it wrong is the difference between only this repository being able to deploy and anyone's being able to.
+
+By hand:
 
 ```bash
 # backend — the image must be linux/arm64, which is what the task definition runs
 aws ecr get-login-password | docker login --username AWS --password-stdin "$(terraform output -raw ecr_repository_url)"
-docker buildx build --platform linux/arm64 -t "$(terraform output -raw ecr_repository_url):$(git rev-parse --short HEAD)" backend/
+docker buildx build --platform linux/arm64 -t "$(terraform output -raw ecr_repository_url):$(git rev-parse --short HEAD)" backend/   # backend/Dockerfile
 docker push "$(terraform output -raw ecr_repository_url):$(git rev-parse --short HEAD)"
-terraform apply -var="backend_image_tag=$(git rev-parse --short HEAD)"
+# then register a revision naming that image and update the service. NOT
+# `terraform apply`: the service ignores task_definition changes so CI and Terraform
+# do not fight over the image tag.
 
 # frontend
 (cd frontend && npm run build)

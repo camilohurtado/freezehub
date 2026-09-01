@@ -42,3 +42,23 @@ output "database_secret_arn" {
   description = "Where the database credentials live. Not the credentials themselves."
   value       = aws_secretsmanager_secret.database.arn
 }
+
+output "github_deploy_role_arn" {
+  description = "Set as the AWS_DEPLOY_ROLE_ARN repository variable in GitHub (FZ-064)."
+  value       = aws_iam_role.github_deploy.arn
+}
+
+output "ecs_cluster_name" {
+  description = "Set as ECS_CLUSTER in GitHub."
+  value       = aws_ecs_cluster.main.name
+}
+
+output "ecs_service_name" {
+  description = "Set as ECS_SERVICE in GitHub."
+  value       = aws_ecs_service.backend.name
+}
+
+output "ecs_task_family" {
+  description = "Set as ECS_TASK_FAMILY in GitHub."
+  value       = aws_ecs_task_definition.backend.family
+}

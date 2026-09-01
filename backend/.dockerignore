@@ -1,0 +1,9 @@
+# Keeps the build context small and stops local state reaching the image.
+**/target/
+**/node_modules/
+**/dist/
+.git/
+.idea/
+infra/
+docs/
+frontend/

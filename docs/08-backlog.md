@@ -798,7 +798,25 @@ Deliberate choices, each with its cost stated in `infra/README.md`:
 **This does not make the product deployable on its own.** `FZ-046` is still outstanding, so the backend refuses to start outside the `local` profile: the infrastructure can be created, and the service will not come up. That pairing is decision `D-4`, not an oversight.
 
 ### FZ-064 — CI/CD
-**Status:** TODO
+**Status:** DONE (verification proven; **deployment never run**)
+
+The story splits cleanly, and the two halves are in very different states.
+
+**`verify.yml` needs no AWS and is proven.** Four parallel jobs — backend (`mvnw verify`, with Testcontainers starting a real PostgreSQL on the runner's own Docker daemon), frontend (`npm ci`, lint, test, build), infrastructure (`terraform fmt -check` plus `validate` with `-backend=false`, which is what makes it need no credentials), and the example gate (`sh -n`, because a syntax error there breaks a customer's pipeline rather than ours). Parallel so a lint failure does not hide a test failure. Every command was run locally exactly as CI runs it, including `npm ci` from a clean checkout.
+
+**`deploy.yml` has never executed**, because there is no AWS account, no ECR repository and no GitHub remote. It is written and reviewed, not proven.
+
+**A gap this story found: there was no `Dockerfile`.** `FZ-063` built an ECS task definition around a container image, and `infra/README.md` documented `docker buildx build backend/` — with nothing to build. Added here as a multi-stage build so `docker build backend/` works identically on a laptop and in CI, with no "build the jar first" step to forget.
+
+**A bug caught while writing the deploy job:** the first version ran `aws ecs update-service --force-new-deployment`, which redeploys whatever revision the service already has — and that one still names the *previous* image. It would have reported a successful deploy and shipped nothing. It now registers a new task definition revision.
+
+**No AWS credentials are stored in GitHub.** The runner exchanges a short-lived OIDC token for a role (`infra/github-oidc.tf`). The trust policy is scoped to this repository *and* the master branch: left open, a fork's pull request could deploy to production, or another account's repository could assume the role outright. `iam:PassRole` is scoped to the two task roles rather than `*`, since `*` there is escalation to anything either role can do.
+
+**CI deliberately cannot run `terraform apply`.** That would need a role able to change the database, the certificates and the user pool — far more than deploying needs. Terraform stays a human operation, and the ECS service gained `lifecycle.ignore_changes = [task_definition]` so the two do not fight over the image tag. The accepted consequence: the running image is no longer described by the Terraform, but by the deploy that put it there — which is why tags are immutable and named after the commit.
+
+**Verified locally** by building and running the image: healthy in 10 seconds against the real database, running as **uid 999 rather than root**, the JVM as **PID 1** so it receives the SIGTERM ECS sends (`docker stop` returns in 0s rather than being killed after the timeout), 379 MB. A production-shaped run — no `local` profile — fails fast on the missing `IdentityProvider`, which is `OI-2` behaving exactly as `FZ-016` designed and confirms that gap is the only thing between this image and a deployment.
+
+**What remains unproven:** every step that touches AWS. The workflow's correctness rests on reading it, not on running it.
 
 Build/test/deploy automation for backend and frontend.
 
