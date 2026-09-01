@@ -154,3 +154,28 @@ export interface DeploymentCheck {
   checkedBy: string
   checkedAt: string
 }
+
+export type AuditActorType = 'USER' | 'SYSTEM' | 'API_KEY'
+
+export type AuditResourceType =
+  | 'RESTRICTION'
+  | 'TEAM'
+  | 'APPLICATION'
+  | 'ENVIRONMENT'
+  | 'API_KEY'
+  | 'USER'
+  | 'ORGANIZATION'
+  | 'POLICY'
+
+/** A change, as it was recorded. `details` is either a before/after diff or a flat object. */
+export interface AuditEvent {
+  id: number
+  actorType: AuditActorType
+  actorId: number | null
+  actorLabel: string
+  action: string
+  resourceType: AuditResourceType
+  resourceId: number | null
+  details: Record<string, unknown> | null
+  occurredAt: string
+}
