@@ -73,6 +73,15 @@ spring:
     activate:
       on-profile: local
 
+# Not 8080 for local development: it is the default for half the JVM ecosystem, so on a
+# machine running anything else it is usually taken. Deployed environments keep 8080 —
+# the container, the ALB target group and the security groups are all written around it,
+# and nothing else on a Fargate task is competing for the port.
+#
+# Override with SERVER_PORT if 8099 is taken too.
+server:
+  port: ${SERVER_PORT:8099}
+
 freezehub:
   cors:
     allowed-origins: ${FREEZEHUB_CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:5174}

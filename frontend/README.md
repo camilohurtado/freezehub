@@ -24,7 +24,7 @@ docker compose up -d postgres                                   # repo root
 npm run dev                                                     # http://localhost:5173
 ```
 
-Sign in at `/signin` with the email of an existing user (see `../backend/README.md` § Signing in during development). The API base URL comes from `VITE_API_BASE_URL`, defaulting to `http://localhost:8080`.
+Sign in at `/signin` with the email of an existing user (see `../backend/README.md` § Signing in during development). The API base URL comes from `VITE_API_BASE_URL`, defaulting to `http://localhost:8099` — the backend's local port. A deployed build must set it, since the API is on a different host there.
 
 **If the browser reports a CORS error**, the backend has to allow the origin the UI is served from. The `local` profile allows `http://localhost:5173` and `:5174`; for any other port set `FREEZEHUB_CORS_ALLOWED_ORIGINS` when starting the backend.
 
