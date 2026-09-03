@@ -905,6 +905,21 @@ Nothing is recorded when nothing happened: a rename to the same name, a repeated
 07:12:05  gitlab-ci      POLICY_BLOCKED_UNREGISTERED   {"application":"payments-api","unregistered":"[APPLICATION]"}
 ```
 
+### FZ-074 — Demo Data and Walkthrough
+**Status:** DONE
+
+`scripts/seed-demo.sh` builds a believable organization to demonstrate against, and `docs/10-demo.md` is the walkthrough it was built for.
+
+**Everything goes through the real API**, so the audit trail and deployment console fill with entries the product genuinely produced rather than rows written straight into tables. The single exception is the first user, which the API deliberately cannot create — there is no self-service signup (`06-security.md`) — so that one row is inserted directly.
+
+**It waits for the lifecycle reconciler before finishing.** For the first minute after seeding, a freeze that is already blocking deployments still reads `SCHEDULED` — correct, because policy decides from the timestamps and not the status column (`D-13`), and impossible to explain on camera. The script polls until the screens agree, and one restriction is deliberately given a two-minute window so the dashboard's recently-completed section is filled by a real transition rather than a pre-completed row.
+
+It refuses to run twice rather than silently doubling the demo.
+
+**It also fixes an ordinary gap:** an empty database has no users at all, so `POST /api/dev/token` returns `404` and nobody can sign in. A fresh checkout was unusable without hand-written SQL; this makes `docker compose down -v` a safe thing to do.
+
+The walkthrough carries a **what not to say** section. The claim to avoid is *"FreezeHub prevents deployments during a freeze"* — it does not and cannot, since enforcement lives in the customer's pipeline. A technical buyer will test that claim, and being caught overclaiming costs the deal. The honest position is stronger anyway: no agent, no credentials into their repositories, and no blast radius.
+
 ## Milestone 7 — Deployment Visibility
 
 Turns FreezeHub from "we announced the freeze and recorded the decision" into "here is every attempt to deploy, and what we told each one". The difference matters commercially: today a `BLOCK` vanishes the instant it is returned, and nobody can answer *"did anyone try to ship during Black Friday?"*
