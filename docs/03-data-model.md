@@ -26,8 +26,9 @@ Covered now:
 
 Deliberately deferred, added just-in-time before their own backlog items:
 
+- `subscription` (one per organization), `demo_request`, and the processed-Stripe-event ledger, added by `FZ-081`, `FZ-083` and `FZ-084`.
 
-It is already conceptually defined in `01-domain.md`, but committing to its physical schema now would be speculative ahead of the story that actually implements it.
+Their purpose and their rules are specified in `11-commercial.md`; committing to a physical schema here would be speculative ahead of the stories that implement them. `demo_request` is worth flagging now for one reason: it is the only table in the system with **no `organization_id`**, because a demo request belongs to no tenant yet. It is read by operators and is never reachable from the tenant API.
 
 **Resolved by `FZ-010`:** the `users` table below includes `cognito_subject`, per `06-security.md`'s choice of Amazon Cognito for human authentication.
 

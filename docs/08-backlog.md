@@ -959,3 +959,138 @@ Each row answers who tried what: application → environment, the person (from `
 **The page says in words that these are questions, not deployments**, and there is a test for that sentence. Decision `D-19` has to reach the person reading the screen, not just whoever reads the code — believing these are deployments would mislead in exactly the audit the screen exists to serve.
 
 Filter state lives in the URL, so *"everything we refused"* is a link someone can send. Paging is by cursor, and "load older" appears only when a page came back full — otherwise it would be a button that does nothing.
+
+## Milestone 8 — Commercial Onboarding
+
+Everything before this milestone assumed the customer already existed. There is no way to acquire one without a developer: `06-security.md` provisions the first Administrator out-of-band, and `scripts/seed-demo.sh` inserts that row with raw SQL because the API refuses to.
+
+`docs/11-commercial.md` is the specification for this milestone. It is the source of truth for pricing, plans, signup and billing; entries here say what to build, not why.
+
+**Order.** `FZ-081` first — everything else reads the subscription it creates. `FZ-087` before anything unauthenticated is exposed. `FZ-082` cannot ship before `FZ-046` (`OI-2`): self-serve signup creates a Cognito identity, and the only `IdentityProvider` today is a `@Profile("local")` fake.
+
+```text
+FZ-081 ── FZ-087 ── FZ-082 ── FZ-083 ── FZ-084 ── FZ-085 ── FZ-086
+              (FZ-046 required before FZ-082)
+```
+
+### FZ-080 — Commercial Model
+**Status:** DONE
+
+Specification only, no code: `docs/11-commercial.md`, plus `D-20`–`D-23`.
+
+Four decisions were the user's to make and were made: hybrid go-to-market (self-serve trial alongside sales-assisted annual), **per registered application** as the pricing metric, Stripe Checkout for payment, and a 14-day full-feature trial with no card.
+
+The reasoning that shaped the rest: **seats and evaluations are both the wrong metric.** Seats charge the customer for telling people about a freeze, which is the product. Evaluations tax calling the Policy API on every deploy, which is how a freeze is enforced at all — a customer optimising that bill would deploy past a freeze. Applications are what scope is built on, are already visible in the product, and cannot be gamed because `D-14` blocks unregistered applications outright.
+
+### FZ-081 — Plans and Subscription State
+**Status:** TODO
+
+One `subscription` row per organization, and the plan limits that read from it.
+
+Plans are **an enum with limits as code constants**, not a table. Limits are product decisions deployed with the code; a table invites per-customer edits that then contradict the pricing page. Enterprise is the exception and gets nullable override columns on the subscription row rather than a second mechanism.
+
+Limits are enforced **on creation only** (`D-22`). A downgrade never deletes anything.
+
+Acceptance:
+
+- Every organization has exactly one subscription; creating an organization creates it.
+- Creating a resource beyond the plan's limit is refused with `402` and a Problem Details body naming the plan, the limit, and the current count.
+- A downgrade below current usage keeps every existing resource and refuses only the next creation.
+- Trial expiry moves the subscription to `SUSPENDED`; a scheduled job does this, following the lifecycle reconciler's pattern.
+- **A suspended organization's `/api/policy/evaluate` answers are byte-for-byte what they were before suspension** — same decision, same matched restrictions. There is a test for this, because it is the rule most likely to be broken by a later change (`D-21`).
+- Suspension makes the human API read-only and stops notifications.
+- Subscription changes are audited.
+
+### FZ-087 — Request Rate Limiting
+**Status:** TODO · **Resolves:** `OI-11`
+
+There is no rate limiting anywhere in the codebase. Today that is defensible: `/actuator/health` is the only endpoint reachable without a credential. `FZ-082` and `FZ-083` end that, and an unauthenticated endpoint that creates a Cognito user and sends an email is not something to expose without a limit.
+
+Per-IP, in-application, fixed window — not a distributed limiter, which `CLAUDE.md` §4 excludes and which one backend instance does not need.
+
+Acceptance:
+
+- Signup and demo-request endpoints are limited per IP.
+- Exceeding the limit returns `429` as Problem Details, with `Retry-After`.
+- The limit is configuration, not a constant.
+- Authenticated endpoints are unaffected.
+
+### FZ-082 — Self-Serve Signup
+**Status:** TODO · **Blocked by:** `FZ-046` (`OI-2`)
+
+`POST /api/signup` — the first unauthenticated write endpoint in the product. Creates the organization, its first Administrator, its Cognito identity and its trial subscription in one transaction.
+
+**The response never varies.** `202 Accepted`, same body, whether the organization was created or the email is already in use. Anything else turns signup into a customer-enumeration oracle — the same reasoning that makes a cross-tenant resource `404` rather than `403`.
+
+Acceptance:
+
+- A new company signs up, receives the Cognito temporary password, signs in, and lands in an active 14-day trial.
+- A duplicate email produces the identical `202` and creates nothing.
+- The organization is `PENDING_VERIFICATION` until first successful sign-in.
+- Organizations still unverified after 7 days are purged, including the Cognito identity.
+- Free-mail addresses are accepted (`11-commercial.md` §4).
+- A failure at any step leaves nothing behind — no orphan organization, no orphan Cognito user.
+
+### FZ-083 — Demo Requests
+**Status:** TODO
+
+`POST /api/demo-requests`, unauthenticated, plus the internal notification that a request arrived.
+
+**Reuses the notification module** rather than sending mail directly: retries, backoff and a dead-letter state already exist and are tested (`FZ-040`–`FZ-044`). The only new thing is a destination owned by FreezeHub rather than by a customer.
+
+Acceptance:
+
+- A request is stored with name, work email, company, team size and message.
+- A Slack notification reaches FreezeHub's own workspace, and a delivery failure is retried rather than lost.
+- Requests carry a status (`NEW`, `CONTACTED`, `CONVERTED`, `DECLINED`) and, once converted, the organization they became.
+- Storage is not tenant-scoped — a demo request belongs to no organization yet, which makes it the one table outside the tenant boundary. It is read by operators, never by the tenant API.
+
+### FZ-084 — Stripe Checkout and Subscription Lifecycle
+**Status:** TODO
+
+Checkout sessions, portal sessions, and the webhook that is the only thing allowed to change entitlement.
+
+`POST /api/webhooks/stripe` gets **its own security chain**, matching `/api/webhooks/stripe/**`, authenticated by `Stripe-Signature` — HMAC over timestamp and body, the same construction as `D-2` pointed inward. No CORS.
+
+Acceptance:
+
+- An administrator reaches Stripe Checkout and returns to an `ACTIVE` subscription on the plan they bought.
+- **Entitlement changes only from a signature-verified webhook** — never from the Checkout redirect, which is a browser navigation anyone can forge. There is a test that forges the redirect and proves it grants nothing.
+- An invalid or missing signature is `401`.
+- A redelivered event is ignored: every processed `event_id` is stored.
+- `invoice.payment_failed` moves the subscription to `PAST_DUE` and notifies the administrator.
+- The Stripe secret key and endpoint signing secret are held the way destination credentials are (`D-3`), never in configuration in plaintext.
+
+### FZ-085 — Billing and Plan UI
+**Status:** TODO
+
+A Billing section in Settings, Administrator-only: current plan, usage against each limit, trial days remaining, and the buttons that open Stripe.
+
+The trial banner is shown to **every member** in the last 5 days, not only administrators. The person who notices a trial ending is rarely the person who signs.
+
+Acceptance:
+
+- Usage against limits is visible before a limit is hit, not only when a creation is refused.
+- A `402` refusal renders as the limit it hit, with the upgrade path, never as a generic error.
+- Nothing in the UI decides entitlement — every limit shown comes from the backend.
+
+### FZ-086 — Operator Provisioning
+**Status:** TODO
+
+`scripts/provision-organization.sh`, following `seed-demo.sh`: create an organization on an agreed plan, invite its first Administrator, mark the originating demo request converted.
+
+**Deliberately a script and not an admin console** (`D-23`). An in-product principal that can act across tenants negates the invariant the whole security model rests on.
+
+Acceptance:
+
+- One command provisions a named organization on a named plan and invites its administrator.
+- It refuses to run twice for the same company.
+- It goes through the API wherever the API allows it, matching `seed-demo.sh`.
+- The operational prerequisites — which credentials, which access — are written down, because whoever runs this is not necessarily whoever wrote it.
+
+### FZ-088 — Organization Domain Claiming
+**Status:** DEFERRED · **Owns:** `OI-12`
+
+Two colleagues signing up separately create two unrelated organizations, and nothing merges them. The honest MVP answer is that support fixes it by hand.
+
+Deferred rather than scheduled: the fix worth building depends on whether the common case is "join the existing organization automatically" (fast, and wrong for a contractor at a client's domain) or "request access from an administrator" (correct, and more machinery). One real occurrence answers that; guessing first does not.

@@ -33,6 +33,24 @@ Not silently broken: without the `local` profile the application refuses to star
 
 The "cannot start outside `local`" consequence bites exactly when the first deployed environment appears, which is `FZ-063` itself. Stays open until the pair ships.
 
+### OI-11 — No rate limiting anywhere in the application
+**Severity:** Gap · **Owner:** `FZ-087` · **Found in:** `FZ-080`
+
+There is no rate limiter in the codebase. Today that is defensible rather than negligent: `/actuator/health` is the only endpoint reachable without a credential, and everything else is behind a Cognito JWT or an API key, so abuse is bounded by having to be a customer first.
+
+`FZ-082` and `FZ-083` end that. `POST /api/signup` creates a Cognito identity and sends an email, and `POST /api/demo-requests` writes a row and fires a Slack notification — both unauthenticated, and both trivially loopable into a bill and a spam problem.
+
+**Neither endpoint may ship before `FZ-087`.** This is a sequencing constraint, not a recommendation: the milestone order in `08-backlog.md` puts rate limiting before the first unauthenticated write for this reason.
+
+### OI-12 — Colleagues signing up separately create unrelated organizations
+**Severity:** Gap · **Owner:** `FZ-088` (deferred) · **Found in:** `FZ-080`
+
+Self-serve signup keys on nothing but the email address, so two people at the same company create two organizations that share a domain and know nothing about each other. Each has its own catalog, its own freezes, and its own bill. Nothing merges them and nothing warns either person.
+
+The MVP answer is that support fixes it by hand, which is honest at this volume and unacceptable later.
+
+`FZ-088` is deliberately deferred rather than scheduled: the right fix depends on whether the common case is *join the existing organization automatically* — fast, and wrong for a contractor signing up under a client's domain — or *request access from an administrator*, which is correct and more machinery. One real occurrence answers that. Guessing first does not.
+
 ## Resolved
 
 | Issue | Found in | Resolved by |
