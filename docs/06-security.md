@@ -32,6 +32,16 @@ Restated from `CLAUDE.md` and `02-architecture.md` — this document must not co
 - Every subsequent user is added via an **in-product invite**, restricted to Administrators. This is a separate backlog item (invite endpoint), not part of `FZ-012` itself — `FZ-012` delivers the authentication mechanism (JWT validation, identity resolution) that the invite feature and everything else builds on.
 - Rationale: `00-product.md` names three actors per organization (Administrator, Manager, Engineer), so multi-user orgs are required — but no backlog item anywhere describes a self-service signup/onboarding flow, so building one isn't MVP scope. See that item for exact invite mechanics.
 
+**Superseded in part by `FZ-080`:** a self-service signup flow is now specified — `docs/11-commercial.md` §4, built by `FZ-082`. The statements above remain an accurate description of what exists today, and of why nothing was built when they were written. What changes is only that "no backlog item describes one" is no longer true.
+
+Three security rules govern it, and none of them are negotiable by the implementation:
+
+- **`POST /api/signup` returns the same `202 Accepted` whether the organization was created or the email was already in use.** Varying the response makes signup a customer-enumeration oracle: anyone could learn which companies use FreezeHub by trying their domains. This is the same reasoning that makes a cross-tenant resource return `404` rather than `403`.
+- **It cannot ship before rate limiting exists** (`OI-11`, `FZ-087`). It is an unauthenticated endpoint that creates a Cognito identity and sends an email.
+- **It cannot ship before a real `IdentityProvider`** (`OI-2`, `FZ-046`). The only implementation today is a `@Profile("local")` fake.
+
+Nothing about it weakens tenant isolation: signup creates a *new* organization and resolves nothing from client input. The organization identifier still never appears in a request.
+
 **Implemented by `FZ-016`:** `POST /api/invites`, Administrator-only. The Cognito `AdminCreateUser` call is behind an `IdentityProvider` port — same local/real split as JWT validation below, since no real Cognito user pool exists yet. Only the local fake ships now; a real Cognito-backed implementation is required before this endpoint runs against a deployed environment (see `FZ-016`'s known gap in `08-backlog.md`).
 
 **Resolved by `FZ-012`:** minimal role model — `users.role` is one of `ADMINISTRATOR` or `MEMBER`. This is not "advanced RBAC" (`00-product.md`'s exclusion): it gates a short, enumerated list of organization-level actions (see Authorization, below), not general resource permissions. `Team`/`Application`/`Environment`/restriction management remain open to any authenticated org member unless a future requirement says otherwise.

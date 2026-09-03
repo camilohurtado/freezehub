@@ -348,3 +348,110 @@ Two separate things, both easy to get wrong.
 The record cannot answer "did it actually deploy". Closing that gap needs the pipeline to report back afterwards, which is unverifiable — a half-populated "deployed" column is worse than no column, because it looks like data. Left out deliberately; revisit only with a customer willing to wire it up.
 
 Recording every evaluation also puts a write on the hot path, once per deployment, and makes FreezeHub a holder of customer PII (the deploying engineer's identity) where it previously held only names a customer typed. Retention is per organization for that reason, and is the only thing bounding either.
+
+---
+
+## D-20 — FreezeHub is priced per registered application, with users and policy evaluations unlimited
+
+**Date:** 2026-09-03 · **Specified by:** `FZ-080` · **Implemented by:** `FZ-081`
+
+### Decision
+
+Plans are bounded by how many applications an organization has registered in its catalog. Users, teams, environments, restrictions and policy evaluations are unlimited on every plan, and that is a commitment rather than current generosity.
+
+### Why
+
+The two conventional metrics are both actively harmful here.
+
+**Seats charge for the product.** The value of FreezeHub arrives as a Slack message and as an API answer inside a pipeline; most engineers at a customer will never sign in. Seats therefore undercount usage badly — but the real objection is that they price the thing the product is *for*. A freeze that half the organization has not been told about is not a freeze, so charging per person told is charging the customer to make the product work.
+
+**Evaluations tax enforcement.** Metering `POST /api/policy/evaluate` gives a customer a financial reason to call it less, and calling it less is exactly how a deployment gets past a freeze. A pricing model that rewards the failure mode the product exists to prevent is not a pricing model.
+
+Applications avoid both. Scope is built on them (`01-domain.md`), so the metric is the same thing the domain already counts. They are visible in the product, so a customer can predict their own bill. And they cannot be gamed: `D-14` blocks deployments for applications that are not registered, so hiding one to save money breaks that application's pipeline. The incentive points at registering everything, which is simultaneously what the customer wants and what FreezeHub is paid for.
+
+### Alternatives
+
+- **Flat per-organization tiers.** Easiest to explain and to build. Rejected because a five-engineer startup and a five-hundred-engineer bank would pay the same, which means either underpricing the bank or pricing the startup out.
+- **Per application plus metered add-ons** (retention, lead time, API keys). Highest revenue ceiling, and the levers already exist as per-organization settings. Rejected for now as billing surface to build and explain before there is a single customer; the levers stay available as tier differentiators without being metered.
+
+### Cost
+
+The metric is coarse. An organization with two hundred tiny services pays more than one with ten large ones, regardless of which gets more value — and application granularity is the customer's choice, so the bill is partly a consequence of how they happened to draw service boundaries. A customer who splits a monolith crosses a tier without gaining anything.
+
+It also decouples price from usage entirely: a customer who registers fifty applications and never creates a restriction pays full price. That is fine for revenue and bad for renewal, and it means adoption has to be measured directly rather than inferred from the invoice.
+
+---
+
+## D-21 — A billing state never changes a policy answer
+
+**Date:** 2026-09-03 · **Specified by:** `FZ-080` · **Implemented by:** `FZ-081`
+
+### Decision
+
+Suspension for non-payment makes the human API read-only and stops notifications. `POST /api/policy/evaluate` keeps answering, unchanged, and active restrictions keep being enforced exactly as before. Suspension is a 30-day grace state; deactivation after it is a deliberate, communicated human action, never a scheduled job.
+
+### Why
+
+The two obvious enforcement mechanisms are both worse than not enforcing.
+
+**Returning `401` breaks the customer's builds.** Every pipeline calling FreezeHub would fail at once, on a schedule the customer did not choose, and `freeze-check.sh` defaults to `block` on error — so an unpaid invoice would halt deployment across the organization. FreezeHub would have caused an outage to collect a debt, and would deserve everything said about it afterwards.
+
+**Returning `ALLOW` silently lifts every freeze.** This is worse. The product would fail at its only job, without saying so, at the exact moment of a commercial dispute — and the customer would discover it from an incident rather than from an invoice.
+
+The leverage that remains is real: a suspended organization cannot schedule the next freeze, cannot change scope, and gets no notifications. That is enough to force the conversation without making FreezeHub dangerous to owe money to.
+
+### Alternatives
+
+- **Hard cut-off at trial end.** Standard SaaS, and it converts better. Rejected on blast radius: the failure lands in the customer's deployment pipeline, not in their FreezeHub tab.
+- **Degrade to advisory** — keep answering but downgrade every `HARD_FREEZE` to `ADVISORY`. Rejected because it is the silent-`ALLOW` failure wearing a disguise; the deployment still goes out.
+
+### Cost
+
+Non-payment is cheap for the customer for 30 days, and a customer who only ever needed the Policy API could sit suspended and keep most of the value. Collection depends on a human noticing and acting, which does not scale and will occasionally be forgotten. Accepted deliberately: the alternative is a product that can take a customer's deployments down or quietly un-freeze production, and neither is survivable in a compliance-adjacent tool.
+
+---
+
+## D-22 — Plan limits refuse creation and are never applied retroactively
+
+**Date:** 2026-09-03 · **Specified by:** `FZ-080` · **Implemented by:** `FZ-081`
+
+### Decision
+
+A plan limit is checked when a resource is created. Downgrading below current usage deletes, disables and hides nothing — the customer keeps every application they have and simply cannot create the next one until the count is back under the limit. The refusal is `402 Payment Required`, as Problem Details, naming the plan, the limit and the current count.
+
+### Why
+
+Enforcing retroactively would mean choosing applications to remove from the catalog, and `D-14` blocks deployments for applications that are not in the catalog. A downgrade would therefore start blocking pipelines for services the customer still runs. If instead the applications were merely detached from restriction scopes, every restriction scoped to them would silently narrow — **a billing event would un-freeze production**, which is the failure `FZ-020` refused to let even the database cause when it chose `RESTRICT` over `CASCADE` for scope foreign keys.
+
+`402` because no other code says what happened. The request was well-formed, so not `400`; the caller is permitted, so not `403`; nothing conflicts, so not `409`. The plan refused, and `402` is the only status that means that.
+
+### Cost
+
+A customer can sit indefinitely over the limit of the plan they pay for, by downgrading, and FreezeHub will keep serving all of it. Over-limit organizations have to be visible somewhere or the situation is invisible until someone runs a query. Adding `402` also widens the status-code surface in `04-api.md`, which every client now has to understand.
+
+---
+
+## D-23 — There is no platform super-administrator; sales provisioning is an operator script
+
+**Date:** 2026-09-03 · **Specified by:** `FZ-080` · **Implemented by:** `FZ-086`
+
+### Decision
+
+Provisioning an organization after a demo is a script run by a FreezeHub operator with production access. There is no in-product role, endpoint or console that can act across organizations.
+
+### Why
+
+The security model is one sentence: *the organization is always resolved from the credential, never from the request*. It is stated in `CLAUDE.md` §5, restated in `04-api.md`, and is the reason a cross-tenant resource returns `404` rather than `403`. Every endpoint written so far is correct because that sentence is unconditionally true.
+
+A principal that can act across tenants makes it conditionally true. From then on, every endpoint — including ones not yet written — has to be reasoned about twice, and a single mistake exposes every customer to every other customer. That is the largest available downside in a multi-tenant product, traded for saving a few minutes on an operation that happens rarely.
+
+At the volume where sales-assisted provisioning matters — the first twenty customers — a script is safer and cheaper than the console, and it is inspectable in git.
+
+### Alternatives
+
+- **A `PLATFORM_OPERATOR` role on `users` with a null organization.** Cheapest to build, worst placed: it puts the cross-tenant principal inside the application that serves tenants, which is precisely where it must not be.
+- **A separate internal admin service** with its own credential and its own deployment. The right answer eventually, and what to build when this is revisited. Rejected now as a second deployable to secure, monitor and maintain for an operation performed a few times a month.
+
+### Cost
+
+Provisioning requires production access, so only engineers can do it — which is wrong the moment a non-engineer needs to close a deal on a Friday, and it is a reason to hand out production access that would not otherwise exist. There is no audit trail of provisioning beyond shell history and whatever the script writes. Revisit when provisioning becomes weekly, or the first time somebody without production access needs to do it; build it then as the separate service, not as a role.

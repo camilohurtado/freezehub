@@ -272,6 +272,8 @@ Create these when the corresponding implementation starts:
 05-frontend.md     → before substantial UI implementation
 06-security.md     → before authentication/API keys are completed
 07-decisions.md    → when meaningful architectural decisions accumulate
+10-demo.md         → before the product is demonstrated to anyone outside the team
+11-commercial.md   → before there is a way for a company to become a customer
 ```
 
 Architecture documentation should record decisions and constraints, not duplicate source code.

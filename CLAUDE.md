@@ -128,6 +128,8 @@ Additional documentation is created just-in-time when implementation requires it
 - `docs/05-frontend.md`
 - `docs/06-security.md`
 - `docs/07-decisions.md`
+- `docs/10-demo.md`      — created by FZ-074
+- `docs/11-commercial.md` — created by FZ-080
 - `backend/CLAUDE.md`
 - `frontend/CLAUDE.md`
 
