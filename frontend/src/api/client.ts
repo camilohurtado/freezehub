@@ -6,7 +6,10 @@
  * (05-frontend.md, API interaction conventions).
  */
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080'
+// The fallback is for local development only — it matches the backend's local port
+// (server.port in application.yml). Any deployed build sets VITE_API_BASE_URL, because
+// the API lives on a different host there, not just a different port.
+const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8099'
 
 /** One invalid field, as named by the backend (RFC 9457 `errors` extension). */
 export interface ApiFieldError {

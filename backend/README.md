@@ -108,8 +108,8 @@ Spring omits `message` by default, which silently discarded every reason this AP
 docker compose -f ../docker-compose.yml up -d postgres   # from repo root: docker compose up -d postgres
 
 ./mvnw clean verify                                       # build + test (Postgres via Testcontainers, no manual step needed)
-./mvnw spring-boot:run -Dspring-boot.run.profiles=local   # run locally (port 8080), connects to the compose Postgres
-curl http://localhost:8080/actuator/health
+./mvnw spring-boot:run -Dspring-boot.run.profiles=local   # run locally (port 8099), connects to the compose Postgres
+curl http://localhost:8099/actuator/health
 ```
 
 Requires Java 21 — `.java-version` pins this via [jenv](https://github.com/jenv/jenv); otherwise set `JAVA_HOME` to a Java 21 JDK.
@@ -129,7 +129,7 @@ produces the same image CI pushes:
 
 ```bash
 docker build -t freezehub-backend backend/
-docker run --rm -p 8080:8080 \
+docker run --rm -p 8099:8080 \   # 8080 inside the container, 8099 on your machine
   -e SPRING_PROFILES_ACTIVE=local \
   -e SPRING_DATASOURCE_URL=jdbc:postgresql://host.docker.internal:5432/freezehub \
   freezehub-backend
@@ -148,10 +148,10 @@ there.
 Every request carries an `X-Request-Id` — supplied by the caller or generated — which appears on each log line, in the response header, and in the `requestId` field of any error body. Quote it when reporting a failure; it is what makes the log searchable.
 
 ```bash
-curl http://localhost:8080/actuator/health            # public
-curl http://localhost:8080/actuator/health/readiness  # public; what the load balancer reads
-curl http://localhost:8080/actuator/metrics/freezehub.notifications -H "Authorization: Bearer $TOKEN"
-curl http://localhost:8080/actuator/metrics/freezehub.policy.evaluations -H "Authorization: Bearer $TOKEN"
+curl http://localhost:8099/actuator/health            # public
+curl http://localhost:8099/actuator/health/readiness  # public; what the load balancer reads
+curl http://localhost:8099/actuator/metrics/freezehub.notifications -H "Authorization: Bearer $TOKEN"
+curl http://localhost:8099/actuator/metrics/freezehub.policy.evaluations -H "Authorization: Bearer $TOKEN"
 ```
 
 `freezehub.notifications{outcome=abandoned}` is the counter worth alerting on: an announcement that will never arrive means engineers may deploy during a freeze nobody told them about.
@@ -177,11 +177,11 @@ Presenting either one where the other is expected is a `401`. A key leaked from 
 No Cognito user pool exists until `FZ-063`, so a browser has no way to obtain a token. Under the `local` profile only, an endpoint mints one for an **existing** user:
 
 ```bash
-curl -X POST http://localhost:8080/api/dev/token \
+curl -X POST http://localhost:8099/api/dev/token \
   -H 'Content-Type: application/json' -d '{"email":"dev@acme.test"}'
 # -> {"token":"eyJ...","userId":1,"organizationId":1,"email":"dev@acme.test","role":"ADMINISTRATOR"}
 
-curl http://localhost:8080/api/me -H "Authorization: Bearer <token>"
+curl http://localhost:8099/api/me -H "Authorization: Bearer <token>"
 ```
 
 `404` if no such user (it is a sign-in shortcut, not a way to create identities); `409` if the email exists in more than one organization, since email is unique per organization rather than globally.
@@ -193,15 +193,15 @@ curl http://localhost:8080/api/me -H "Authorization: Bearer <token>"
 An Administrator issues an API key for CI. The raw key is returned **once** — only its SHA-256 hash is stored, so it cannot be read back afterwards:
 
 ```bash
-TOKEN=$(curl -s -X POST http://localhost:8080/api/dev/token \
+TOKEN=$(curl -s -X POST http://localhost:8099/api/dev/token \
   -H 'Content-Type: application/json' -d '{"email":"dev@acme.test"}' | jq -r .token)
 
-curl -X POST http://localhost:8080/api/api-keys \
+curl -X POST http://localhost:8099/api/api-keys \
   -H "Authorization: Bearer $TOKEN" \
   -H 'Content-Type: application/json' -d '{"name":"gitlab-ci"}'
 # -> {"id":1,"name":"gitlab-ci","keyPrefix":"fzh_...","key":"fzh_...","createdBy":3,...}
 
-curl -X POST http://localhost:8080/api/policy/evaluate -H "X-API-Key: $KEY" ...
+curl -X POST http://localhost:8099/api/policy/evaluate -H "X-API-Key: $KEY" ...
 ```
 
 `POST /api/api-keys/{id}/revoke` withdraws a key permanently; there is no un-revoke, because a withdrawn key may already be in someone else's hands. Issue a new one instead.

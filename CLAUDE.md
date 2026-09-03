@@ -171,11 +171,11 @@ cd backend
 # run tests only
 ./mvnw test
 
-# run the app locally (default port 8080); requires `docker compose up -d postgres` first
+# run the app locally (port 8099 — see server.port under the local profile); requires `docker compose up -d postgres` first
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=local
 
 # health check (no auth required)
-curl http://localhost:8080/actuator/health
+curl http://localhost:8099/actuator/health
 ```
 
 ### Frontend (`frontend/`)
