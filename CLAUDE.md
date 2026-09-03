@@ -118,7 +118,8 @@ freezhub/
 ├── frontend/
 ├── infra/
 ├── scripts/
-└── examples/          # CI/CD integration example (FZ-053)
+├── connectors/        # shipped CI/CD connectors (FZ-091+)
+└── examples/          # hand-rolled CI/CD integration walkthrough (FZ-053)
 ```
 
 Additional documentation is created just-in-time when implementation requires it:
@@ -130,6 +131,7 @@ Additional documentation is created just-in-time when implementation requires it
 - `docs/07-decisions.md`
 - `docs/10-demo.md`      — created by FZ-074
 - `docs/11-commercial.md` — created by FZ-080
+- `docs/12-connectors.md`  — created by FZ-090
 - `backend/CLAUDE.md`
 - `frontend/CLAUDE.md`
 

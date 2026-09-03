@@ -1094,3 +1094,116 @@ Acceptance:
 Two colleagues signing up separately create two unrelated organizations, and nothing merges them. The honest MVP answer is that support fixes it by hand.
 
 Deferred rather than scheduled: the fix worth building depends on whether the common case is "join the existing organization automatically" (fast, and wrong for a contractor at a client's domain) or "request access from an administrator" (correct, and more machinery). One real occurrence answers that; guessing first does not.
+
+## Milestone 9 — Repository and CI Connectors
+
+`FZ-053` shipped a gate that works and that every customer has to vendor into their own repository by hand. This milestone removes that friction without changing what FreezeHub can reach.
+
+`docs/12-connectors.md` is the specification. `00-product.md`'s deferred list excludes "native GitHub/GitLab/Jenkins/Argo CD integrations" from the MVP; **this milestone promotes the non-native half of that into scope** — packaging around the existing call — and leaves the native half (an installed app with a write credential) deferred as `FZ-096`.
+
+**Runs before Milestone 8**, by decision: adoption friction blocks usage today, whereas billing blocks revenue from customers who are not yet using the product.
+
+```text
+FZ-091 ── FZ-092 ── FZ-093 ── FZ-094 ── FZ-095 ── FZ-097
+   │
+   └── everything below depends on the canonical script and image it produces
+```
+
+### FZ-090 — Connector Strategy
+**Status:** DONE
+
+Specification only, no code: `docs/12-connectors.md`, plus `D-24`.
+
+Four connectors were chosen and one was deliberately not. The rule that shapes all of them: **one implementation, four wrappers.** A customer running GitLab in one team and Jenkins in another must get the same answer from the same freeze, and four native implementations would drift until one team deployed during a freeze that stopped another.
+
+### FZ-091 — Connector Runtime and Image
+**Status:** TODO
+
+The foundation the other four sit on.
+
+`examples/freeze-check.sh` moves to `connectors/freeze-check.sh` — it stopped being an example the moment it became a shipped artifact. `examples/` stays as the hand-rolled walkthrough for CI systems with no connector, and points at the new location.
+
+`connectors/Dockerfile` builds `ghcr.io/freezehub/freeze-check` — Alpine, `curl`, `jq`, script on `PATH`, non-root, following `backend/Dockerfile`'s shape. **Required regardless of preference**: an Argo CD PreSync hook is a Kubernetes Job and cannot run without an image.
+
+Acceptance:
+
+- The script's behaviour is unchanged by the move; the existing exit codes and fail-closed rules hold.
+- `examples/README.md` and `examples/gitlab-ci.yml` reference the new path and still work.
+- The image runs the check with no arguments beyond environment variables, as non-root.
+- A test proves the image exits `1` on a blocked decision and `2` on an unreachable server — the two outcomes a broken image would most plausibly turn into `0`.
+- The image is built in CI. Publishing it is `FZ-097`.
+
+### FZ-092 — GitHub Actions Connector
+**Status:** TODO
+
+A composite action at `connectors/github-action/action.yml`, usable as `uses: freezehub/freezehub/connectors/github-action@v1`.
+
+Composite rather than a Docker action: it runs on the runner's own `curl`/`jq`, so it costs no image pull on the platform where most usage will be, and it works on self-hosted runners with no Docker.
+
+Acceptance:
+
+- Inputs `url`, `api-key`, `application`, `environment`, `on-error`, `timeout`, mapping onto the script's variables and adding nothing.
+- Blocked fails the step; not-evaluated fails the step; the two are distinguishable in the log.
+- **No input downgrades a freeze to a warning** (`12-connectors.md` §4).
+- `actor`, `reference` and `source` are populated from the GitHub context, as the script already does.
+- Exercised by a workflow in `.github/workflows/` that runs the action against a stubbed endpoint — the action must be proven to fail, not only to pass.
+
+### FZ-093 — GitLab CI Connector
+**Status:** TODO
+
+An includable component at `connectors/gitlab/`, running the `FZ-091` image so no pipeline installs `curl` and `jq` on every run.
+
+Acceptance:
+
+- A customer adds the check with an `include:` and one variable block.
+- Defaults to running only on the deploying branch; asking on every feature branch would fail merge-request pipelines during a freeze, which is not the point.
+- The documented wiring uses `needs:` so a failed check prevents the deploy job from being created, and says explicitly why `allow_failure: true` must not be added.
+
+### FZ-094 — Jenkins Connector
+**Status:** TODO
+
+A shared library at `connectors/jenkins/`: `vars/freezeCheck.groovy` plus the script as a library resource.
+
+**This is the one connector that carries a copy of the script**, because Jenkins loads library resources from within the library itself. `12-connectors.md` §2 requires the copy to be byte-identical to the canonical file, and a check enforces it — a drifted copy is exactly the failure the one-implementation rule exists to prevent.
+
+Acceptance:
+
+- `freezeCheck(application: 'payments-api', environment: 'production')` gates a stage.
+- A blocked check fails the build; `catchError` is not used anywhere in the step.
+- A test fails if the resource copy and `connectors/freeze-check.sh` differ by one byte.
+- The API key is read from Jenkins credentials, never from a pipeline literal, and does not appear in the build log.
+
+### FZ-095 — Argo CD Connector
+**Status:** TODO
+
+A PreSync hook manifest at `connectors/argocd/`, running the `FZ-091` image.
+
+**Different in kind from the other three.** They gate a step in a pipeline; this gates a *sync*, and by the time Argo syncs, the change is already committed and merged. With auto-sync on, the freeze is the only thing between a merged commit and production — the strongest form of the product, and the most surprising.
+
+Acceptance:
+
+- Application and environment are read from annotations on the Argo `Application`; a missing annotation fails the hook rather than defaulting to something.
+- A blocked check fails the sync and leaves the Application `OutOfSync`.
+- The API key comes from a Kubernetes `Secret`, never from the manifest.
+- **The documentation states that Argo will retry the failed sync on its own schedule**, so repeated failures during a freeze are expected and are not an incident. Nobody should learn this from an alert at 3am.
+
+### FZ-097 — Connector Publication
+**Status:** TODO · **Resolves:** `OI-13`
+
+Tag `v1`, publish the image to GHCR, list the action on GitHub Marketplace, and register the GitLab CI/CD Catalog project.
+
+Marketplace requires `action.yml` at the root of its own repository and the Catalog requires a dedicated catalog project, so this is a packaging and release step rather than a rewrite. It is also the commercial half: a Marketplace listing is an inbound channel, and a path inside a monorepo is not.
+
+Acceptance:
+
+- `v1` is tagged, and the release process for moving it is written down.
+- The compatibility promise in `12-connectors.md` §5 is stated where a consumer will read it, not only in the repository.
+
+### FZ-096 — GitHub App and Required Checks
+**Status:** DEFERRED · **Decision required before scheduling**
+
+A GitHub App that posts a commit status, so branch protection can make FreezeHub a **required check** — the one thing that turns a `HARD_FREEZE` from voluntary into enforced, and the strongest thing the product could offer.
+
+Deferred deliberately, not for effort. It **inverts the trust direction**: FreezeHub would hold an installation token that can write to the customer's repository metadata, ingest their webhooks, and appear in their audit log. Every sentence in `10-demo.md` about having no credentials into their repositories and no blast radius stops being true, and the answer to the first question a security review asks changes.
+
+That trade may well be worth making — it is the natural Scale/Enterprise differentiator, and `11-commercial.md` has nowhere else to put an upsell of that weight. It is not something to arrive at as a side effect of "we added GitHub support", which is why it is a separate decision with its own security review rather than a task inside `FZ-092`.

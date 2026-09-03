@@ -274,6 +274,7 @@ Create these when the corresponding implementation starts:
 07-decisions.md    → when meaningful architectural decisions accumulate
 10-demo.md         → before the product is demonstrated to anyone outside the team
 11-commercial.md   → before there is a way for a company to become a customer
+12-connectors.md   → before shipping anything a customer installs into their pipeline
 ```
 
 Architecture documentation should record decisions and constraints, not duplicate source code.

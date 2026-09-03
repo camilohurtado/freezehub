@@ -455,3 +455,35 @@ At the volume where sales-assisted provisioning matters — the first twenty cus
 ### Cost
 
 Provisioning requires production access, so only engineers can do it — which is wrong the moment a non-engineer needs to close a deal on a Friday, and it is a reason to hand out production access that would not otherwise exist. There is no audit trail of provisioning beyond shell history and whatever the script writes. Revisit when provisioning becomes weekly, or the first time somebody without production access needs to do it; build it then as the separate service, not as a role.
+
+---
+
+## D-24 — Connectors distribute the existing gate; FreezeHub gains no reach into customer systems
+
+**Date:** 2026-09-03 · **Specified by:** `FZ-090` · **Implemented by:** `FZ-091`–`FZ-095`
+
+### Decision
+
+The GitHub Action, GitLab component, Jenkins library and Argo CD hook are packaging around one implementation — `connectors/freeze-check.sh`. None of them requires FreezeHub to hold a credential for the customer's forge, receive a webhook from it, or run an agent inside their infrastructure. The integration arrow keeps pointing one way: their pipeline calls FreezeHub, and FreezeHub calls nothing.
+
+### Why
+
+**One implementation, because four would drift.** A customer running GitLab in one team and Jenkins in another must get the same answer from the same freeze. Four native implementations — a TypeScript action, a Groovy step, curl embedded in YAML — would diverge in exactly the places that matter: what a timeout means, whether a `401` fails open, how an unregistered name is reported. The drift would surface as one team deploying during a freeze that stopped another, which is the product failing while appearing to work.
+
+**No reach, because the reach is the objection.** `10-demo.md` sells "no agent, no credentials into your repositories, no blast radius" deliberately: it is the answer to the first question a security review asks, and it is why a platform team can adopt FreezeHub without a procurement cycle. Adding a forge credential to solve a *distribution* problem would spend that position on something packaging solves for free.
+
+**Adoption friction is what is actually missing**, not capability. The gate works today; every customer has to vendor it and keep it current. That is the gap.
+
+### Alternatives
+
+- **Native app integrations now** (a GitHub App posting a required commit status). The only option that makes a `HARD_FREEZE` genuinely enforced rather than voluntary, and probably the most valuable thing the product could ship. Deferred to `FZ-096` as its own decision with its own security review — it inverts the trust direction, and that should be chosen on its merits rather than arriving as a side effect of adding GitHub support.
+- **Reimplement per ecosystem** in each one's native language, for better logs and typed inputs. Rejected: four codebases and four bug surfaces wrapped around a single HTTP call.
+- **Leave it at the script and write better documentation.** Cheapest, preserves everything, and leaves every customer maintaining a vendored copy — which is where the friction was.
+
+### Cost
+
+**Enforcement stays voluntary, and connectors do not move that.** A wrapper cannot post a commit status, cannot be made a required check by branch protection, and cannot stop a merge or a manual deploy. This is the same limit `10-demo.md` forbids overclaiming, and shipping four polished connectors makes it easier to forget, not harder — a customer who installs an official GitHub Action may reasonably assume it enforces something.
+
+The Jenkins connector must carry a copy of the script, because Jenkins loads library resources from within the library. That copy is the one place the one-implementation rule can break, so it is verified byte-for-byte rather than trusted.
+
+And distribution is not finished by building them: Marketplace and Catalog listings need dedicated repositories (`OI-13`), so the connectors are usable by direct reference before they are discoverable.
