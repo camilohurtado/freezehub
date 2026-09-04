@@ -16,4 +16,11 @@ public interface ApiKeyRepository extends JpaRepository<ApiKey, Long> {
 
     Optional<ApiKey> findByIdAndOrganizationId(Long id, Long organizationId);
 
+    /**
+     * Live keys only (FZ-081). A revoked key is not a credential any more, and counting
+     * one against the plan would charge a customer for rotating — discouraging exactly
+     * the habit that limits the damage of a leaked CI variable.
+     */
+    long countByOrganizationIdAndRevokedAtIsNull(Long organizationId);
+
 }

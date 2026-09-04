@@ -70,6 +70,15 @@ So every guideline currently names an image that does not exist, and the README 
 
 Discoverability — a Marketplace or Catalog listing — is a separate and lesser problem, deferred to `FZ-096`.
 
+### OI-14 — The deployment-check retention lever cannot be used
+**Severity:** Gap · **Owner:** `FZ-085` · **Found in:** `FZ-081`
+
+`11-commercial.md` prices deployment-check retention as a paid lever — 90 days on Starter, a year on Growth, up to ten on Enterprise — and `Plan` carries the number. Nothing can set it.
+
+`organization.deployment_check_retention_days` is a column with a default, and `PATCH /api/organization/settings` exposes only `startingSoonLeadTimeMinutes`. So every organization sits on the 365-day default regardless of plan: Starter customers get more than they pay for, and an Enterprise customer who needs seven years cannot ask for it.
+
+Not urgent — nobody is billed yet — but it means a row of the pricing table is currently fiction. `FZ-085` owns it, since that is where plan-aware settings surface.
+
 ## Resolved
 
 | Issue | Found in | Resolved by |

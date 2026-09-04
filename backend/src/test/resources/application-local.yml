@@ -11,3 +11,8 @@ freezehub:
     enabled: false
   notifications:
     enabled: false
+  # The trial-expiry sweep is off for the same reason as the lifecycle one: the suite must
+  # not race a background job that suspends organizations underneath it. Expiry itself is
+  # tested directly against an explicit clock.
+  subscriptions:
+    enabled: false

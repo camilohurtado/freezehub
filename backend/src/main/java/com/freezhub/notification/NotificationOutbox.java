@@ -2,6 +2,7 @@ package com.freezhub.notification;
 
 import com.freezhub.integration.Integration;
 import com.freezhub.integration.IntegrationRepository;
+import com.freezhub.subscription.SubscriptionService;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,11 +31,14 @@ public class NotificationOutbox {
 
     private final NotificationRepository notificationRepository;
     private final IntegrationRepository integrationRepository;
+    private final SubscriptionService subscriptions;
 
     public NotificationOutbox(NotificationRepository notificationRepository,
-                              IntegrationRepository integrationRepository) {
+                              IntegrationRepository integrationRepository,
+                              SubscriptionService subscriptions) {
         this.notificationRepository = notificationRepository;
         this.integrationRepository = integrationRepository;
+        this.subscriptions = subscriptions;
     }
 
     /**
@@ -52,6 +56,21 @@ public class NotificationOutbox {
      */
     @Transactional(propagation = Propagation.MANDATORY)
     public int enqueue(Long organizationId, Long restrictionId, NotificationEvent event) {
+        // A suspended organization stops being announced for (FZ-081). Suppressed at
+        // enqueue rather than at delivery, deliberately: skipping it later would leave the
+        // row PENDING for ever, growing a backlog that floods the customer with stale
+        // announcements the moment they pay - "starting soon" about a freeze that ended
+        // three weeks ago. Not queued is not sent, and stays not sent.
+        //
+        // The reachable cases are all system-driven - lifecycle transitions and the
+        // starting-soon sweep - because a suspended organization cannot make the changes
+        // that queue the others.
+        if (!subscriptions.allowsNotifications(organizationId)) {
+            log.debug("Organization {} is not active; not queueing {} for restriction {}",
+                    organizationId, event, restrictionId);
+            return 0;
+        }
+
         List<Integration> destinations =
                 integrationRepository.findAllByOrganizationIdAndEnabledTrue(organizationId);
 

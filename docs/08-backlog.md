@@ -985,7 +985,7 @@ Four decisions were the user's to make and were made: hybrid go-to-market (self-
 The reasoning that shaped the rest: **seats and evaluations are both the wrong metric.** Seats charge the customer for telling people about a freeze, which is the product. Evaluations tax calling the Policy API on every deploy, which is how a freeze is enforced at all — a customer optimising that bill would deploy past a freeze. Applications are what scope is built on, are already visible in the product, and cannot be gamed because `D-14` blocks unregistered applications outright.
 
 ### FZ-081 — Plans and Subscription State
-**Status:** TODO
+**Status:** DONE
 
 One `subscription` row per organization, and the plan limits that read from it.
 
@@ -1002,6 +1002,14 @@ Acceptance:
 - **A suspended organization's `/api/policy/evaluate` answers are byte-for-byte what they were before suspension** — same decision, same matched restrictions. There is a test for this, because it is the rule most likely to be broken by a later change (`D-21`).
 - Suspension makes the human API read-only and stops notifications.
 - Subscription changes are audited.
+
+**Two things this story decided that the entry did not anticipate.**
+
+*A missing subscription grants everything rather than nothing.* The row is unique and not null, every organization predating billing was backfilled, and signup will create one — so absence is a defect, and it is logged as one. But refusing on absence would make a customer's API read-only because of a bug in **our** billing data, which is exactly what `D-21` refuses to do everywhere else. It fails towards not billing, which is a conversation, rather than towards not working, which is an outage.
+
+*The write guard is an interceptor, not a filter.* A filter throws outside the DispatcherServlet, so `@RestControllerAdvice` never sees it and a refusal would arrive as a generic 500 rather than the one error shape the API promises. `FZ-052` paid for that lesson once already with the `/error` forward.
+
+Notifications are suppressed at **enqueue**, not at delivery. Skipping them later would leave rows `PENDING` for ever and flood the customer with stale announcements the moment they pay — "starting soon" about a freeze that ended three weeks ago.
 
 ### FZ-087 — Request Rate Limiting
 **Status:** TODO · **Resolves:** `OI-11`

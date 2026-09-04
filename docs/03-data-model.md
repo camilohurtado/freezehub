@@ -22,11 +22,12 @@ Covered now:
 - `api_key`, added by `FZ-052`
 - `audit_event`, added by `FZ-060`
 - `deployment_check`, added by `FZ-070`
+- `subscription`, added by `FZ-081`
 - `integration.signing_secret`, added by `FZ-048`
 
 Deliberately deferred, added just-in-time before their own backlog items:
 
-- `subscription` (one per organization), `demo_request`, and the processed-Stripe-event ledger, added by `FZ-081`, `FZ-083` and `FZ-084`.
+- `demo_request` and the processed-Stripe-event ledger, added by `FZ-083` and `FZ-084`. (`subscription` landed with `FZ-081`.)
 
 Their purpose and their rules are specified in `11-commercial.md`; committing to a physical schema here would be speculative ahead of the stories that implement them. `demo_request` is worth flagging now for one reason: it is the only table in the system with **no `organization_id`**, because a demo request belongs to no tenant yet. It is read by operators and is never reachable from the tenant API.
 

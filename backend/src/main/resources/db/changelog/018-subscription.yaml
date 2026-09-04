@@ -1,0 +1,94 @@
+databaseChangeLog:
+  - changeSet:
+      id: 018-subscription
+      author: freezehub
+      changes:
+        # One row per organization, enforced by the unique constraint rather than by
+        # convention: every entitlement question resolves through this row, and "no
+        # subscription" is not an answer any of them can give (FZ-081).
+        - createTable:
+            tableName: subscription
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: organization_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+                    unique: true
+                    uniqueConstraintName: uq_subscription_organization
+                    references: organization(id)
+                    foreignKeyName: fk_subscription_organization
+              - column:
+                  name: plan
+                  type: varchar(32)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: status
+                  type: varchar(32)
+                  constraints:
+                    nullable: false
+              # Set while TRIALING and left in place afterwards, so "when did their trial
+              # end" stays answerable after they convert.
+              - column:
+                  name: trial_ends_at
+                  type: timestamptz
+              # Enterprise is priced per deal, so its limits are per customer. A nullable
+              # override rather than a second mechanism, and null everywhere else.
+              - column:
+                  name: application_limit_override
+                  type: int
+              - column:
+                  name: created_at
+                  type: timestamptz
+                  defaultValueComputed: now()
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamptz
+                  defaultValueComputed: now()
+                  constraints:
+                    nullable: false
+
+        - sql:
+            sql: >
+              ALTER TABLE subscription ADD CONSTRAINT chk_subscription_plan
+              CHECK (plan IN ('TRIAL','STARTER','GROWTH','SCALE','ENTERPRISE'))
+        - sql:
+            sql: >
+              ALTER TABLE subscription ADD CONSTRAINT chk_subscription_status
+              CHECK (status IN ('TRIALING','ACTIVE','PAST_DUE','SUSPENDED','CANCELLED'))
+        # An override is a number of applications; zero or negative is a data error, not a
+        # very small plan.
+        - sql:
+            sql: >
+              ALTER TABLE subscription ADD CONSTRAINT chk_subscription_override
+              CHECK (application_limit_override IS NULL OR application_limit_override > 0)
+
+  - changeSet:
+      id: 018-subscription-backfill
+      author: freezehub
+      changes:
+        # Organizations that predate billing get ENTERPRISE/ACTIVE, not a trial.
+        #
+        # They are pilots and demo tenants created before any of this existed. Starting a
+        # 14-day clock on them would suspend a working pilot two weeks after a migration
+        # nobody would connect it to, and imposing Starter's ten-application limit would refuse
+        # the eleventh application of a catalog that already has more.
+        #
+        # Deliberately generous: the cost of being wrong here is a customer who is not
+        # billed correctly, which is a conversation. The cost of the other error is a
+        # customer whose deployments start failing.
+        - sql:
+            sql: >
+              INSERT INTO subscription (organization_id, plan, status)
+              SELECT o.id, 'ENTERPRISE', 'ACTIVE' FROM organization o
+              WHERE NOT EXISTS (SELECT 1 FROM subscription s WHERE s.organization_id = o.id)

@@ -13,4 +13,10 @@ public interface IntegrationRepository extends JpaRepository<Integration, Long> 
 
     Optional<Integration> findByIdAndOrganizationId(Long id, Long organizationId);
 
+    /**
+     * What the plan limit counts (FZ-081). Disabled destinations count: they are still
+     * configured, still hold an encrypted credential, and are one toggle from sending.
+     */
+    long countByOrganizationId(Long organizationId);
+
 }
