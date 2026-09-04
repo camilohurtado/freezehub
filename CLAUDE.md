@@ -216,6 +216,9 @@ docker build -t freeze-check:test connectors/
 sh connectors/test/image-smoke.sh freeze-check:test
 ```
 
+The image is the connector (`D-26`): every CI system in `connectors/README.md` runs it.
+It is not published yet — `FZ-099` — so build it locally to try a guideline.
+
 ### Infrastructure (`infra/`)
 
 Requires Terraform >= 1.6 and AWS credentials. See `infra/README.md` for the full runbook

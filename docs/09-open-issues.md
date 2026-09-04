@@ -51,14 +51,24 @@ The MVP answer is that support fixes it by hand, which is honest at this volume 
 
 `FZ-088` is deliberately deferred rather than scheduled: the right fix depends on whether the common case is *join the existing organization automatically* — fast, and wrong for a contractor signing up under a client's domain — or *request access from an administrator*, which is correct and more machinery. One real occurrence answers that. Guessing first does not.
 
-### OI-13 — Connectors are usable but not discoverable
-**Severity:** Gap · **Owner:** `FZ-097` · **Found in:** `FZ-090`
+### OI-13 — The connector image is not published, so nothing is installable
+**Severity:** Gap · **Owner:** `FZ-099` · **Found in:** `FZ-090`, corrected twice
 
-A connector referenced by a path inside this monorepo works, and nobody finds it. GitHub Marketplace requires `action.yml` at the root of its own repository; the GitLab CI/CD Catalog requires a dedicated catalog project. Neither will list a subdirectory.
+**This entry has been wrong twice, and both errors are worth keeping visible.**
 
-This is a packaging step, not a rewrite, and it is deliberately not folded into the connector stories — building four connectors and publishing them are different kinds of work, and conflating them would leave the listings half-done inside stories that looked finished.
+It first described publication as *discoverability* — "usable by direct reference now, listable later". That was wrong: a connector in a private repository is not usable at all, because `uses:` and `component:` resolve against a repository the customer can read.
 
-It is a commercial gap as much as a technical one. A Marketplace listing is an inbound channel; a path in a monorepo is not, and `11-commercial.md` counts on the former.
+It then described the fix as extracting the connectors into a second public repository. That was over-built. The image is the connector (`D-26`), so publishing **one artifact** makes every guideline in `connectors/README.md` work at once — no second repository, no sync, no cross-repo token.
+
+Verified rather than assumed, at the time of writing:
+
+- `docker manifest inspect ghcr.io/freezehubio/freeze-check:v1` → `manifest unknown`
+- `git tag` → empty
+- the repository is private, and under a personal account
+
+So every guideline currently names an image that does not exist, and the README says so. `FZ-099` has the tooling ready and is blocked on two human actions: creating the `freezehubio` organization, and a token with `packages: write` on it.
+
+Discoverability — a Marketplace or Catalog listing — is a separate and lesser problem, deferred to `FZ-096`.
 
 ## Resolved
 

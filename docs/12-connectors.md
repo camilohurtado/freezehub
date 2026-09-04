@@ -47,7 +47,7 @@ Where a connector cannot reference the script across a repository boundary (Jenk
 
 ### The container image
 
-`ghcr.io/freezehub/freeze-check:v1` — Alpine, `curl`, `jq`, and the script on `PATH`.
+`ghcr.io/freezehubio/freeze-check:v1` — Alpine, `curl`, `jq`, and the script on `PATH`.
 
 Not gold-plating: Argo CD's PreSync hook *is* a Kubernetes Job, so it needs an image whatever else happens. Once it exists, the GitLab component uses it instead of `apk add --no-cache curl jq` on every pipeline run, and anyone on a CI system without a connector has a one-line answer.
 
@@ -55,10 +55,10 @@ Not gold-plating: Argo CD's PreSync hook *is* a Kubernetes Job, so it needs an i
 
 | | Shape | How a customer uses it |
 |---|---|---|
-| **GitHub Actions** | composite action | `uses: freezehub/freezehub/connectors/github-action@v1` |
-| **GitLab CI** | includable component | `include: {component: .../freeze-check@v1}` |
-| **Jenkins** | shared library | `freezeCheck(application: 'payments-api', environment: 'production')` |
-| **Argo CD** | PreSync hook Job | a manifest, with names read from Application annotations |
+| **GitHub Actions** | `docker run` step | reference action kept in-tree, not published |
+| **GitLab CI** | job `image:` | reference component kept in-tree, not published |
+| **Jenkins** | `withCredentials` + `docker run` | guideline, no shared library |
+| **Argo CD** | PreSync hook Job | a manifest the customer copies |
 
 Inputs are the same everywhere and map onto the script's existing environment variables — `url`, `apiKey`, `application`, `environment`, `onError`, `timeout`. A connector adds no input the script does not already have, and interprets none of them itself.
 
@@ -98,9 +98,13 @@ Connectors are consumed by customer pipelines, so a breaking change is an outage
 
 ## 6. Publication
 
-Direct reference works immediately. Discovery does not: a GitHub Marketplace listing needs `action.yml` at the root of its own repository, and the GitLab CI/CD Catalog needs a dedicated catalog project. Both are a packaging step, not a rewrite — recorded as `OI-13`, owned by `FZ-097`.
+**One artifact.** The image is the connector: every guideline in `connectors/README.md` reaches FreezeHub by running it, so publishing that one thing makes all of them work (`D-26`). It is public, Apache-2.0, and free with or without a subscription — what is sold is the answer it fetches, and the API key is the boundary.
 
-This matters commercially as much as technically. A Marketplace listing is an inbound channel; a path inside a monorepo is not.
+There is no second repository. The source stays private; GHCR package visibility is set on the package rather than inherited from the repository, which is what lets a public image ship from a private tree.
+
+This section said the opposite twice — first that direct reference worked from a private repository, then that the fix was extracting a public repository. `OI-13` keeps both errors visible, because the first made a blocker look like a nicety and the second bought machinery with no customer to justify it.
+
+**Marketplace and Catalog listings are deferred** (`FZ-096`). They need public source repositories, and they buy discovery rather than capability. Real, and second.
 
 ## 7. Not doing
 

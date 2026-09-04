@@ -526,3 +526,50 @@ Precision is silently lost. A client that sends nanoseconds gets microseconds ba
 A window shorter than one microsecond now collapses to zero length and is rejected as a `400`. Defensible, since the database cannot represent it as non-empty, but it is a case that used to be accepted.
 
 And the rule lives in two places — the request record and the aggregate — which is duplication, deliberately: the first is what fixes the diff, the second is the aggregate refusing to hold state it cannot store, for callers that never touched a request. Any new user-supplied timestamp field needs the same treatment, and nothing enforces that but this entry.
+
+
+---
+
+## D-26 — One image is the connector; per-ecosystem packages are reference implementations
+
+**Date:** 2026-09-04 · **Specified by:** `FZ-097` · **Published by:** `FZ-099`
+
+### Decision
+
+One implementation and **one published artifact**: the container image, public on GHCR as `ghcr.io/freezehubio/freeze-check`, Apache-2.0, free with or without a subscription. Every CI system integrates by running it, and `connectors/README.md` carries a guideline per system.
+
+The GitHub Action and the GitLab component stay in the source tree as **tested reference implementations, not published packages**. The product source stays private and there is no second repository.
+
+What is sold is the answer the image fetches. Nothing in it checks a licence, a plan or an entitlement, and nothing ever will.
+
+### Why
+
+**Nearly every CI system runs containers**, so one artifact covers nearly the whole market. A per-ecosystem package covers one ecosystem and adds a repository to keep in step. And because it is literally the same binary everywhere, a customer running GitLab in one team and Jenkins in another cannot get different answers from the same freeze — which is what `D-24` is protecting.
+
+**Publishing native packages requires public source repositories.** `uses:` and `component:` resolve against a repository the customer can read; a private one fails with "repository not found" whatever else is right. So Marketplace and Catalog listings mean a second public repository, a sync step, a cross-repo token and a release that force-pushes a build artefact — machinery to maintain before there is a customer, bought with roughly two lines of YAML in each customer's pipeline.
+
+**Free and open is required, not generous.** The gate is about two hundred lines of POSIX shell making one HTTP POST. Any customer can rewrite it in an afternoon, so a licence check is unenforceable theatre — and it is read by a security team before it enters a deploy path. "No agent, no credentials into your repositories, no blast radius" (`D-24`) is only credible if they can read the thing that runs there.
+
+**The billable boundary is already in the right place.** An API key reaches `/api/policy/**` and nothing else (`FZ-052`); without one the connector gets `401` and fails the build, which is the correct behaviour for a non-customer. And because policy evaluations are unlimited on every plan (`D-20`) and a billing state never changes a policy answer (`D-21`), the connector never needs to know anything about billing — permanently.
+
+**The incentives align.** An unregistered application is blocked (`D-14`) and billing is per registered application (`D-20`), so every pipeline that adopts the free image pushes the customer to register that application. The free thing drives the meter.
+
+### Alternatives
+
+- **Publish native packages from a second public repository**, listed on Marketplace and the GitLab Catalog. Best ergonomics, and a listing is a genuine inbound channel. **Deferred rather than rejected** (`FZ-096`): revisit when a listing is worth its maintenance, which is a question about demand, not engineering.
+- **Make the whole monorepo public** — no extraction, no sync, and the security review reads everything. Rejected on what it discloses: `11-commercial.md` is the pricing model and go-to-market, and that is not something to hand a competitor before the first customer.
+- **Source-available, licensed only with a subscription.** Keeps a legal tether and still passes a security read. Rejected: unenforceable at this size, forfeits any listing, and converts goodwill into friction for no collectable revenue.
+- **MIT rather than Apache-2.0.** Shorter and better known. Apache-2.0 chosen for the explicit patent grant, which is what enterprise legal review — the exact audience for a change-freeze tool — waves through without a question.
+
+### Cost
+
+**No Marketplace or Catalog listing, so no inbound discovery from either.** That is the main thing being traded, and it is a marketing loss rather than a technical one. It is also the thing most likely to be regretted, because discovery compounds and this decision postpones the start of that compounding.
+
+**Every integration guideline carries plumbing a native package would have hidden.** Passing `GITHUB_ACTOR`, `GITHUB_SHA` and the run URL through to the container is three lines the customer sees and could get wrong, and getting it wrong degrades the deployment record silently rather than loudly.
+
+**The image is the only thing a customer can inspect.** Reading the script means `docker run --entrypoint cat`, which is a worse answer in a security review than "here is the repository". The script is short and that keeps it survivable, but it is a real weakening of the strongest thing we have to say.
+
+**Two reference implementations are maintained and tested but shipped to nobody.** If a listing never happens they are dead weight, and the temptation to document them as installable — which they are not — is a live risk that the README has to keep resisting.
+
+And a permissive licence on a thin client means anyone can point it at their own implementation of the Policy API, or fork it. That is the honest consequence, and it is worth less to a competitor than it looks: the client is the easy part.
+

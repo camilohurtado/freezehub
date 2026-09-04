@@ -62,7 +62,8 @@ runs:
         FREEZEHUB_ENVIRONMENT: ${{ inputs.environment }}
         FREEZEHUB_ON_ERROR: ${{ inputs.on-error }}
         FREEZEHUB_TIMEOUT: ${{ inputs.timeout }}
-      # The whole repository is checked out alongside the action, so the one
-      # implementation is one directory up. actor, reference and source are filled from
-      # GITHUB_ACTOR, GITHUB_SHA and the run URL by the script itself.
-      run: "$GITHUB_ACTION_PATH/../freeze-check.sh"
+      # The gate sits beside this file in both layouts — here, and at the root of the
+      # published repo — so the path is the same in each and publishing copies rather
+      # than rewrites. actor, reference and source are filled from GITHUB_ACTOR,
+      # GITHUB_SHA and the run URL by the script itself.
+      run: "$GITHUB_ACTION_PATH/freeze-check.sh"

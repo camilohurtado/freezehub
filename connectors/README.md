@@ -1,138 +1,203 @@
 # FreezeHub connectors
 
-What a customer installs into their pipeline so they do not have to vendor a script and keep it current.
+Ask FreezeHub whether a deployment may proceed, and fail the build if it may not.
 
 | | |
 |---|---|
 | [`freeze-check.sh`](./freeze-check.sh) | **the one implementation** — POSIX shell, `curl` + `jq` |
-| [`Dockerfile`](./Dockerfile) | `ghcr.io/freezehub/freeze-check` — the script, packaged |
-| [`github-action/`](./github-action) | the GitHub Action (`FZ-092`) |
-| [`gitlab/`](./gitlab) | the GitLab CI/CD component (`FZ-093`) |
+| [`Dockerfile`](./Dockerfile) | `ghcr.io/freezehubio/freeze-check` — the script, packaged. **The connector.** |
+| [`action.yml`](./action.yml) | GitHub Action — a tested reference implementation, see below |
+| [`templates/`](./templates) | GitLab component — likewise |
 | [`test/`](./test) | what proves all of the above still fail closed |
+| [`LICENSE`](./LICENSE) | Apache-2.0 — free to use, subscription or not (`D-26`) |
 
-## One implementation
+## One source, one artifact
 
-Every connector is packaging around `freeze-check.sh`. None of them reimplements the call.
+There is one implementation and one published thing: **the image**. Every CI system below reaches FreezeHub by running it.
 
-A customer running GitLab in one team and Jenkins in another must get **the same answer from the same freeze**. Four native implementations would drift in exactly the places that matter — what a timeout means, whether a `401` fails open, how an unregistered name is reported — and the drift would show up as one team deploying during a freeze that stopped another. That is the product failing while appearing to work.
+That is not a compromise — it is what the market actually looks like. Nearly every CI system runs containers, so one artifact covers nearly all of them, and a customer running GitLab in one team and Jenkins in another gets **the same answer from the same freeze** because it is the same binary (`D-24`). Per-ecosystem plugins would drift in exactly the places that matter — what a timeout means, whether a `401` fails open, how an unregistered name is reported — and that drift shows up as one team deploying during a freeze that stopped another.
 
-So: change the behaviour here, once. `docs/12-connectors.md` is the specification; `D-24` is why.
+> **The image is not published yet.** `ghcr.io/freezehubio/freeze-check:v1` does not exist until `FZ-099` runs. Until then, build it: `docker build -t freeze-check connectors/` and use `freeze-check` in place of the image reference below.
 
-Where a connector cannot reach across a repository boundary and must carry a copy — Jenkins loads library resources from within the library itself — a check asserts the copy is byte-identical.
+## What it does, and what it does not
 
-## What this does not do
+One HTTP request to your FreezeHub organization, turned into an exit code.
 
-It asks a question and reports the answer. It cannot stop a deployment, post a commit status, or be made a required check by branch protection: enforcement lives in your pipeline, and skipping the step skips the gate.
+| Exit | Meaning |
+|---|---|
+| `0` | allowed — deploy. Advisory restrictions, if any, are printed |
+| `1` | blocked — a restriction is in force, or a name is not registered |
+| `2` | not evaluated — misconfiguration, or FreezeHub could not be asked |
 
-FreezeHub holds no credential for your repositories, receives no webhook from them, and runs no agent in your infrastructure. The arrow points one way — your pipeline calls FreezeHub.
+`1` and `2` are separate on purpose. "You may not deploy" and "I could not find out" are different facts, and only the second is your infrastructure's problem.
 
-## The image
-
-```bash
-docker build -t freeze-check connectors/
-
-docker run --rm \
-  -e FREEZEHUB_URL=https://freezehub.example.com \
-  -e FREEZEHUB_API_KEY="$FREEZEHUB_API_KEY" \
-  -e FREEZEHUB_APPLICATION=payments-api \
-  -e FREEZEHUB_ENVIRONMENT=production \
-  freeze-check
-```
-
-Alpine, `curl`, `jq`, non-root, script on `PATH` as `freeze-check`. The container's exit code **is** the gate's answer — `0` allowed, `1` blocked, `2` not evaluated.
-
-It exists because an Argo CD PreSync hook is a Kubernetes Job and needs an image whatever else happens. Once it existed, the GitLab component stopped installing `curl` and `jq` on every pipeline run.
-
-Publishing it to GHCR is `FZ-097`; until then, build it yourself.
-
-## GitHub Actions
-
-```yaml
-- name: FreezeHub check
-  uses: freezehub/freezehub/connectors/github-action@v1
-  with:
-    url: https://freezehub.example.com
-    api-key: ${{ secrets.FREEZEHUB_API_KEY }}
-    application: payments-api
-    environment: production
-```
-
-Put it in the job that deploys, before the deploy step — or in a job the deploy job `needs`.
-
-A blocked deployment **fails the step**, which is the whole point. Do not add
-`continue-on-error` unless you mean it: it turns every freeze into a warning, and it will
-be set once during an incident and never removed.
-
-The action declares no outputs, deliberately. An output saying `BLOCKED` next to a step
-that passed is a warn-only mode wearing a disguise. If you want a restriction to inform
-rather than stop, make it `ADVISORY` — the gate exits `0` and prints it.
-
-`on-error` covers a FreezeHub outage and nothing else. A missing input or a rejected API
-key fails the step whatever it is set to.
-
-## GitLab CI
-
-```yaml
-include:
-  - component: gitlab.com/freezehub/freezehub/freeze-check@v1
-    inputs:
-      url: https://freezehub.example.com
-      application: payments-api
-      environment: production
-
-deploy:production:
-  needs: ["freeze-check"]
-  script:
-    - ./deploy.sh
-```
-
-Set **`FREEZEHUB_API_KEY`** in Settings → CI/CD → Variables, Masked and Protected.
-
-There is deliberately **no `api-key` input**. Component inputs are interpolated when the
-pipeline is created and become part of its configuration, so a key passed as an input is a
-key written into the pipeline. It comes from a CI/CD variable or the job fails.
-
-`needs:` is what enforces the gate: a failed check fails the pipeline before the deploy
-job is created. Do not add `allow_failure: true` to the check — it turns every freeze into
-a warning.
-
-By default the job runs on the branch that deploys. Asking on every feature branch would
-fail merge-request pipelines during a freeze, which is not the point.
+**It cannot stop a deployment.** Enforcement is your pipeline failing the step. Skip the step and you skip the gate. That is a deliberate limit, and it is why FreezeHub needs no credentials for your repositories, no webhook from them, and no agent inside your infrastructure — the only thing that leaves your network is a question.
 
 ## Configuration
 
-Environment variables, the same everywhere. `examples/README.md` has the full table and the reasoning.
+The same everywhere, because it is the same program.
 
 | | | |
 |---|---|---|
 | `FREEZEHUB_URL` | — | required |
 | `FREEZEHUB_API_KEY` | — | required; a credential |
-| `FREEZEHUB_APPLICATION` | — | required; the name **exactly** as registered, including case |
+| `FREEZEHUB_APPLICATION` | — | required; exactly as registered, **including case** |
 | `FREEZEHUB_ENVIRONMENT` | — | required; likewise |
 | `FREEZEHUB_ON_ERROR` | `block` | what silence means — the one genuine choice |
 | `FREEZEHUB_TIMEOUT` | `10` | seconds |
 
 `FREEZEHUB_ON_ERROR=allow` covers a FreezeHub outage. It does **not** cover a missing variable or a rejected credential — both exit `2` regardless, because otherwise revoking a key or fat-fingering a variable would silently switch enforcement off for every pipeline still using it.
 
+An API key reaches `/api/policy/**` and nothing else: it cannot read your restrictions, change your catalog, or issue another key. A leaked CI variable is not an account takeover.
+
+---
+
+# Integration guidelines
+
+## GitHub Actions
+
+```yaml
+- name: FreezeHub check
+  env:
+    FREEZEHUB_URL: https://freezehub.example.com
+    FREEZEHUB_API_KEY: ${{ secrets.FREEZEHUB_API_KEY }}
+  run: |
+    docker run --rm \
+      -e FREEZEHUB_URL -e FREEZEHUB_API_KEY \
+      -e FREEZEHUB_APPLICATION=payments-api \
+      -e FREEZEHUB_ENVIRONMENT=production \
+      -e GITHUB_ACTOR -e GITHUB_SHA -e GITHUB_SERVER_URL -e GITHUB_REPOSITORY -e GITHUB_RUN_ID \
+      ghcr.io/freezehubio/freeze-check:v1
+```
+
+Put it in the job that deploys, before the deploy step — or in a job the deploy job `needs`. Do not add `continue-on-error`; it turns every freeze into a warning.
+
+The `GITHUB_*` variables are passed through so the check is recorded against a person and a commit rather than "some pipeline". They are optional — omit them and the gate still works, the record is just less useful afterwards.
+
+## GitLab CI
+
+```yaml
+freeze-check:production:
+  stage: freeze-check
+  image: ghcr.io/freezehubio/freeze-check:v1
+  script: [freeze-check]
+  variables:
+    FREEZEHUB_URL: https://freezehub.example.com
+    FREEZEHUB_APPLICATION: payments-api
+    FREEZEHUB_ENVIRONMENT: production
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
+deploy:production:
+  needs: ["freeze-check:production"]
+  script: [./deploy.sh]
+```
+
+Set `FREEZEHUB_API_KEY` in Settings → CI/CD → Variables, **Masked and Protected**. Never as a job variable in the file — that is a credential in your repository.
+
+`needs:` is what enforces the gate: a failed check fails the pipeline before the deploy job is created. Do not add `allow_failure: true`.
+
+GitLab Runner overrides the image's entrypoint and runs its own shell, which is why the gate is on `PATH` as `freeze-check` and not only the entrypoint. `CI_COMMIT_SHA`, `GITLAB_USER_EMAIL` and `CI_PIPELINE_URL` are already in the job environment and are picked up automatically.
+
+The check runs only on the deploying branch by default. Asking on every feature branch would fail merge-request pipelines during a freeze, which is not the point.
+
+## Jenkins
+
+```groovy
+stage('FreezeHub check') {
+  steps {
+    withCredentials([string(credentialsId: 'freezehub-api-key', variable: 'FREEZEHUB_API_KEY')]) {
+      sh '''
+        docker run --rm \
+          -e FREEZEHUB_URL=https://freezehub.example.com \
+          -e FREEZEHUB_API_KEY \
+          -e FREEZEHUB_APPLICATION=payments-api \
+          -e FREEZEHUB_ENVIRONMENT=production \
+          -e FREEZEHUB_ACTOR="${BUILD_USER_EMAIL:-jenkins}" \
+          -e FREEZEHUB_REFERENCE="${GIT_COMMIT}" \
+          -e FREEZEHUB_SOURCE="${BUILD_URL}" \
+          ghcr.io/freezehubio/freeze-check:v1
+      '''
+    }
+  }
+}
+```
+
+`withCredentials` rather than a pipeline literal, so the key never reaches the build log. Do not wrap the step in `catchError` — a failed check must fail the build.
+
+Jenkins exposes no standard "who started this" variable, so `FREEZEHUB_ACTOR` is set explicitly; `BUILD_USER_EMAIL` comes from the Build User Vars plugin if you have it.
+
+## Argo CD
+
+A `PreSync` hook, so the check runs before the sync it is gating:
+
+```yaml
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: freeze-check
+  annotations:
+    argocd.argoproj.io/hook: PreSync
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
+spec:
+  backoffLimit: 0            # a freeze is not a transient error; do not retry inside the hook
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: freeze-check
+          image: ghcr.io/freezehubio/freeze-check:v1
+          env:
+            - name: FREEZEHUB_URL
+              value: https://freezehub.example.com
+            - name: FREEZEHUB_APPLICATION
+              value: payments-api
+            - name: FREEZEHUB_ENVIRONMENT
+              value: production
+            - name: FREEZEHUB_API_KEY
+              valueFrom:
+                secretKeyRef: { name: freezehub, key: api-key }
+```
+
+**Argo is different in kind from the others, and it is worth understanding before you turn it on.** They gate a step in a pipeline; this gates a *sync*, and by the time Argo syncs, the change is already committed and merged. With auto-sync enabled, the freeze is the only thing standing between a merged commit and production — the strongest form of the product, and the most surprising.
+
+A failed hook fails the sync and leaves the Application `OutOfSync`. **Argo will retry on its own schedule**, so during a freeze it will fail repeatedly, by design. Tell whoever watches your alerts, or they will page someone at 3am for a working freeze.
+
+## Anything else
+
+CircleCI, Buildkite, Tekton, Azure Pipelines, Bitbucket, Drone, Concourse — all the same shape:
+
+```bash
+docker run --rm \
+  -e FREEZEHUB_URL -e FREEZEHUB_API_KEY \
+  -e FREEZEHUB_APPLICATION=payments-api \
+  -e FREEZEHUB_ENVIRONMENT=production \
+  ghcr.io/freezehubio/freeze-check:v1
+```
+
+No container runtime? Run the script directly — it is POSIX shell and needs only `curl` and `jq`. `examples/` shows that route.
+
+---
+
+## The reference implementations
+
+[`action.yml`](./action.yml) and [`templates/freeze-check.yml`](./templates/freeze-check.yml) are a real GitHub Action and a real GitLab CI/CD component, and both are covered by the test suite.
+
+**They are not installable today**, and the docs above deliberately do not offer them. `uses:` and `component:` resolve against a source repository the customer can read, and this one is private. Publishing them would mean a second, public repository to keep in step — machinery worth building when a Marketplace listing is worth having, and not before (`FZ-096` covers that question, `D-26` the reasoning).
+
+They are kept because they cost nothing to keep, they stay honest by being tested, and they are ready the day that changes.
+
 ## Tests
 
 ```bash
-node connectors/test/run-tests.js              # behaviour — the script and the action
-node connectors/test/check-connectors.js       # the connectors' shape
+node connectors/test/run-tests.js              # behaviour — the script and both references
+node connectors/test/check-connectors.js       # their shape
 docker build -t freeze-check:test connectors/
-sh connectors/test/image-smoke.sh              # the same rules, as a container
+sh connectors/test/image-smoke.sh freeze-check:test
 ```
 
-`run-tests.js` drives the script against a stub Policy API in its own process, and most of what it asserts is the set of rules that must **not** fail open. Those are each one `case` branch away from turning a freeze into a warning for every customer at once, and the failure is silent: the pipeline deploys and reports success.
+`run-tests.js` drives the script against a stub Policy API, and most of what it asserts is the set of rules that must **not** fail open. Each is one `case` branch away from turning a freeze into a warning for every customer at once, and the failure is silent: the pipeline deploys and reports success.
 
-`run-tests.js` also executes the GitHub Action and the GitLab job — the exact command each runs, with the environment built by reading `action.yml` and `template.yml` rather than restated, so the two cannot drift. That makes both verifiable without a runner; the workflow in `verify.yml` is still what proves GitHub itself wires the action up.
+It also executes the action and the GitLab job, with the environment read out of `action.yml` and `templates/freeze-check.yml` rather than restated, so the two cannot drift.
 
-`check-connectors.js` is structural: an input declared but never wired reaches a customer as a setting that silently does nothing. It also enforces the two rules that matter — no input may turn a blocked check into a passing one, and the GitLab component may not take the API key as an input.
-
-`image-smoke.sh` covers only what packaging can break — that busybox `ash` runs the script, that the exit code survives the container boundary, that the gate is reachable on `PATH` when the entrypoint is overridden the way GitLab Runner overrides it, and that it is not root. It needs no network, deliberately, so it behaves the same on a laptop and on a CI runner.
-
-## Coming
-
-The remaining connectors are the rest of Milestone 9 in `docs/08-backlog.md`: Jenkins (`FZ-094`) and Argo CD (`FZ-095`).
-
-Until they land, `examples/` shows how to wire the script by hand — which is also the answer for any CI system that never gets a connector.
+`image-smoke.sh` covers what packaging can break — that busybox `ash` runs the script, that the exit code survives the container boundary, that the gate is on `PATH` when the entrypoint is overridden the way GitLab Runner overrides it, and that it is not root. It needs no network, so it behaves the same on a laptop and on a CI runner.
