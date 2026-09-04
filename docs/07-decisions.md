@@ -487,3 +487,42 @@ The GitHub Action, GitLab component, Jenkins library and Argo CD hook are packag
 The Jenkins connector must carry a copy of the script, because Jenkins loads library resources from within the library. That copy is the one place the one-implementation rule can break, so it is verified byte-for-byte rather than trusted.
 
 And distribution is not finished by building them: Marketplace and Catalog listings need dedicated repositories (`OI-13`), so the connectors are usable by direct reference before they are discoverable.
+
+
+---
+
+## D-25 — Instants are normalised to the precision the database stores
+
+**Date:** 2026-09-04 · **Implemented by:** `FZ-098`
+
+### Decision
+
+A user-supplied `Instant` is truncated to microseconds — PostgreSQL `TIMESTAMPTZ`'s precision — at the edge where it enters the system, in `RestrictionRequest`. The aggregate truncates again on construction and replacement, so its in-memory state equals what a reload would produce for every caller, not only for ones that arrived over HTTP.
+
+### Why
+
+Found by the first CI run this project ever executed. `AuditTrailTest.recordsNothingWhenAnUpdateChangedNothing` failed on Linux and passed on macOS, because `Instant.now()` hands out nanoseconds on one and typically microseconds on the other.
+
+The failure was not the test. An update compared the client's nanosecond value against the stored microsecond one, found a difference, and recorded:
+
+```json
+{"startsAt":{"from":"2026-09-06T07:03:40Z","to":"2026-09-06T07:03:40.000000123Z"}}
+```
+
+Nothing had changed; the client sent back exactly what it sent before. Worse, **the `to` value was never persisted** — the database truncated it straight back to `from`. The audit trail, whose whole purpose is answering "who changed this freeze, and to what", was recording an after-state that never existed, on every update, burying real changes in noise.
+
+Normalising at the boundary makes one value flow through validation, the diff, the aggregate and the response. A comparison between the stored value and the incoming one then means something.
+
+### Alternatives
+
+- **Truncate inside the comparison only.** Two lines, fixes the symptom. Rejected because it puts knowledge of storage precision in the service, and leaves the request, the response and the entity disagreeing about what the value is.
+- **Reject sub-microsecond precision with a `400`.** Honest and explicit. Rejected as hostile: a client formatting an ISO-8601 instant with nanoseconds has done nothing wrong, and refusing it would break integrations over a difference that cannot matter.
+- **Store timestamps as text, or as an epoch-nanosecond `BIGINT`.** Preserves everything. Rejected: it trades every date function PostgreSQL has for precision nobody asked for.
+
+### Cost
+
+Precision is silently lost. A client that sends nanoseconds gets microseconds back and is told only by the response, never by an error — which is the right trade, but it is a trade.
+
+A window shorter than one microsecond now collapses to zero length and is rejected as a `400`. Defensible, since the database cannot represent it as non-empty, but it is a case that used to be accepted.
+
+And the rule lives in two places — the request record and the aggregate — which is duplication, deliberately: the first is what fixes the diff, the second is the aggregate refusing to hold state it cannot store, for callers that never touched a request. Any new user-supplied timestamp field needs the same treatment, and nothing enforces that but this entry.
