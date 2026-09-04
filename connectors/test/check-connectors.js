@@ -43,9 +43,9 @@ const SCRIPT = path.join(__dirname, '..', 'freeze-check.sh');
 // GitHub Actions
 // ---------------------------------------------------------------------------------
 
-console.log('github-action/action.yml');
+console.log('action.yml');
 
-const ACTION = path.join(__dirname, '..', 'github-action', 'action.yml');
+const ACTION = path.join(__dirname, '..', 'action.yml');
 const action = yaml(ACTION);
 
 check('it is a composite action', action.runs && action.runs.using === 'composite',
@@ -88,8 +88,12 @@ check('"timeout" has a default', Boolean(action.inputs.timeout.default));
 check('no input is interpolated into the run line',
     !/\$\{\{\s*inputs\./.test(step.run || ''), step.run);
 
+// The same path in the monorepo and in the published repo, because the gate sits
+// beside action.yml in both. Publishing copies rather than rewrites, so what customers
+// run is what these tests ran.
 check('the run line points at the canonical script',
-    (step.run || '').includes('$GITHUB_ACTION_PATH/../freeze-check.sh'), step.run);
+    (step.run || '').includes('$GITHUB_ACTION_PATH/freeze-check.sh')
+        && !(step.run || '').includes('..'), step.run);
 check('that script exists', fs.existsSync(SCRIPT), SCRIPT);
 
 // D-24 and 12-connectors.md §4: a connector must not offer a way to downgrade a freeze
@@ -107,9 +111,9 @@ check('no input offers a warn-only mode',
 // ---------------------------------------------------------------------------------
 
 console.log();
-console.log('gitlab/template.yml');
+console.log('templates/freeze-check.yml');
 
-const TEMPLATE = path.join(__dirname, '..', 'gitlab', 'template.yml');
+const TEMPLATE = path.join(__dirname, '..', 'templates', 'freeze-check.yml');
 const [spec, jobs] = yaml(TEMPLATE, true);
 
 check('it is a component: a spec header and a job document',
@@ -137,7 +141,7 @@ check('the job does not set FREEZEHUB_API_KEY itself',
 check('the job runs the gate', JSON.stringify(job.script || []).includes('freeze-check'),
     JSON.stringify(job.script));
 check('it runs the connector image',
-    String(spec.spec.inputs.image.default).startsWith('ghcr.io/freezehub/freeze-check'),
+    String(spec.spec.inputs.image.default).startsWith('ghcr.io/freezehubio/freeze-check:'),
     spec.spec.inputs.image.default);
 
 check('"on-error" defaults to block', spec.spec.inputs['on-error'].default === 'block',

@@ -231,13 +231,13 @@ check('the action is DEPLOY', JSON.parse(firstRequest().raw).action === 'DEPLOY'
 
 const action = JSON.parse(execFileSync('ruby', [
     '-ryaml', '-rjson', '-e', 'puts YAML.load_file(ARGV[0]).to_json',
-    path.join(__dirname, '..', 'github-action', 'action.yml'),
+    path.join(__dirname, '..', 'action.yml'),
 ], { encoding: 'utf8' }));
 
 const actionStep = action.runs.steps[0];
 
 function runAction(inputs) {
-    const env = { PATH: process.env.PATH, GITHUB_ACTION_PATH: path.join(__dirname, '..', 'github-action') };
+    const env = { PATH: process.env.PATH, GITHUB_ACTION_PATH: path.join(__dirname, '..') };
     for (const [name, expression] of Object.entries(actionStep.env)) {
         const input = String(expression).match(/inputs\.([a-z-]+)/)[1];
         const supplied = inputs[input];
@@ -280,7 +280,7 @@ check('the action passes its inputs through rather than defaulting them',
 
 const [gitlabSpec, gitlabJobs] = JSON.parse(execFileSync('ruby', [
     '-ryaml', '-rjson', '-e', 'puts YAML.load_stream(File.read(ARGV[0])).to_json',
-    path.join(__dirname, '..', 'gitlab', 'template.yml'),
+    path.join(__dirname, '..', 'templates', 'freeze-check.yml'),
 ], { encoding: 'utf8' }));
 
 const gitlabJob = gitlabJobs[Object.keys(gitlabJobs)[0]];

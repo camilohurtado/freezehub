@@ -1,7 +1,7 @@
 # FreezeHub's deployment gate as a GitLab CI/CD component (FZ-093).
 #
 #   include:
-#     - component: gitlab.com/freezehub/freezehub/freeze-check@v1
+#     - component: gitlab.com/freezehub/freeze-check/freeze-check@v1
 #       inputs:
 #         url: https://freezehub.example.com
 #         application: payments-api
@@ -45,7 +45,7 @@ spec:
       default: '10'
       description: Seconds to wait for FreezeHub before giving up.
     image:
-      default: ghcr.io/freezehub/freeze-check:v1
+      default: ghcr.io/freezehubio/freeze-check:v1
       description: Override only to pin a digest or to use a mirror.
 
 # There is deliberately no `api-key` input. Component inputs are interpolated when the

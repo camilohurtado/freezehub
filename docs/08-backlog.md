@@ -1125,7 +1125,7 @@ The foundation the other four sit on.
 
 `examples/freeze-check.sh` moves to `connectors/freeze-check.sh` — it stopped being an example the moment it became a shipped artifact. `examples/` stays as the hand-rolled walkthrough for CI systems with no connector, and points at the new location.
 
-`connectors/Dockerfile` builds `ghcr.io/freezehub/freeze-check` — Alpine, `curl`, `jq`, script on `PATH`, non-root, following `backend/Dockerfile`'s shape. **Required regardless of preference**: an Argo CD PreSync hook is a Kubernetes Job and cannot run without an image.
+`connectors/Dockerfile` builds `ghcr.io/freezehubio/freeze-check` — Alpine, `curl`, `jq`, script on `PATH`, non-root, following `backend/Dockerfile`'s shape. **Required regardless of preference**: an Argo CD PreSync hook is a Kubernetes Job and cannot run without an image.
 
 Acceptance:
 
@@ -1138,7 +1138,9 @@ Acceptance:
 ### FZ-092 — GitHub Actions Connector
 **Status:** DONE
 
-A composite action at `connectors/github-action/action.yml`, usable as `uses: freezehub/freezehub/connectors/github-action@v1`.
+A composite action at `connectors/action.yml`, usable as `uses: freezehubio/freeze-check@v1`.
+
+**Moved to the `connectors/` root by `FZ-097`**, together with the GitLab template, so that this directory *is* the published repository's layout. Marketplace requires `action.yml` at a repository root; publishing now copies rather than rewrites the script path, so what a customer runs is what the tests ran.
 
 Composite rather than a Docker action: it runs on the runner's own `curl`/`jq`, so it costs no image pull on the platform where most usage will be, and it works on self-hosted runners with no Docker.
 
@@ -1153,7 +1155,9 @@ Acceptance:
 ### FZ-093 — GitLab CI Connector
 **Status:** DONE
 
-An includable component at `connectors/gitlab/`, running the `FZ-091` image so no pipeline installs `curl` and `jq` on every run.
+A CI/CD component at `connectors/templates/freeze-check.yml` (moved there by `FZ-097`), running the `FZ-091` image so no pipeline installs `curl` and `jq` on every run.
+
+**Kept as a tested reference implementation, not published** (`D-26`): `component:` resolves against a repository the customer can read. The GitLab guideline in `connectors/README.md` is what customers actually use, and it is the same job with the image inlined.
 
 Acceptance:
 
@@ -1162,7 +1166,12 @@ Acceptance:
 - The documented wiring uses `needs:` so a failed check prevents the deploy job from being created, and says explicitly why `allow_failure: true` must not be added.
 
 ### FZ-094 — Jenkins Connector
-**Status:** TODO
+**Status:** SUPERSEDED by `FZ-097`
+
+A Jenkins shared library needs its own repository for Jenkins to load it, the same constraint that stopped the Action and the component being installable (`D-26`). The Jenkins guideline in `connectors/README.md` delivers the outcome — `withCredentials` around a `docker run` — without a second repository to maintain. Reopen if a customer needs a library rather than a snippet.
+
+The original plan below is kept for the reasoning it carries, not as work to do.
+
 
 A shared library at `connectors/jenkins/`: `vars/freezeCheck.groovy` plus the script as a library resource.
 
@@ -1176,7 +1185,12 @@ Acceptance:
 - The API key is read from Jenkins credentials, never from a pipeline literal, and does not appear in the build log.
 
 ### FZ-095 — Argo CD Connector
-**Status:** TODO
+**Status:** SUPERSEDED by `FZ-097`
+
+An Argo CD PreSync hook is a manifest a customer copies, not something installed, so it is a guideline rather than an artifact. `connectors/README.md` carries it, including the two things that surprise people: `backoffLimit: 0`, because a freeze is not a transient error, and the fact that Argo retries the sync on its own schedule. Reopen if a maintained, tested manifest is wanted rather than a documented one.
+
+The original plan below is kept for the reasoning it carries, not as work to do.
+
 
 A PreSync hook manifest at `connectors/argocd/`, running the `FZ-091` image.
 
@@ -1189,17 +1203,37 @@ Acceptance:
 - The API key comes from a Kubernetes `Secret`, never from the manifest.
 - **The documentation states that Argo will retry the failed sync on its own schedule**, so repeated failures during a freeze are expected and are not an incident. Nobody should learn this from an alert at 3am.
 
-### FZ-097 — Connector Publication
-**Status:** TODO · **Resolves:** `OI-13`
+### FZ-097 — Integration Guidelines
+**Status:** DONE · **Resolves the usable half of** `OI-13`
 
-Tag `v1`, publish the image to GHCR, list the action on GitHub Marketplace, and register the GitLab CI/CD Catalog project.
+Taken out of order, ahead of `FZ-094` and `FZ-095`, because two connectors existed and **neither could be installed by anyone**.
 
-Marketplace requires `action.yml` at the root of its own repository and the Catalog requires a dedicated catalog project, so this is a packaging and release step rather than a rewrite. It is also the commercial half: a Marketplace listing is an inbound channel, and a path inside a monorepo is not.
+The approach changed during this story, and the change came from asking what customers actually run. Most CI systems run containers, so **the image is the connector** and one published artifact covers nearly the whole market (`D-26`). What was nearly built instead — a second public repository, an assemble step, a cross-repo token and a force-pushed release — was machinery to maintain before there is a customer, bought with about two lines of YAML per pipeline.
+
+`connectors/README.md` is now the integration guide: GitHub Actions, GitLab CI, Jenkins, Argo CD, and a generic form for everything else. Each is the same program with the same environment variables, which is the point.
+
+**`connectors/` was restructured** so `action.yml` and `freeze-check.sh` are siblings — done for a publishing layout that is no longer needed, kept because the action's script path is now identical wherever it runs.
 
 Acceptance:
 
-- `v1` is tagged, and the release process for moving it is written down.
-- The compatibility promise in `12-connectors.md` §5 is stated where a consumer will read it, not only in the repository.
+- A guideline per CI system, each one runnable, each naming what it deliberately does not do.
+- Argo CD's guideline states that **Argo retries a failed sync on its own schedule**, so repeated failures during a freeze are expected and are not an incident. Nobody should learn that from an alert at 3am.
+- The Jenkins guideline uses `withCredentials`, never a pipeline literal, so the key stays out of the build log.
+- The reference implementations stay tested, and the documentation **does not offer them as installable** — they are not, while the repository is private.
+
+### FZ-099 — Publish the Connector Image
+**Status:** TODO · **Owner of** `OI-13` · **Deliberately last**
+
+`.github/workflows/publish-connectors.yml` builds `linux/amd64` and `linux/arm64`, runs the connector tests first, tags the exact version and moves `v1`, and has a dry-run mode. It refuses a version that is not `vN.N.N`, and there is no `latest` tag — a moving `latest` in a deploy gate is how a pipeline changes behaviour on a day nobody touched it.
+
+**Not executed, and cannot be.** Two prerequisites, both human decisions rather than a workflow's to make:
+
+1. A GitHub organization **`freezehubio`**. The image is named for it because a personal username in a customer's deploy pipeline undercuts a product sold to companies — and renaming later breaks every pipeline using it.
+2. A secret **`CONNECTOR_PUBLISH_TOKEN`** with `packages: write` on that organization. `GITHUB_TOKEN` cannot write to another owner's package namespace.
+
+Then one thing that is easy to miss: **GHCR package visibility is set on the package, not inherited from the repository.** It must be set to public after the first push or customers get `denied` on pull. That property is also what lets a public image ship from a private source tree at all.
+
+Until this runs, every guideline in `connectors/README.md` names an image that does not exist, and the README says so.
 
 ### FZ-096 — GitHub App and Required Checks
 **Status:** DEFERRED · **Decision required before scheduling**

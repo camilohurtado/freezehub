@@ -148,7 +148,7 @@ jobs:
           echo "STUB_URL=http://127.0.0.1:$(cat "$RUNNER_TEMP/stub/port")" >> "$GITHUB_ENV"
 
       - name: An allowed deployment passes
-        uses: ./connectors/github-action
+        uses: ./connectors
         with:
           url: ${{ env.STUB_URL }}
           api-key: fzh_test
@@ -161,7 +161,7 @@ jobs:
       - name: A blocked deployment fails
         id: blocked
         continue-on-error: true
-        uses: ./connectors/github-action
+        uses: ./connectors
         with:
           url: ${{ env.STUB_URL }}
           api-key: fzh_test
@@ -177,7 +177,7 @@ jobs:
       - name: A rejected credential fails even when asked to fail open
         id: rejected
         continue-on-error: true
-        uses: ./connectors/github-action
+        uses: ./connectors
         with:
           url: ${{ env.STUB_URL }}
           api-key: fzh_revoked
