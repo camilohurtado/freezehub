@@ -115,6 +115,11 @@ jobs:
       - name: Test the deployment gate
         run: node connectors/test/run-tests.js
 
+      # An input declared but never wired reaches the customer as a setting that
+      # silently does nothing. Structural, so it runs on a laptop too.
+      - name: Check the GitHub Action
+        run: node connectors/test/check-action.js
+
       - name: Build the connector image
         run: docker build -t freeze-check:test connectors/
 
@@ -123,3 +128,65 @@ jobs:
       # network, so it behaves the same here as on a laptop.
       - name: Smoke-test the connector image
         run: sh connectors/test/image-smoke.sh freeze-check:test
+
+  # The GitHub Action, actually executed. check-action.js covers its shape on a laptop;
+  # only a runner can prove the composite step resolves the script and that a blocked
+  # deployment fails the job — which is the entire purpose of the thing.
+  github-action:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start a stub Policy API
+        run: |
+          mkdir -p "$RUNNER_TEMP/stub"
+          printf '%s' '{"status":200,"body":{"decision":"ALLOW","message":"No restriction is in force.","restrictions":[],"unregistered":[]}}' > "$RUNNER_TEMP/stub/response.json"
+          node connectors/test/stub-server.js "$RUNNER_TEMP/stub" &
+          for _ in $(seq 1 100); do [ -f "$RUNNER_TEMP/stub/port" ] && break; sleep 0.1; done
+          test -f "$RUNNER_TEMP/stub/port" || { echo "the stub server did not start" >&2; exit 1; }
+          echo "STUB_URL=http://127.0.0.1:$(cat "$RUNNER_TEMP/stub/port")" >> "$GITHUB_ENV"
+
+      - name: An allowed deployment passes
+        uses: ./connectors/github-action
+        with:
+          url: ${{ env.STUB_URL }}
+          api-key: fzh_test
+          application: payments-api
+          environment: production
+
+      - name: Freeze the stub
+        run: printf '%s' '{"status":200,"body":{"decision":"BLOCK","message":"A hard freeze is in force.","restrictions":[{"name":"Black Friday Freeze","level":"HARD_FREEZE","reason":"Revenue-critical period","endsAt":"2026-12-02T00:00:00Z"}],"unregistered":[]}}' > "$RUNNER_TEMP/stub/response.json"
+
+      - name: A blocked deployment fails
+        id: blocked
+        continue-on-error: true
+        uses: ./connectors/github-action
+        with:
+          url: ${{ env.STUB_URL }}
+          api-key: fzh_test
+          application: payments-api
+          environment: production
+
+      - name: Reject the stub credential
+        run: printf '%s' '{"status":401,"body":{"title":"Unauthorized"}}' > "$RUNNER_TEMP/stub/response.json"
+
+      # The one that would be invisible if it broke: on-error=allow covers a FreezeHub
+      # outage, never a rejected key. If it did, revoking a key would switch the gate
+      # off for every workflow still using it, and every one of them would go green.
+      - name: A rejected credential fails even when asked to fail open
+        id: rejected
+        continue-on-error: true
+        uses: ./connectors/github-action
+        with:
+          url: ${{ env.STUB_URL }}
+          api-key: fzh_revoked
+          application: payments-api
+          environment: production
+          on-error: allow
+
+      - name: Both refusals must have failed the step
+        run: |
+          status=0
+          [ "${{ steps.blocked.outcome }}" = "failure" ] || { echo "a BLOCK decision did not fail the step" >&2; status=1; }
+          [ "${{ steps.rejected.outcome }}" = "failure" ] || { echo "a rejected credential did not fail the step" >&2; status=1; }
+          exit $status
