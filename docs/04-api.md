@@ -262,7 +262,7 @@ Still open: whether these evaluations should be **recorded**, so a repeated bypa
 
 **If FreezeHub is unreachable, the pipeline decides — not FreezeHub.** Nothing in this API can express "I could not be asked". A pipeline that treats an error as `ALLOW` fails open and will deploy through an outage during a freeze; one that treats it as `BLOCK` fails closed and will halt all deployments if FreezeHub is down. Choose deliberately and state the choice in the pipeline, rather than inheriting whatever the HTTP client does by default.
 
-[`examples/freeze-check.sh`](../examples/freeze-check.sh) is a worked example (`FZ-053`). Note what it does **not** leave to that setting: an `HTTP 401` fails the pipeline regardless, because otherwise revoking a key would silently disable the gate for everyone still using it.
+[`connectors/freeze-check.sh`](../connectors/freeze-check.sh) is the gate customers run (`FZ-053`, moved to `connectors/` by `FZ-091`). Note what it does **not** leave to that setting: an `HTTP 401` fails the pipeline regardless, because otherwise revoking a key would silently disable the gate for everyone still using it.
 
 ## Not in this contract
 

@@ -681,6 +681,8 @@ Implement secure organization-owned machine credentials according to `06-securit
 
 `examples/` holds a worked deployment gate: `freeze-check.sh` (POSIX shell, `curl` + `jq`) and `gitlab-ci.yml` wiring it into a pipeline. No native plugin, per the story.
 
+**Moved by `FZ-091`:** the script now lives at `connectors/freeze-check.sh` — it stopped being an example the moment connectors started wrapping it. `examples/` keeps the hand-rolled walkthrough for CI systems with no connector.
+
 **The logic lives in a script, not in pipeline YAML.** It is then identical on every CI system, runnable on a laptop while debugging, and readable by whoever is looking at it during an actual freeze. `gitlab-ci.yml` is wiring; the README carries a six-line GitHub Actions equivalent calling the same script rather than a second copy of the logic.
 
 **It answers the question `04-api.md` deliberately left to the client** — what FreezeHub's silence means. `FREEZEHUB_ON_ERROR` is `block` by default, because a gate that opens when it breaks is not a gate, and the trade-off is stated in the script itself rather than buried in prose.
@@ -1117,7 +1119,7 @@ Specification only, no code: `docs/12-connectors.md`, plus `D-24`.
 Four connectors were chosen and one was deliberately not. The rule that shapes all of them: **one implementation, four wrappers.** A customer running GitLab in one team and Jenkins in another must get the same answer from the same freeze, and four native implementations would drift until one team deployed during a freeze that stopped another.
 
 ### FZ-091 — Connector Runtime and Image
-**Status:** TODO
+**Status:** DONE
 
 The foundation the other four sit on.
 

@@ -96,15 +96,30 @@ jobs:
           terraform init -backend=false -input=false
           terraform validate
 
-  examples:
+  connectors:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      # The deployment gate customers copy. A syntax error here breaks their pipeline,
-      # not ours, so it is worth a job of its own however small.
+      # The deployment gate customers run. A change here changes what every one of their
+      # pipelines does, so this job checks behaviour and not only that the file parses.
       - name: Check the deployment gate parses
-        run: sh -n examples/freeze-check.sh
+        run: sh -n connectors/freeze-check.sh
 
       - name: Check it is executable
-        run: test -x examples/freeze-check.sh
+        run: test -x connectors/freeze-check.sh
+
+      # Most of what this asserts is the set of rules that must not fail open: a missing
+      # variable, a rejected credential, an unrecognised decision. Each is one branch away
+      # from a pipeline that deploys during a freeze and reports success.
+      - name: Test the deployment gate
+        run: node connectors/test/run-tests.js
+
+      - name: Build the connector image
+        run: docker build -t freeze-check:test connectors/
+
+      # Only what packaging can break: that busybox ash runs the script, that the exit
+      # code survives the container boundary, and that it is not root. It needs no
+      # network, so it behaves the same here as on a laptop.
+      - name: Smoke-test the connector image
+        run: sh connectors/test/image-smoke.sh freeze-check:test

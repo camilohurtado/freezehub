@@ -196,6 +196,22 @@ npm run lint      # oxlint
 npm run test      # vitest run
 ```
 
+### Connectors (`connectors/`)
+
+Requires Node 20+ (the test harness), `curl`, `jq`, and Docker for the image checks.
+
+`connectors/freeze-check.sh` is the one implementation every connector wraps (`D-24`).
+Change behaviour there, not in a connector.
+
+```bash
+# behaviour — drives the script against a stub Policy API
+node connectors/test/run-tests.js
+
+# the same rules, as a container
+docker build -t freeze-check:test connectors/
+sh connectors/test/image-smoke.sh freeze-check:test
+```
+
 ### Infrastructure (`infra/`)
 
 Requires Terraform >= 1.6 and AWS credentials. See `infra/README.md` for the full runbook
