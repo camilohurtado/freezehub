@@ -64,6 +64,7 @@ It is a commercial gap as much as a technical one. A Marketplace listing is an i
 
 | Issue | Found in | Resolved by |
 |---|---|---|
+| **The audit trail recorded changes that never happened** — a no-op update compared the client's nanosecond timestamps against the microsecond values PostgreSQL had already truncated them to, and wrote an entry whose `to` value was never persisted | first CI run, `FZ-092` | `FZ-098` — decided (`D-25`): instants are normalised to storable precision at the boundary |
 | Deleting a catalog entry referenced by a restriction returned `500` instead of `409` | `FZ-020` | `FZ-036` |
 | Deliberate rejection reasons never reached clients — Spring omits `message` from its error body, so every `ResponseStatusException` reason in the API arrived as a bare status code | `FZ-036` | `FZ-036` |
 | No API or UI configured notification destinations | `FZ-040` | `FZ-045` |
