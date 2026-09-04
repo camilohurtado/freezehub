@@ -271,6 +271,67 @@ check('the action passes its inputs through rather than defaulting them',
     JSON.parse(firstRequest().raw).application === 'checkout-web', firstRequest().raw);
 
 
+// --- the GitLab component, executed --------------------------------------------------
+//
+// Same idea as the action above: run what the job runs, with the environment read out of
+// template.yml rather than restated, so the two cannot drift. A typo in a variable name
+// here would not be loud — FREEZEHUB_TIMEOUT misspelled just silently reverts to 10
+// seconds, and FREEZEHUB_ON_ERROR misspelled silently reverts to blocking.
+
+const [gitlabSpec, gitlabJobs] = JSON.parse(execFileSync('ruby', [
+    '-ryaml', '-rjson', '-e', 'puts YAML.load_stream(File.read(ARGV[0])).to_json',
+    path.join(__dirname, '..', 'gitlab', 'template.yml'),
+], { encoding: 'utf8' }));
+
+const gitlabJob = gitlabJobs[Object.keys(gitlabJobs)[0]];
+
+function runGitlabJob(inputs, extraEnv = {}) {
+    const env = { PATH: process.env.PATH, ...extraEnv };
+    for (const [name, expression] of Object.entries(gitlabJob.variables)) {
+        const input = String(expression).match(/inputs\.([a-z-]+)/)[1];
+        const supplied = inputs[input];
+        env[name] = String(supplied !== undefined ? supplied : (gitlabSpec.spec.inputs[input].default ?? ''));
+    }
+    // The job's script line, run the way GitLab Runner runs it: its own shell, with the
+    // image's entrypoint overridden. Locally that is the script by path; the container
+    // form of the same thing is covered by image-smoke.sh.
+    const result = spawnSync('sh', [SCRIPT], { env, encoding: 'utf8' });
+    return { code: result.status, stdout: result.stdout || '', stderr: result.stderr || '' };
+}
+
+const gitlabInputs = { url, application: 'payments-api', environment: 'production', timeout: '5' };
+const apiKey = { FREEZEHUB_API_KEY: 'fzh_test' };
+
+respondWith(200, ALLOW);
+outcome = runGitlabJob(gitlabInputs, apiKey);
+check('the GitLab job succeeds on ALLOW', outcome.code === 0,
+    `exit ${outcome.code}: ${outcome.stderr.trim()}`);
+
+respondWith(200, BLOCK);
+outcome = runGitlabJob(gitlabInputs, apiKey);
+check('the GitLab job fails on BLOCK', outcome.code === 1,
+    `exit ${outcome.code}: ${outcome.stderr.trim()}`);
+
+// The component deliberately has no api-key input, because a component input becomes
+// part of the pipeline's configuration. It has to come from a CI/CD variable instead —
+// so the job must fail clearly when nobody set one, rather than deploying.
+outcome = runGitlabJob(gitlabInputs);
+check('the GitLab job fails when FREEZEHUB_API_KEY is not set', outcome.code === 2,
+    `exit ${outcome.code}: ${outcome.stderr.trim()}`);
+check('and says which variable is missing',
+    outcome.stderr.includes('FREEZEHUB_API_KEY'), outcome.stderr.trim());
+
+respondWith(401, { title: 'Unauthorized' });
+outcome = runGitlabJob({ ...gitlabInputs, 'on-error': 'allow' }, apiKey);
+check('the GitLab job fails on a rejected credential even with on-error: allow', outcome.code === 2,
+    `exit ${outcome.code}: ${outcome.stderr.trim()}`);
+
+respondWith(200, ALLOW);
+forgetRequests();
+runGitlabJob({ ...gitlabInputs, application: 'billing-worker' }, apiKey);
+check('the GitLab job passes its inputs through rather than defaulting them',
+    JSON.parse(firstRequest().raw).application === 'billing-worker', firstRequest().raw);
+
 stub.kill();
 fs.rmSync(workDir, { recursive: true, force: true });
 

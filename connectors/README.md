@@ -7,6 +7,7 @@ What a customer installs into their pipeline so they do not have to vendor a scr
 | [`freeze-check.sh`](./freeze-check.sh) | **the one implementation** — POSIX shell, `curl` + `jq` |
 | [`Dockerfile`](./Dockerfile) | `ghcr.io/freezehub/freeze-check` — the script, packaged |
 | [`github-action/`](./github-action) | the GitHub Action (`FZ-092`) |
+| [`gitlab/`](./gitlab) | the GitLab CI/CD component (`FZ-093`) |
 | [`test/`](./test) | what proves all of the above still fail closed |
 
 ## One implementation
@@ -69,6 +70,35 @@ rather than stop, make it `ADVISORY` — the gate exits `0` and prints it.
 `on-error` covers a FreezeHub outage and nothing else. A missing input or a rejected API
 key fails the step whatever it is set to.
 
+## GitLab CI
+
+```yaml
+include:
+  - component: gitlab.com/freezehub/freezehub/freeze-check@v1
+    inputs:
+      url: https://freezehub.example.com
+      application: payments-api
+      environment: production
+
+deploy:production:
+  needs: ["freeze-check"]
+  script:
+    - ./deploy.sh
+```
+
+Set **`FREEZEHUB_API_KEY`** in Settings → CI/CD → Variables, Masked and Protected.
+
+There is deliberately **no `api-key` input**. Component inputs are interpolated when the
+pipeline is created and become part of its configuration, so a key passed as an input is a
+key written into the pipeline. It comes from a CI/CD variable or the job fails.
+
+`needs:` is what enforces the gate: a failed check fails the pipeline before the deploy
+job is created. Do not add `allow_failure: true` to the check — it turns every freeze into
+a warning.
+
+By default the job runs on the branch that deploys. Asking on every feature branch would
+fail merge-request pipelines during a freeze, which is not the point.
+
 ## Configuration
 
 Environment variables, the same everywhere. `examples/README.md` has the full table and the reasoning.
@@ -88,21 +118,21 @@ Environment variables, the same everywhere. `examples/README.md` has the full ta
 
 ```bash
 node connectors/test/run-tests.js              # behaviour — the script and the action
-node connectors/test/check-action.js           # the action's shape
+node connectors/test/check-connectors.js       # the connectors' shape
 docker build -t freeze-check:test connectors/
 sh connectors/test/image-smoke.sh              # the same rules, as a container
 ```
 
 `run-tests.js` drives the script against a stub Policy API in its own process, and most of what it asserts is the set of rules that must **not** fail open. Those are each one `case` branch away from turning a freeze into a warning for every customer at once, and the failure is silent: the pipeline deploys and reports success.
 
-`run-tests.js` also executes the GitHub Action — the exact command its composite step runs, with the environment built from `action.yml` rather than restated, so the two cannot drift. That makes the action verifiable without a runner; the workflow in `verify.yml` is still what proves GitHub itself wires it up.
+`run-tests.js` also executes the GitHub Action and the GitLab job — the exact command each runs, with the environment built by reading `action.yml` and `template.yml` rather than restated, so the two cannot drift. That makes both verifiable without a runner; the workflow in `verify.yml` is still what proves GitHub itself wires the action up.
 
-`check-action.js` is structural: an input declared but never wired reaches a customer as a setting that silently does nothing, and it also enforces the rule that no input may turn a blocked check into a passing one.
+`check-connectors.js` is structural: an input declared but never wired reaches a customer as a setting that silently does nothing. It also enforces the two rules that matter — no input may turn a blocked check into a passing one, and the GitLab component may not take the API key as an input.
 
-`image-smoke.sh` covers only what packaging can break — that busybox `ash` runs the script, that the exit code survives the container boundary, and that it is not root. It needs no network, deliberately, so it behaves the same on a laptop and on a CI runner.
+`image-smoke.sh` covers only what packaging can break — that busybox `ash` runs the script, that the exit code survives the container boundary, that the gate is reachable on `PATH` when the entrypoint is overridden the way GitLab Runner overrides it, and that it is not root. It needs no network, deliberately, so it behaves the same on a laptop and on a CI runner.
 
 ## Coming
 
-The remaining connectors are the rest of Milestone 9 in `docs/08-backlog.md`: GitLab CI (`FZ-093`), Jenkins (`FZ-094`), Argo CD (`FZ-095`).
+The remaining connectors are the rest of Milestone 9 in `docs/08-backlog.md`: Jenkins (`FZ-094`) and Argo CD (`FZ-095`).
 
 Until they land, `examples/` shows how to wire the script by hand — which is also the answer for any CI system that never gets a connector.
