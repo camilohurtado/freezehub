@@ -16,3 +16,9 @@ freezehub:
   # tested directly against an explicit clock.
   subscriptions:
     enabled: false
+  # Off for the suite: MockMvc reports every request as coming from 127.0.0.1, so tests
+  # sharing a run would share one counter and start refusing each other. The limiter is
+  # exercised directly in RateLimiterTest and end to end in RateLimitTest, which turns it
+  # back on with a low limit of its own.
+  rate-limit:
+    enabled: false

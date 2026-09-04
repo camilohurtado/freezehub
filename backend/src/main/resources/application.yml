@@ -10,6 +10,22 @@ spring:
   jpa:
     open-in-view: false
 
+# Deployed behind an Application Load Balancer (FZ-063), which terminates the client
+# connection and appends the real address to X-Forwarded-For. Without this every request
+# looks like it came from the load balancer, which would put every customer in one bucket
+# for the per-IP rate limiter (FZ-087) and refuse them all together.
+#
+# Trusting a forwarded header is only safe because nothing reaches these tasks except
+# through that load balancer - they sit in private subnets with no other ingress.
+#
+# The local profile turns it back OFF, explicitly. Leaving it unset there is not enough:
+# a profile document merges with this one rather than replacing it, so this value would
+# apply locally too and X-Forwarded-For would be trusted with no proxy in front - letting
+# any caller choose their own rate-limit bucket, or fill somebody else's. Found by a test,
+# not by reading.
+server:
+  forward-headers-strategy: framework
+
 freezehub:
   cors:
     # Empty by default: a deployed environment must name its frontend origin explicitly
@@ -81,6 +97,9 @@ spring:
 # Override with SERVER_PORT if 8099 is taken too.
 server:
   port: ${SERVER_PORT:8099}
+  # No proxy in front locally, so nothing may claim to be one. Explicit rather than
+  # omitted: profile documents merge, so the deployed value above would otherwise apply.
+  forward-headers-strategy: none
 
 freezehub:
   cors:

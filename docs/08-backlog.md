@@ -1012,7 +1012,7 @@ Acceptance:
 Notifications are suppressed at **enqueue**, not at delivery. Skipping them later would leave rows `PENDING` for ever and flood the customer with stale announcements the moment they pay — "starting soon" about a freeze that ended three weeks ago.
 
 ### FZ-087 — Request Rate Limiting
-**Status:** TODO · **Resolves:** `OI-11`
+**Status:** DONE · **Resolves:** `OI-11`
 
 There is no rate limiting anywhere in the codebase. Today that is defensible: `/actuator/health` is the only endpoint reachable without a credential. `FZ-082` and `FZ-083` end that, and an unauthenticated endpoint that creates a Cognito user and sends an email is not something to expose without a limit.
 
@@ -1024,6 +1024,16 @@ Acceptance:
 - Exceeding the limit returns `429` as Problem Details, with `Retry-After`.
 - The limit is configuration, not a constant.
 - Authenticated endpoints are unaffected.
+
+**The part the entry missed entirely: who "one client" is.**
+
+Nothing in the codebase configured forwarded headers. Behind the load balancer (`FZ-063`) that means `getRemoteAddr()` returns the balancer, so a per-IP limiter would put every customer in one bucket and refuse them all together — a limiter that is worse than none.
+
+Setting `server.forward-headers-strategy: framework` fixes that, and introduces the opposite hazard: anywhere without a trusted proxy in front, a caller can send their own `X-Forwarded-For` and choose their bucket, or fill somebody else's.
+
+**A YAML detail made that live in local development too.** A profile document *merges* with the default one rather than replacing it, so the deployed value applied under `local` as well. The local profile now sets `none` explicitly. This was found by a test failing, not by reading the file — and both halves are now covered: reading the header in the interceptor, and dropping the `none`, each fail the same test.
+
+The interceptor uses `getRemoteAddr()` and never reads the header itself. That looks like an oversight and is the whole defence.
 
 ### FZ-082 — Self-Serve Signup
 **Status:** TODO · **Blocked by:** `FZ-046` (`OI-2`)
