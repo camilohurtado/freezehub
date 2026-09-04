@@ -1,5 +1,7 @@
 # CI/CD integration
 
+**There are connectors now** — GitHub Actions and GitLab CI, in `connectors/`. Use those unless you have a reason not to. What follows is how to wire the gate by hand, which is still the answer for any CI system without a connector.
+
 A worked example of gating a deployment on FreezeHub's Policy API (`FZ-053`).
 
 | File | What it is |

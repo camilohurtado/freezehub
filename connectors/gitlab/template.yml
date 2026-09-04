@@ -1,0 +1,77 @@
+# FreezeHub's deployment gate as a GitLab CI/CD component (FZ-093).
+#
+#   include:
+#     - component: gitlab.com/freezehub/freezehub/freeze-check@v1
+#       inputs:
+#         url: https://freezehub.example.com
+#         application: payments-api
+#         environment: production
+#
+#   deploy:production:
+#     needs: ["freeze-check"]
+#     script: [...]
+#
+# Runs the connector image, so no pipeline installs curl and jq on every run.
+#
+# It wraps connectors/freeze-check.sh and adds nothing — a customer running GitLab in one
+# team and GitHub Actions in another must get the same answer from the same freeze (D-24).
+
+spec:
+  inputs:
+    url:
+      description: Your FreezeHub base URL, for example https://freezehub.example.com
+    application:
+      description: The application name, exactly as registered in FreezeHub — including case.
+    environment:
+      description: The environment name, exactly as registered in FreezeHub — including case.
+    stage:
+      default: freeze-check
+      description: The stage the check runs in. It must come before the stage that deploys.
+    job-name:
+      default: freeze-check
+      description: The job name, so a pipeline can gate more than one application.
+    on-error:
+      default: block
+      options: [block, allow]
+      description: >-
+        What FreezeHub's silence means. "block" refuses to deploy when FreezeHub cannot be
+        reached; "allow" deploys anyway. It does NOT cover a missing input or a rejected
+        API key — both fail the job regardless.
+      # `options` so GitLab rejects a typo when the pipeline is created rather than
+      # letting the script find it at deploy time. "allow" spelled wrong would otherwise
+      # silently become "block", which is at least the safe direction — but "block"
+      # spelled wrong is caught here too, and that one is not.
+    timeout:
+      default: '10'
+      description: Seconds to wait for FreezeHub before giving up.
+    image:
+      default: ghcr.io/freezehub/freeze-check:v1
+      description: Override only to pin a digest or to use a mirror.
+
+# There is deliberately no `api-key` input. Component inputs are interpolated when the
+# pipeline is created and become part of its configuration, so a key passed as an input
+# is a key written into the pipeline. It comes from the FREEZEHUB_API_KEY CI/CD variable
+# instead — set it Masked and Protected in Settings -> CI/CD -> Variables.
+#
+# There is also no input that downgrades a freeze to a warning. `allow_failure: true`
+# already exists in GitLab, so a customer who wants that can have it in their own file
+# where a reviewer sees it — rather than as a setting here that gets turned on during one
+# incident and never turned off.
+
+---
+
+"$[[ inputs.job-name ]]":
+  stage: $[[ inputs.stage ]]
+  image: $[[ inputs.image ]]
+  # GitLab Runner overrides the image's ENTRYPOINT and runs its own shell, which is why
+  # the gate is on PATH rather than only being the entrypoint.
+  script:
+    - freeze-check
+  variables:
+    FREEZEHUB_URL: $[[ inputs.url ]]
+    FREEZEHUB_APPLICATION: $[[ inputs.application ]]
+    FREEZEHUB_ENVIRONMENT: $[[ inputs.environment ]]
+    FREEZEHUB_ON_ERROR: $[[ inputs.on-error ]]
+    FREEZEHUB_TIMEOUT: $[[ inputs.timeout ]]
+    # FREEZEHUB_API_KEY is not set here on purpose — see above. The script fails the job
+    # with a clear message if the variable is missing.

@@ -1151,7 +1151,7 @@ Acceptance:
 - Exercised by a workflow in `.github/workflows/` that runs the action against a stubbed endpoint — the action must be proven to fail, not only to pass.
 
 ### FZ-093 — GitLab CI Connector
-**Status:** TODO
+**Status:** DONE
 
 An includable component at `connectors/gitlab/`, running the `FZ-091` image so no pipeline installs `curl` and `jq` on every run.
 

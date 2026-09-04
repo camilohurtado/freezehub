@@ -56,6 +56,15 @@ expect 2 "a missing variable exits 2 even when asked to fail open" \
         -e FREEZEHUB_ENVIRONMENT=production \
         -e FREEZEHUB_ON_ERROR=allow "$IMAGE"
 
+# GitLab Runner overrides the image's ENTRYPOINT and runs its own shell, then calls the
+# job's script. That is why the gate is on PATH and not only the entrypoint — and why the
+# GitLab component would break, in a way no other connector would, if it stopped being.
+expect 2 "the gate is on PATH when the entrypoint is overridden, as GitLab runs it" \
+    docker run --rm --entrypoint sh \
+        -e FREEZEHUB_URL="$UNREACHABLE" -e FREEZEHUB_API_KEY=fzh_test \
+        -e FREEZEHUB_APPLICATION=payments-api -e FREEZEHUB_ENVIRONMENT=production \
+        -e FREEZEHUB_TIMEOUT=3 "$IMAGE" -c 'freeze-check'
+
 # It reads environment variables and makes one HTTP call. Root would be a way to make a
 # compromised runner's blast radius larger for no gain.
 user=$(docker run --rm --entrypoint id "$IMAGE" -un)
