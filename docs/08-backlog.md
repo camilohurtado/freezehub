@@ -1209,3 +1209,31 @@ A GitHub App that posts a commit status, so branch protection can make FreezeHub
 Deferred deliberately, not for effort. It **inverts the trust direction**: FreezeHub would hold an installation token that can write to the customer's repository metadata, ingest their webhooks, and appear in their audit log. Every sentence in `10-demo.md` about having no credentials into their repositories and no blast radius stops being true, and the answer to the first question a security review asks changes.
 
 That trade may well be worth making — it is the natural Scale/Enterprise differentiator, and `11-commercial.md` has nowhere else to put an upsell of that weight. It is not something to arrive at as a side effect of "we added GitHub support", which is why it is a separate decision with its own security review rather than a task inside `FZ-092`.
+
+## Milestone 10 — Defects Found After Milestone 9
+
+### FZ-098 — Timestamp Precision in the Audit Trail
+**Status:** DONE · **Found by:** the first CI run, `FZ-092`
+
+`AuditTrailTest.recordsNothingWhenAnUpdateChangedNothing` failed on Linux and passed on macOS. The cause was not the test.
+
+PostgreSQL `TIMESTAMPTZ` stores **microseconds**. `Instant` carries **nanoseconds**, and on Linux `Instant.now()` actually populates them. A client sending `2026-09-06T07:03:40.000000123Z` therefore has its value silently truncated on the way to the database — and on the next update, the incoming nanosecond value is compared against the stored microsecond one, they differ, and an audit event is written saying the freeze window moved:
+
+```json
+{"startsAt":{"from":"2026-09-06T07:03:40Z","to":"2026-09-06T07:03:40.000000123Z"}}
+```
+
+Three things wrong with that entry, in increasing order of seriousness:
+
+1. Nothing changed. The client sent back exactly what it sent before.
+2. It appears on **every** update, so genuine changes arrive buried in noise.
+3. **The `to` value was never persisted.** The database truncates it straight back to `from`. The audit trail — whose entire purpose is answering "who changed this freeze, and to what" — records an after-state that never existed.
+
+The fix truncates user-supplied instants to microseconds as they enter the aggregate, so the entity's state is always what the database will hold and a comparison between them is meaningful (`D-25`).
+
+Acceptance:
+
+- A no-op update with nanosecond-precision timestamps records nothing.
+- A real change to the window is still recorded, with both values at storable precision.
+- The API returns what was stored, so a client that sends nanoseconds is told plainly what it got.
+- The macOS/Linux split is gone: the regression test supplies nanoseconds explicitly rather than depending on the host clock's precision.

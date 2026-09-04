@@ -23,6 +23,7 @@ import com.freezhub.restriction.RestrictionLifecycleService;
 import com.freezhub.shared.security.TestTokens;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -192,6 +193,70 @@ class AuditTrailTest {
                 .andExpect(status().isOk());
 
         assertThat(trail()).hasSize(before);
+    }
+
+    @Test
+    void recordsNothingWhenTimestampsCarryMorePrecisionThanTheDatabaseKeeps() throws Exception {
+        // The defect FZ-098 fixed, pinned so it cannot come back. PostgreSQL TIMESTAMPTZ
+        // stores microseconds and Instant carries nanoseconds, so a client sending
+        // ...T07:03:40.000000123Z had it truncated on the way in - and the next update
+        // compared its own nanoseconds against the stored microseconds, found a
+        // difference, and recorded a freeze window that was never persisted.
+        //
+        // The nanoseconds are supplied explicitly rather than taken from Instant.now(),
+        // which is what made this pass on macOS and fail on Linux: the two clocks do not
+        // agree about how much precision they hand out.
+        Instant precise = Instant.now().plus(Duration.ofDays(2))
+                .truncatedTo(ChronoUnit.SECONDS).plusNanos(123);
+        String body = "{\"name\":\"Precision\",\"reason\":\"Revenue-critical period\","
+                + "\"level\":\"HARD_FREEZE\",\"startsAt\":\"" + precise + "\",\"endsAt\":\""
+                + precise.plus(Duration.ofDays(1)) + "\",\"scope\":{\"environmentIds\":["
+                + environmentId + "]}}";
+
+        String created = mockMvc.perform(post("/api/restrictions")
+                        .header("Authorization", auth())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        long id = objectMapper.readTree(created).get("id").asLong();
+
+        // The API reports what was stored, so the client is told plainly what it got
+        // rather than being echoed a value the database will not keep.
+        assertThat(objectMapper.readTree(created).get("startsAt").asText())
+                .isEqualTo(precise.truncatedTo(ChronoUnit.MICROS).toString());
+
+        int before = trail().size();
+
+        mockMvc.perform(put("/api/restrictions/" + id)
+                        .header("Authorization", auth())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk());
+
+        assertThat(trail()).hasSize(before);
+    }
+
+    @Test
+    void stillRecordsARealChangeToTheWindow() throws Exception {
+        // The other half: truncation must not make the diff blind. A move of a whole day
+        // is still a change, and both values are reported at storable precision.
+        long id = createRestriction();
+        Instant moved = startsAt.plus(Duration.ofDays(3));
+
+        mockMvc.perform(put("/api/restrictions/" + id)
+                        .header("Authorization", auth())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\":\"Black Friday Freeze\",\"reason\":\"Revenue-critical period\","
+                                + "\"level\":\"HARD_FREEZE\",\"startsAt\":\"" + moved + "\",\"endsAt\":\""
+                                + moved.plus(Duration.ofDays(1)) + "\",\"scope\":{\"environmentIds\":["
+                                + environmentId + "]}}"))
+                .andExpect(status().isOk());
+
+        JsonNode details = objectMapper.readTree(trail().getLast().getDetails());
+        assertThat(details.has("startsAt")).isTrue();
+        assertThat(details.path("startsAt").path("to").asText())
+                .isEqualTo(moved.truncatedTo(ChronoUnit.MICROS).toString());
     }
 
     @Test

@@ -3,6 +3,7 @@ package com.freezhub.restriction;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Set;
 
 /**
@@ -42,6 +43,38 @@ public record RestrictionRequest(
         public Set<Long> environmentIds() {
             return environmentIds == null ? Set.of() : environmentIds;
         }
+    }
+
+    /**
+     * The window, rounded down to what the database can hold (FZ-098).
+     *
+     * <p>PostgreSQL {@code TIMESTAMPTZ} stores microseconds; {@link Instant} carries
+     * nanoseconds, and on Linux {@code Instant.now()} populates them. Normalised here,
+     * at the edge where external precision enters, so that everything downstream agrees:
+     * validation, the before/after comparison that writes the audit trail, the aggregate,
+     * and the response.
+     *
+     * <p>Without it, {@code update} compared the stored value against the raw request and
+     * found a difference on every no-op save - recording a freeze window that the database
+     * had already truncated away, in the trail meant to say what actually changed.
+     *
+     * <p>Truncating both ends can collapse a window shorter than a microsecond into a
+     * zero-length one, which then fails the {@code startsAt < endsAt} rule. That is the
+     * right answer: a window the database cannot represent as non-empty is not a window.
+     *
+     * <p>An accessor rather than a compact constructor, matching {@link #scope()} above,
+     * and so that {@code @NotNull} still sees a genuinely absent value as absent.
+     */
+    public Instant startsAt() {
+        return storable(startsAt);
+    }
+
+    public Instant endsAt() {
+        return storable(endsAt);
+    }
+
+    private static Instant storable(Instant instant) {
+        return instant == null ? null : instant.truncatedTo(ChronoUnit.MICROS);
     }
 
     public ScopeRequest scope() {

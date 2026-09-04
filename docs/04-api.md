@@ -78,6 +78,12 @@ A client must therefore not assume a body is present on failure. `type` is `abou
 
 Every instant in every request and response is **ISO-8601 UTC**. Time zone is a presentation concern and never travels over the API (`01-domain.md` invariants 9 and 10).
 
+**Precision is microseconds** (`FZ-098`). A request may send more — `Instant` carries nanoseconds and some clocks populate them — and it is rounded down on the way in, because that is what PostgreSQL `TIMESTAMPTZ` stores. The response then reports what was stored rather than echoing what was sent, so a client is told plainly what it got.
+
+This is not cosmetic. Before it, an update comparing a client's nanoseconds against the truncated stored value found a difference on every no-op save, and wrote an audit entry describing a freeze window the database had already discarded.
+
+One consequence worth naming: a window shorter than a microsecond collapses to zero length and is then rejected by `startsAt < endsAt` as a `400`. A window the database cannot represent as non-empty is not a window.
+
 ## Human API (summary)
 
 Authenticated with a JWT; all tenant-scoped.

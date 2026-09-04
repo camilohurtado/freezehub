@@ -15,6 +15,7 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.Set;
@@ -111,12 +112,30 @@ public class ChangeRestriction {
         this.type = RestrictionType.DEPLOYMENT_FREEZE;
         this.level = level;
         this.status = RestrictionStatus.SCHEDULED;
-        this.startsAt = startsAt;
-        this.endsAt = endsAt;
+        this.startsAt = storable(startsAt);
+        this.endsAt = storable(endsAt);
         this.createdBy = createdBy;
         this.teamIds = new LinkedHashSet<>(teamIds);
         this.applicationIds = new LinkedHashSet<>(applicationIds);
         this.environmentIds = new LinkedHashSet<>(environmentIds);
+    }
+
+    /**
+     * Rounds an incoming instant down to what the database can actually hold (FZ-098).
+     *
+     * <p>PostgreSQL {@code TIMESTAMPTZ} stores microseconds; {@link Instant} carries
+     * nanoseconds, and on Linux {@code Instant.now()} populates them. Without this, an
+     * update comparing a client's nanosecond value against the stored microsecond one
+     * finds a difference that is not a change, and the audit trail records a freeze
+     * window that was never persisted - the database truncates it straight back.
+     *
+     * <p>{@code RestrictionRequest} already normalises what arrives over HTTP, which is
+     * what fixes the audit diff. This is the aggregate keeping its own invariant: after
+     * construction or replacement its in-memory state is exactly what a reload would
+     * produce, for every caller, including ones that never went through a request.
+     */
+    private static Instant storable(Instant instant) {
+        return instant == null ? null : instant.truncatedTo(ChronoUnit.MICROS);
     }
 
     /**
@@ -135,8 +154,8 @@ public class ChangeRestriction {
         this.description = description;
         this.reason = reason;
         this.level = level;
-        this.startsAt = startsAt;
-        this.endsAt = endsAt;
+        this.startsAt = storable(startsAt);
+        this.endsAt = storable(endsAt);
 
         this.teamIds.clear();
         this.teamIds.addAll(teamIds);
