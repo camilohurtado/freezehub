@@ -89,7 +89,9 @@ The response says which name it did not recognise. The cost is that registering 
 
 ## GitHub Actions
 
-The script has nothing GitLab-specific in it:
+There is a connector for this now — `connectors/github-action`, see `connectors/README.md`. Use it unless you have a reason not to.
+
+The script itself has nothing GitLab-specific in it either, if you would rather run it directly:
 
 ```yaml
 - name: FreezeHub check

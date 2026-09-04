@@ -204,8 +204,11 @@ Requires Node 20+ (the test harness), `curl`, `jq`, and Docker for the image che
 Change behaviour there, not in a connector.
 
 ```bash
-# behaviour — drives the script against a stub Policy API
+# behaviour — drives the script, and the GitHub Action, against a stub Policy API
 node connectors/test/run-tests.js
+
+# the GitHub Action's shape: every input wired, nothing that downgrades a freeze
+node connectors/test/check-action.js
 
 # the same rules, as a container
 docker build -t freeze-check:test connectors/

@@ -1,0 +1,68 @@
+# FreezeHub's deployment gate as a GitHub Action (FZ-092).
+#
+# Composite rather than a Docker action: it runs on the runner's own curl and jq, so it
+# costs no image pull on the platform where most usage will be, and it works on a
+# self-hosted runner with no Docker daemon. The script checks for both and says so
+# plainly if either is missing.
+#
+# It wraps connectors/freeze-check.sh and adds nothing. That is the point — a customer
+# running GitHub Actions in one team and Jenkins in another must get the same answer
+# from the same freeze (D-24).
+
+name: FreezeHub check
+description: Ask FreezeHub whether this deployment may proceed, and fail the job if it may not.
+
+branding:
+  icon: pause-circle
+  color: blue
+
+inputs:
+  url:
+    description: Your FreezeHub base URL, for example https://freezehub.example.com
+    required: true
+  api-key:
+    description: A FreezeHub API key. Pass a secret; never a literal.
+    required: true
+  application:
+    description: The application name, exactly as registered in FreezeHub — including case.
+    required: true
+  environment:
+    description: The environment name, exactly as registered in FreezeHub — including case.
+    required: true
+  on-error:
+    description: >-
+      What FreezeHub's silence means: "block" (default) refuses to deploy when FreezeHub
+      cannot be reached, "allow" deploys anyway. It does NOT cover a missing input or a
+      rejected API key — both fail the step regardless, because otherwise revoking a key
+      would silently switch the gate off for every workflow still using it.
+    required: false
+    default: block
+  timeout:
+    description: Seconds to wait for FreezeHub before giving up.
+    required: false
+    default: '10'
+
+# No outputs, deliberately. An output saying "BLOCKED" alongside a step that succeeded is
+# a warn-only mode wearing a disguise, and it would be set once and forgotten. If you want
+# a freeze to be advisory, use an ADVISORY restriction — that is what they are for — or
+# add continue-on-error yourself, in your own workflow, where a reviewer can see it.
+
+runs:
+  using: composite
+  steps:
+    - name: Ask FreezeHub
+      shell: bash
+      # Passed as environment rather than interpolated into the run line: an application
+      # name is customer data, and ${{ }} inside a shell command is how that becomes a
+      # command. Environment values are never evaluated.
+      env:
+        FREEZEHUB_URL: ${{ inputs.url }}
+        FREEZEHUB_API_KEY: ${{ inputs.api-key }}
+        FREEZEHUB_APPLICATION: ${{ inputs.application }}
+        FREEZEHUB_ENVIRONMENT: ${{ inputs.environment }}
+        FREEZEHUB_ON_ERROR: ${{ inputs.on-error }}
+        FREEZEHUB_TIMEOUT: ${{ inputs.timeout }}
+      # The whole repository is checked out alongside the action, so the one
+      # implementation is one directory up. actor, reference and source are filled from
+      # GITHUB_ACTOR, GITHUB_SHA and the run URL by the script itself.
+      run: "$GITHUB_ACTION_PATH/../freeze-check.sh"

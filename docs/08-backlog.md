@@ -1136,7 +1136,7 @@ Acceptance:
 - The image is built in CI. Publishing it is `FZ-097`.
 
 ### FZ-092 — GitHub Actions Connector
-**Status:** TODO
+**Status:** DONE
 
 A composite action at `connectors/github-action/action.yml`, usable as `uses: freezehub/freezehub/connectors/github-action@v1`.
 

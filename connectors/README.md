@@ -6,7 +6,8 @@ What a customer installs into their pipeline so they do not have to vendor a scr
 |---|---|
 | [`freeze-check.sh`](./freeze-check.sh) | **the one implementation** — POSIX shell, `curl` + `jq` |
 | [`Dockerfile`](./Dockerfile) | `ghcr.io/freezehub/freeze-check` — the script, packaged |
-| [`test/`](./test) | what proves both of the above still fail closed |
+| [`github-action/`](./github-action) | the GitHub Action (`FZ-092`) |
+| [`test/`](./test) | what proves all of the above still fail closed |
 
 ## One implementation
 
@@ -43,6 +44,31 @@ It exists because an Argo CD PreSync hook is a Kubernetes Job and needs an image
 
 Publishing it to GHCR is `FZ-097`; until then, build it yourself.
 
+## GitHub Actions
+
+```yaml
+- name: FreezeHub check
+  uses: freezehub/freezehub/connectors/github-action@v1
+  with:
+    url: https://freezehub.example.com
+    api-key: ${{ secrets.FREEZEHUB_API_KEY }}
+    application: payments-api
+    environment: production
+```
+
+Put it in the job that deploys, before the deploy step — or in a job the deploy job `needs`.
+
+A blocked deployment **fails the step**, which is the whole point. Do not add
+`continue-on-error` unless you mean it: it turns every freeze into a warning, and it will
+be set once during an incident and never removed.
+
+The action declares no outputs, deliberately. An output saying `BLOCKED` next to a step
+that passed is a warn-only mode wearing a disguise. If you want a restriction to inform
+rather than stop, make it `ADVISORY` — the gate exits `0` and prints it.
+
+`on-error` covers a FreezeHub outage and nothing else. A missing input or a rejected API
+key fails the step whatever it is set to.
+
 ## Configuration
 
 Environment variables, the same everywhere. `examples/README.md` has the full table and the reasoning.
@@ -61,17 +87,22 @@ Environment variables, the same everywhere. `examples/README.md` has the full ta
 ## Tests
 
 ```bash
-node connectors/test/run-tests.js              # behaviour — needs node, curl, jq
+node connectors/test/run-tests.js              # behaviour — the script and the action
+node connectors/test/check-action.js           # the action's shape
 docker build -t freeze-check:test connectors/
 sh connectors/test/image-smoke.sh              # the same rules, as a container
 ```
 
 `run-tests.js` drives the script against a stub Policy API in its own process, and most of what it asserts is the set of rules that must **not** fail open. Those are each one `case` branch away from turning a freeze into a warning for every customer at once, and the failure is silent: the pipeline deploys and reports success.
 
+`run-tests.js` also executes the GitHub Action — the exact command its composite step runs, with the environment built from `action.yml` rather than restated, so the two cannot drift. That makes the action verifiable without a runner; the workflow in `verify.yml` is still what proves GitHub itself wires it up.
+
+`check-action.js` is structural: an input declared but never wired reaches a customer as a setting that silently does nothing, and it also enforces the rule that no input may turn a blocked check into a passing one.
+
 `image-smoke.sh` covers only what packaging can break — that busybox `ash` runs the script, that the exit code survives the container boundary, and that it is not root. It needs no network, deliberately, so it behaves the same on a laptop and on a CI runner.
 
 ## Coming
 
-The four connectors themselves are the rest of Milestone 9 in `docs/08-backlog.md`: GitHub Actions (`FZ-092`), GitLab CI (`FZ-093`), Jenkins (`FZ-094`), Argo CD (`FZ-095`).
+The remaining connectors are the rest of Milestone 9 in `docs/08-backlog.md`: GitLab CI (`FZ-093`), Jenkins (`FZ-094`), Argo CD (`FZ-095`).
 
 Until they land, `examples/` shows how to wire the script by hand — which is also the answer for any CI system that never gets a connector.

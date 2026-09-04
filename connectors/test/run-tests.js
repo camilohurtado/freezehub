@@ -20,7 +20,7 @@
 
 const fs = require("node:fs");
 const os = require("node:os");
-const { spawn, spawnSync } = require("node:child_process");
+const { execFileSync, spawn, spawnSync } = require("node:child_process");
 const path = require("node:path");
 
 const SCRIPT = path.join(__dirname, "..", "freeze-check.sh");
@@ -68,8 +68,25 @@ function forgetRequests() {
     fs.rmSync(requestLog, { force: true });
 }
 
+// A check that asserts on what was sent has to survive nothing being sent — otherwise a
+// gate that fails to run at all crashes the suite with a TypeError, and the failures
+// after it are never reported. The empty object makes it a clean FAIL instead.
+function firstRequest() {
+    return requests()[0] || { url: null, headers: {}, raw: "{}" };
+}
+
 respondWith(200, ALLOW);
-const stub = spawn(process.execPath, [path.join(__dirname, "stub-server.js"), workDir], { stdio: "inherit" });
+// "ignore" rather than "inherit": the stub prints nothing, and inheriting means it
+// holds this process's stdout. If the suite then died early — an exception, or a reader
+// closing the pipe — the orphan would keep that pipe open and whatever was waiting on it
+// would wait for ever. A test suite that hangs instead of failing is worse than one that
+// fails, because CI reports it as a timeout six hours later.
+const stub = spawn(process.execPath, [path.join(__dirname, "stub-server.js"), workDir], { stdio: "ignore" });
+
+// Belt and braces: unref so a live stub can never hold this process open, and kill it on
+// the way out however the way out is reached.
+stub.unref();
+process.on("exit", () => stub.kill());
 
 // Synchronous wait: everything below drives the script with spawnSync, so there is no
 // event loop to await on. The stub writes its port once it is listening.
@@ -177,18 +194,18 @@ respondWith(200, ALLOW);
 
 forgetRequests();
 run({ env: { GITLAB_USER_EMAIL: 'dev@northwind.test', CI_COMMIT_SHA: '9c1f0aa', CI_PIPELINE_URL: 'https://gitlab.test/run/7' } });
-let sent = JSON.parse(requests()[0].raw);
+let sent = JSON.parse(firstRequest().raw);
 check('CI metadata is detected and forwarded',
     sent.actor === 'dev@northwind.test' && sent.reference === '9c1f0aa' && sent.source === 'https://gitlab.test/run/7',
-    requests()[0].raw);
+    firstRequest().raw);
 check('the API key travels in X-API-Key and nowhere else',
-    requests()[0].headers['x-api-key'] === 'fzh_test' && !requests()[0].headers.authorization);
-check('it posts to /api/policy/evaluate', requests()[0].url === '/api/policy/evaluate', requests()[0].url);
+    firstRequest().headers['x-api-key'] === 'fzh_test' && !firstRequest().headers.authorization);
+check('it posts to /api/policy/evaluate', firstRequest().url === '/api/policy/evaluate', firstRequest().url);
 
 forgetRequests();
 run({ env: { FREEZEHUB_ACTOR: 'someone', GITHUB_ACTOR: 'ignored' } });
 check('an explicit actor overrides what the CI system reports',
-    JSON.parse(requests()[0].raw).actor === 'someone', requests()[0].raw);
+    JSON.parse(firstRequest().raw).actor === 'someone', firstRequest().raw);
 
 // A name containing a quote is the case that turns a hand-built JSON body into an
 // unparseable one — the reason the script builds its request with jq.
@@ -196,11 +213,63 @@ forgetRequests();
 const quoted = 'payments "api"';
 run({ env: { FREEZEHUB_APPLICATION: quoted } });
 check('a quote in a name does not break the request body',
-    JSON.parse(requests()[0].raw).application === quoted, requests()[0].raw);
+    JSON.parse(firstRequest().raw).application === quoted, firstRequest().raw);
 
 forgetRequests();
 run();
-check('the action is DEPLOY', JSON.parse(requests()[0].raw).action === 'DEPLOY', requests()[0].raw);
+check('the action is DEPLOY', JSON.parse(firstRequest().raw).action === 'DEPLOY', firstRequest().raw);
+
+// --- the GitHub Action, executed ------------------------------------------------------
+//
+// check-action.js covers the action's shape. This covers what it does, by running the
+// exact command the composite step runs, with the exact environment it builds — read
+// out of action.yml rather than restated here, so the two cannot drift.
+//
+// It is not a substitute for the workflow in verify.yml, which is the only thing that
+// proves GitHub itself wires it up. It is what makes the action verifiable without a
+// runner, which is the difference between "the tests pass" and "CI has not run yet".
+
+const action = JSON.parse(execFileSync('ruby', [
+    '-ryaml', '-rjson', '-e', 'puts YAML.load_file(ARGV[0]).to_json',
+    path.join(__dirname, '..', 'github-action', 'action.yml'),
+], { encoding: 'utf8' }));
+
+const actionStep = action.runs.steps[0];
+
+function runAction(inputs) {
+    const env = { PATH: process.env.PATH, GITHUB_ACTION_PATH: path.join(__dirname, '..', 'github-action') };
+    for (const [name, expression] of Object.entries(actionStep.env)) {
+        const input = String(expression).match(/inputs\.([a-z-]+)/)[1];
+        const supplied = inputs[input];
+        env[name] = supplied !== undefined ? supplied : (action.inputs[input].default ?? '');
+    }
+    const result = spawnSync('bash', ['-e', '-c', actionStep.run], { env, encoding: 'utf8' });
+    return { code: result.status, stdout: result.stdout || '', stderr: result.stderr || '' };
+}
+
+const actionInputs = { url, 'api-key': 'fzh_test', application: 'payments-api', environment: 'production', timeout: '5' };
+
+respondWith(200, ALLOW);
+let outcome = runAction(actionInputs);
+check('the action succeeds on ALLOW', outcome.code === 0,
+    `exit ${outcome.code}: ${outcome.stderr.trim()}`);
+
+respondWith(200, BLOCK);
+outcome = runAction(actionInputs);
+check('the action fails on BLOCK', outcome.code === 1,
+    `exit ${outcome.code}: ${outcome.stderr.trim()}`);
+
+respondWith(401, { title: 'Unauthorized' });
+outcome = runAction({ ...actionInputs, 'on-error': 'allow' });
+check('the action fails on a rejected credential even with on-error: allow', outcome.code === 2,
+    `exit ${outcome.code}: ${outcome.stderr.trim()}`);
+
+respondWith(200, ALLOW);
+forgetRequests();
+runAction({ ...actionInputs, application: 'checkout-web' });
+check('the action passes its inputs through rather than defaulting them',
+    JSON.parse(firstRequest().raw).application === 'checkout-web', firstRequest().raw);
+
 
 stub.kill();
 fs.rmSync(workDir, { recursive: true, force: true });
