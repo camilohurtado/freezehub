@@ -33,15 +33,6 @@ Not silently broken: without the `local` profile the application refuses to star
 
 The "cannot start outside `local`" consequence bites exactly when the first deployed environment appears, which is `FZ-063` itself. Stays open until the pair ships.
 
-### OI-11 — No rate limiting anywhere in the application
-**Severity:** Gap · **Owner:** `FZ-087` · **Found in:** `FZ-080`
-
-There is no rate limiter in the codebase. Today that is defensible rather than negligent: `/actuator/health` is the only endpoint reachable without a credential, and everything else is behind a Cognito JWT or an API key, so abuse is bounded by having to be a customer first.
-
-`FZ-082` and `FZ-083` end that. `POST /api/signup` creates a Cognito identity and sends an email, and `POST /api/demo-requests` writes a row and fires a Slack notification — both unauthenticated, and both trivially loopable into a bill and a spam problem.
-
-**Neither endpoint may ship before `FZ-087`.** This is a sequencing constraint, not a recommendation: the milestone order in `08-backlog.md` puts rate limiting before the first unauthenticated write for this reason.
-
 ### OI-12 — Colleagues signing up separately create unrelated organizations
 **Severity:** Gap · **Owner:** `FZ-088` (deferred) · **Found in:** `FZ-080`
 
@@ -83,6 +74,7 @@ Not urgent — nobody is billed yet — but it means a row of the pricing table 
 
 | Issue | Found in | Resolved by |
 |---|---|---|
+| **No rate limiting anywhere** — defensible while `/actuator/health` was the only endpoint reachable without a credential, and a prerequisite for signup, which creates a Cognito identity and sends an email | `FZ-080` | `FZ-087` — per-IP fixed window, in application; it also found that forwarded headers were unconfigured, so a limiter would have bucketed every customer together behind the load balancer |
 | **The audit trail recorded changes that never happened** — a no-op update compared the client's nanosecond timestamps against the microsecond values PostgreSQL had already truncated them to, and wrote an entry whose `to` value was never persisted | first CI run, `FZ-092` | `FZ-098` — decided (`D-25`): instants are normalised to storable precision at the boundary |
 | Deleting a catalog entry referenced by a restriction returned `500` instead of `409` | `FZ-020` | `FZ-036` |
 | Deliberate rejection reasons never reached clients — Spring omits `message` from its error body, so every `ResponseStatusException` reason in the API arrived as a bare status code | `FZ-036` | `FZ-036` |

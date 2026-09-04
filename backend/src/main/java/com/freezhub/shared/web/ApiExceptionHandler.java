@@ -1,5 +1,6 @@
 package com.freezhub.shared.web;
 
+import com.freezhub.shared.ratelimit.RateLimitExceededException;
 import com.freezhub.subscription.OrganizationSuspendedException;
 import com.freezhub.subscription.PlanLimitExceededException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -70,6 +71,21 @@ public class ApiExceptionHandler {
         ProblemDetail problem = problem(HttpStatus.PAYMENT_REQUIRED.value(),
                 exception.getMessage(), request);
         problem.setProperty("subscriptionStatus", exception.status().name());
+        return problem;
+    }
+
+    /**
+     * Too many requests from one caller (FZ-087).
+     *
+     * <p>{@code Retry-After} is set by the interceptor rather than here, because it is a
+     * header and this builds a body. The seconds are repeated in {@code detail} so the
+     * message stands on its own for a human reading a log.
+     */
+    @ExceptionHandler(RateLimitExceededException.class)
+    ProblemDetail handleRateLimit(RateLimitExceededException exception, HttpServletRequest request) {
+        ProblemDetail problem = problem(HttpStatus.TOO_MANY_REQUESTS.value(),
+                exception.getMessage(), request);
+        problem.setProperty("retryAfterSeconds", Math.max(1, exception.retryAfter().toSeconds()));
         return problem;
     }
 

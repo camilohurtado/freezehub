@@ -41,6 +41,7 @@ A resource belonging to another organization returns **`404`, not `403`** — ex
 | `403` | authenticated but not permitted (currently: non-administrator) |
 | `404` | unknown **or** another organization's resource |
 | `409` | state conflict — the resource has moved on; refetch |
+| `429` | too many requests from this caller; `Retry-After` says when (`FZ-087`) |
 
 Every error is **RFC 9457 Problem Details**, served as `application/problem+json` (`FZ-061`):
 
