@@ -4,7 +4,7 @@ A worked example of gating a deployment on FreezeHub's Policy API (`FZ-053`).
 
 | File | What it is |
 |---|---|
-| [`freeze-check.sh`](./freeze-check.sh) | the gate — POSIX shell, `curl` + `jq`, no FreezeHub-specific tooling |
+| [`../connectors/freeze-check.sh`](../connectors/freeze-check.sh) | the gate — POSIX shell, `curl` + `jq`, no FreezeHub-specific tooling |
 | [`gitlab-ci.yml`](./gitlab-ci.yml) | GitLab CI wiring for it |
 
 The logic lives in the script rather than in pipeline YAML so it is the same on every CI system, testable on your laptop, and readable by whoever has to debug it at 2am during a freeze.
@@ -31,7 +31,7 @@ export FREEZEHUB_API_KEY=fzh_...
 export FREEZEHUB_APPLICATION=payments-api
 export FREEZEHUB_ENVIRONMENT=production
 
-./freeze-check.sh
+../connectors/freeze-check.sh
 ```
 
 | Variable | Default | |
@@ -98,7 +98,7 @@ The script has nothing GitLab-specific in it:
     FREEZEHUB_API_KEY: ${{ secrets.FREEZEHUB_API_KEY }}
     FREEZEHUB_APPLICATION: payments-api
     FREEZEHUB_ENVIRONMENT: production
-  run: ./examples/freeze-check.sh
+  run: ./connectors/freeze-check.sh
 ```
 
 Put it in the job that deploys, before the deploy step — or in a separate job the deploy job `needs`. Do not mark it `continue-on-error`; that turns every freeze into a warning.

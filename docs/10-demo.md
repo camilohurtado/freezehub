@@ -41,7 +41,7 @@ export FREEZEHUB_API_KEY=fzh_...          # from the seed output
 export FREEZEHUB_APPLICATION=payments-api
 export FREEZEHUB_ENVIRONMENT=production
 
-GITLAB_USER_EMAIL=you@northwind.test CI_COMMIT_SHA=9c1f0aa ./examples/freeze-check.sh
+GITLAB_USER_EMAIL=you@northwind.test CI_COMMIT_SHA=9c1f0aa ./connectors/freeze-check.sh
 ```
 
 It exits non-zero and names the freeze.
