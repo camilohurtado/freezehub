@@ -37,6 +37,7 @@ A resource belonging to another organization returns **`404`, not `403`** — ex
 |---|---|
 | `400` | request rejected by validation or a domain rule |
 | `401` | missing, invalid, or unrecognised credential |
+| `402` | refused by the plan — a limit reached, or the organization suspended (`FZ-081`) |
 | `403` | authenticated but not permitted (currently: non-administrator) |
 | `404` | unknown **or** another organization's resource |
 | `409` | state conflict — the resource has moved on; refetch |

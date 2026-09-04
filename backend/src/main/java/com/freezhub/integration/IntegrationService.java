@@ -2,6 +2,7 @@ package com.freezhub.integration;
 
 import java.util.List;
 import org.springframework.http.HttpStatus;
+import com.freezhub.subscription.SubscriptionService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -10,9 +11,12 @@ import org.springframework.web.server.ResponseStatusException;
 public class IntegrationService {
 
     private final IntegrationRepository integrationRepository;
+    private final SubscriptionService subscriptions;
 
-    public IntegrationService(IntegrationRepository integrationRepository) {
+    public IntegrationService(IntegrationRepository integrationRepository,
+                              SubscriptionService subscriptions) {
         this.integrationRepository = integrationRepository;
+        this.subscriptions = subscriptions;
     }
 
     public List<Integration> list(Long organizationId) {
@@ -21,6 +25,8 @@ public class IntegrationService {
 
     @Transactional
     public Integration create(Long organizationId, IntegrationType type, String config) {
+        subscriptions.requireDestinationHeadroom(organizationId,
+                () -> integrationRepository.countByOrganizationId(organizationId));
         IntegrationConfigs.validate(type, config);
         return integrationRepository.save(new Integration(organizationId, type, config));
     }

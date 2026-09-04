@@ -196,6 +196,17 @@ Events handled:
 
 ### Limit enforcement
 
+**Built by `FZ-081`.** Applications, API keys and notification destinations are enforced on creation; a refusal is `402` with the plan, the limit and the current count as extensions, so a UI can say "10 of 10 applications used" rather than "something went wrong".
+
+Two things the specification did not anticipate, both decided during implementation:
+
+- **Revoked API keys do not count.** The limit is on live credentials. Counting a revoked one would charge a customer for rotating a key, discouraging exactly the habit that limits the damage of a leaked CI variable. Disabled notification destinations *do* count — they are still configured, still hold an encrypted credential, and are one toggle from sending.
+- **An organization with no subscription row gets everything, not nothing.** That state is a defect and is logged as one, but refusing on it would make a customer's API read-only because of a bug in our billing data — the failure `D-21` exists to prevent. It fails towards not billing, which is a conversation, rather than towards not working.
+
+**Retention is not yet enforced** (`OI-14`): `Plan` carries the number, but nothing can set `deployment_check_retention_days`, so every organization sits on the 365-day default whatever they pay. That row of the table above is currently aspirational.
+
+
+
 **Refused on creation, never applied retroactively.** Creating application number 11 on Starter is refused. A Growth customer with 30 applications who downgrades to Starter keeps all 30 — nothing is deleted, disabled, or hidden — and simply cannot create number 31 until the count is under the limit.
 
 Deleting applications on a downgrade would silently narrow every restriction scoped to them, which un-freezes deployments as a side effect of a billing event. That is the same failure `FZ-020` refused to allow the database to cause, and the reasoning has not changed. See `D-22`.

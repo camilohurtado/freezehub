@@ -1,5 +1,7 @@
 package com.freezhub.shared.web;
 
+import com.freezhub.subscription.OrganizationSuspendedException;
+import com.freezhub.subscription.PlanLimitExceededException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
 import java.time.Instant;
@@ -40,6 +42,36 @@ public class ApiExceptionHandler {
 
     /** Deliberately not a link to documentation that does not exist. */
     private static final URI NO_TYPE = URI.create("about:blank");
+
+    /**
+     * A plan limit, answered as {@code 402 Payment Required} (FZ-081, {@code D-22}).
+     *
+     * <p>{@code 402} because no other status says what happened: the request was
+     * well-formed, so not {@code 400}; the caller is permitted, so not {@code 403};
+     * nothing conflicts, so not {@code 409}. The plan refused.
+     *
+     * <p>The numbers travel as extensions so a UI can say "10 of 10 applications used"
+     * and offer the upgrade, rather than rendering a sentence and a dead end.
+     */
+    @ExceptionHandler(PlanLimitExceededException.class)
+    ProblemDetail handlePlanLimit(PlanLimitExceededException exception, HttpServletRequest request) {
+        ProblemDetail problem = problem(HttpStatus.PAYMENT_REQUIRED.value(),
+                exception.getMessage(), request);
+        problem.setProperty("plan", exception.plan().name());
+        problem.setProperty("resource", exception.resource());
+        problem.setProperty("limit", exception.limit());
+        problem.setProperty("current", exception.current());
+        return problem;
+    }
+
+    /** A suspended or cancelled organization attempting a write (FZ-081). */
+    @ExceptionHandler(OrganizationSuspendedException.class)
+    ProblemDetail handleSuspended(OrganizationSuspendedException exception, HttpServletRequest request) {
+        ProblemDetail problem = problem(HttpStatus.PAYMENT_REQUIRED.value(),
+                exception.getMessage(), request);
+        problem.setProperty("subscriptionStatus", exception.status().name());
+        return problem;
+    }
 
     @ExceptionHandler(ResponseStatusException.class)
     ProblemDetail handleResponseStatus(ResponseStatusException exception, HttpServletRequest request) {

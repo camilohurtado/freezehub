@@ -33,3 +33,5 @@ databaseChangeLog:
       file: db/changelog/016-audit-event.yaml
   - include:
       file: db/changelog/017-deployment-check.yaml
+  - include:
+      file: db/changelog/018-subscription.yaml

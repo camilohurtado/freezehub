@@ -5,6 +5,7 @@ import com.freezhub.audit.AuditDetails;
 import com.freezhub.audit.AuditActor;
 import com.freezhub.audit.AuditResourceType;
 import com.freezhub.audit.AuditTrail;
+import com.freezhub.subscription.SubscriptionService;
 import com.freezhub.shared.security.ApiKeyPrincipal;
 import java.util.List;
 import java.util.Optional;
@@ -18,10 +19,13 @@ public class ApiKeyService {
 
     private final ApiKeyRepository apiKeyRepository;
     private final AuditTrail auditTrail;
+    private final SubscriptionService subscriptions;
 
-    public ApiKeyService(ApiKeyRepository apiKeyRepository, AuditTrail auditTrail) {
+    public ApiKeyService(ApiKeyRepository apiKeyRepository, AuditTrail auditTrail,
+                         SubscriptionService subscriptions) {
         this.apiKeyRepository = apiKeyRepository;
         this.auditTrail = auditTrail;
+        this.subscriptions = subscriptions;
     }
 
     public List<ApiKey> list(Long organizationId) {
@@ -36,6 +40,11 @@ public class ApiKeyService {
      */
     @Transactional
     public IssuedApiKey create(Long organizationId, AuditActor actor, String name) {
+        // Revoked keys do not count: the limit is on live credentials, and a plan that
+        // punished a customer for rotating one would discourage exactly the right habit.
+        subscriptions.requireApiKeyHeadroom(organizationId,
+                () -> apiKeyRepository.countByOrganizationIdAndRevokedAtIsNull(organizationId));
+
         String rawKey = ApiKeySecret.generate();
 
         ApiKey apiKey = apiKeyRepository.save(new ApiKey(

@@ -5,6 +5,7 @@ import com.freezhub.audit.AuditActor;
 import com.freezhub.audit.AuditDetails;
 import com.freezhub.audit.AuditResourceType;
 import com.freezhub.audit.AuditTrail;
+import com.freezhub.subscription.SubscriptionService;
 import com.freezhub.audit.FieldChanges;
 import java.util.List;
 import org.springframework.http.HttpStatus;
@@ -19,18 +20,31 @@ public class ApplicationService {
     private final TeamRepository teamRepository;
     private final TeamApplicationRepository teamApplicationRepository;
     private final AuditTrail auditTrail;
+    private final SubscriptionService subscriptions;
 
     public ApplicationService(ApplicationRepository applicationRepository, TeamRepository teamRepository,
                                TeamApplicationRepository teamApplicationRepository,
-                               AuditTrail auditTrail) {
+                               AuditTrail auditTrail,
+                               SubscriptionService subscriptions) {
         this.applicationRepository = applicationRepository;
         this.teamRepository = teamRepository;
         this.teamApplicationRepository = teamApplicationRepository;
         this.auditTrail = auditTrail;
+        this.subscriptions = subscriptions;
     }
 
+    /**
+     * Registers an application, if the plan has room for one more.
+     *
+     * <p>Applications are the metric FreezeHub is priced on ({@code D-20}), so this is the
+     * limit that matters. It is checked inside the transaction, which is what makes the
+     * count meaningful: two concurrent creations at the limit would otherwise both read
+     * one below it and both succeed.
+     */
     @Transactional
     public Application create(Long organizationId, AuditActor actor, String name) {
+        subscriptions.requireApplicationHeadroom(organizationId,
+                () -> applicationRepository.countByOrganizationId(organizationId));
         requireNameNotTaken(organizationId, name);
         Application created = applicationRepository.save(new Application(organizationId, name));
         auditTrail.record(organizationId, actor, AuditAction.CATALOG_CREATED,

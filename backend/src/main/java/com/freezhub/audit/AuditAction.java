@@ -49,6 +49,19 @@ public enum AuditAction {
     ORGANIZATION_SETTINGS_CHANGED,
 
     /**
+     * The organization's commercial state changed (FZ-081).
+     *
+     * <p>Audited because "why did we get suspended on the 3rd" must be answerable without
+     * reading a payment provider's dashboard, and because a suspension changes what the
+     * product will let a customer do — which is exactly the kind of thing an administrator
+     * later swears nobody did.
+     *
+     * <p>{@code SUBSCRIPTION_SUSPENDED} carries a system actor: time did it, not a person.
+     */
+    SUBSCRIPTION_STARTED,
+    SUBSCRIPTION_SUSPENDED,
+
+    /**
      * A deployment was refused because it named an application or environment this
      * organization has not registered (decision {@code D-14}).
      *

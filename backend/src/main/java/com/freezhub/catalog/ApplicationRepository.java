@@ -19,4 +19,7 @@ public interface ApplicationRepository extends JpaRepository<Application, Long> 
     /** Batched ownership check: compare against the requested id count. */
     long countByOrganizationIdAndIdIn(Long organizationId, Collection<Long> ids);
 
+    /** What the plan limit counts (FZ-081) — applications are the pricing metric. */
+    long countByOrganizationId(Long organizationId);
+
 }
