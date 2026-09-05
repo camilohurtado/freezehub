@@ -22,3 +22,7 @@ freezehub:
   # back on with a low limit of its own.
   rate-limit:
     enabled: false
+  # Off for the suite, like the other sweeps: the notifier is driven directly against an
+  # explicit clock in DemoRequestTest rather than raced with.
+  demo-requests:
+    enabled: false

@@ -157,7 +157,9 @@ Suspension is therefore a **grace state, not a kill switch**, and it lasts 30 da
 
 The demo request captures name, work email, company, approximate team size, and a free-text message. It is stored rather than only emailed, so the pipeline is inspectable and so a request is never lost to a mail filter.
 
-**Notification reuses the existing module.** A demo request is an event that needs to reach a Slack channel reliably, with retries and a dead-letter state — which is `FZ-040`–`FZ-044`, already built and already tested. The only new thing is a destination belonging to FreezeHub rather than to a customer.
+**Built by `FZ-083`.** The request is stored first and announced second, which is the important ordering: the lead is the row, so a Slack outage or a webhook nobody configured cannot lose it.
+
+It does *not* reuse the notification module, though this document said it would. That module is restriction-shaped — a notification needs an organization and a restriction, and a demo request has neither. It reuses `RetryPolicy` and keeps its own four-column outbox, which is smaller than the change reuse would have required.
 
 ### There is no platform super-administrator
 

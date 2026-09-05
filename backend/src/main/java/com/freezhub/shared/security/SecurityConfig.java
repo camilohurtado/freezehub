@@ -2,6 +2,7 @@ package com.freezhub.shared.security;
 
 import jakarta.servlet.DispatcherType;
 import org.springframework.context.annotation.Bean;
+import org.springframework.http.HttpMethod;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -39,6 +40,13 @@ public class SecurityConfig {
                         // reads /actuator/health/readiness, and an exact match on
                         // /actuator/health would answer it with a 401 (FZ-062).
                         .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
+                        // "Book a demo" (FZ-083). Unauthenticated by necessity — the
+                        // person filling it in has no account yet, which is the point.
+                        //
+                        // POST only, and no read anywhere: the table sits outside the
+                        // tenant boundary, so there is no organization to scope a read to.
+                        // Rate limited by FZ-087, which is why that story came first.
+                        .requestMatchers(HttpMethod.POST, "/api/demo-requests").permitAll()
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.jwtAuthenticationConverter(converter)));
 
