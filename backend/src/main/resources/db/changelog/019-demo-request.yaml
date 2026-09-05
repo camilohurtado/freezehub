@@ -1,0 +1,113 @@
+databaseChangeLog:
+  - changeSet:
+      id: 019-demo-request
+      author: freezehub
+      changes:
+        # The ONE table with no organization_id (FZ-083).
+        #
+        # Every other tenant-owned table has one and every query is scoped by it. A demo
+        # request predates the organization it might become, so there is nothing to scope
+        # it to — which also means nothing in the tenant API may ever read this table. It
+        # is written by one unauthenticated endpoint and read by operators.
+        #
+        # Called out here because "the table without organization_id" is exactly the shape
+        # a future tenant-isolation bug takes, and the next person to add a query against
+        # it should have to notice.
+        - createTable:
+            tableName: demo_request
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: name
+                  type: varchar(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: email
+                  type: varchar(320)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: company
+                  type: varchar(255)
+                  constraints:
+                    nullable: false
+              # Free text, not a number: a form asks "roughly how many engineers" and the
+              # useful answers are ranges. Storing "11-50" beats forcing a guess to an int.
+              - column:
+                  name: team_size
+                  type: varchar(32)
+              - column:
+                  name: message
+                  type: text
+              # Which page or campaign it came from, when the caller says.
+              - column:
+                  name: source
+                  type: varchar(255)
+              - column:
+                  name: status
+                  type: varchar(32)
+                  defaultValue: NEW
+                  constraints:
+                    nullable: false
+              # Set when the request becomes a customer (FZ-086). No foreign key on
+              # purpose: this row is a record of something that happened, and it must stay
+              # readable if the organization is later removed.
+              - column:
+                  name: converted_organization_id
+                  type: bigint
+
+              # Its own small outbox. The notification module cannot carry this: a
+              # Notification requires a non-null organization_id AND restriction_id, and
+              # NotificationSender.send takes a ChangeRestriction. A demo request has none
+              # of the three.
+              - column:
+                  name: notified_at
+                  type: timestamptz
+              - column:
+                  name: notify_attempts
+                  type: int
+                  defaultValueNumeric: 0
+                  constraints:
+                    nullable: false
+              - column:
+                  name: next_notify_at
+                  type: timestamptz
+                  defaultValueComputed: now()
+                  constraints:
+                    nullable: false
+              - column:
+                  name: notify_error
+                  type: varchar(500)
+
+              - column:
+                  name: created_at
+                  type: timestamptz
+                  defaultValueComputed: now()
+                  constraints:
+                    nullable: false
+              - column:
+                  name: updated_at
+                  type: timestamptz
+                  defaultValueComputed: now()
+                  constraints:
+                    nullable: false
+
+        - sql:
+            sql: >
+              ALTER TABLE demo_request ADD CONSTRAINT chk_demo_request_status
+              CHECK (status IN ('NEW','CONTACTED','CONVERTED','DECLINED'))
+
+        # The sweep asks for un-notified rows that are due, on every pass.
+        - createIndex:
+            tableName: demo_request
+            indexName: idx_demo_request_pending_notification
+            columns:
+              - column:
+                  name: next_notify_at

@@ -1052,11 +1052,17 @@ Acceptance:
 - A failure at any step leaves nothing behind — no orphan organization, no orphan Cognito user.
 
 ### FZ-083 — Demo Requests
-**Status:** TODO
+**Status:** DONE
 
 `POST /api/demo-requests`, unauthenticated, plus the internal notification that a request arrived.
 
-**Reuses the notification module** rather than sending mail directly: retries, backoff and a dead-letter state already exist and are tested (`FZ-040`–`FZ-044`). The only new thing is a destination owned by FreezeHub rather than by a customer.
+~~**Reuses the notification module** rather than sending mail directly: retries, backoff and a dead-letter state already exist and are tested (`FZ-040`–`FZ-044`). The only new thing is a destination owned by FreezeHub rather than by a customer.~~
+
+**That was wrong, and the code said so.** A `Notification` requires a non-null `organizationId` **and** `restrictionId`, and `NotificationSender.send` takes a `ChangeRestriction`. A demo request has none of the three. Reusing the module would have meant changing the port signature and rippling through the email and webhook senders and their tests — to carry one message that goes to us rather than to a customer.
+
+What *is* reused is the part worth reusing: `RetryPolicy`, a pure function of attempt count with no coupling at all. Same backoff, same give-up point, no second schedule to drift. The rest is a small outbox of its own — four columns on the row.
+
+**The lead is the row, not the message.** The request is stored before anything is sent, so a Slack outage or an unconfigured webhook cannot lose it. That is also what makes it acceptable to stop retrying after six attempts rather than for ever.
 
 Acceptance:
 

@@ -25,6 +25,16 @@ The two credentials do not overlap, and that is enforced rather than merely inte
 - A JWT is not accepted on `/api/policy/**`. A signed-in browser session cannot reach the machine boundary.
 - Both mismatches are `401`, indistinguishable from no credential at all.
 
+### Unauthenticated endpoints
+
+`/actuator/health` and its probes, and **`POST /api/demo-requests`** (`FZ-083`) — "book a demo", which by its nature is used by someone with no account.
+
+It is rate limited per caller (`FZ-087`), which is why that story shipped first, and it accepts a bounded body: every field has a maximum length, because what an endpoint with no credential will accept is part of its security.
+
+**There is no way to read demo requests through this API.** Not for the person who submitted one, and not for a signed-in customer: the table sits outside the tenant boundary — a lead belongs to no organization — so there is no organization to scope a read to and no safe way to offer one.
+
+Under the `local` profile only, `POST /api/dev/token` mints a development JWT (`FZ-035`); it is rate limited too.
+
 ### Tenant isolation
 
 The organization is always resolved from the credential, never from the request. A client-supplied organization identifier is not authorization and appears nowhere in this API.
