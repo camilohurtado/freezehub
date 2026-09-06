@@ -1,5 +1,8 @@
 package com.freezhub.billing;
 
+import com.freezhub.apikey.ApiKeyRepository;
+import com.freezhub.catalog.ApplicationRepository;
+import com.freezhub.integration.IntegrationRepository;
 import com.freezhub.shared.security.AuthenticatedUser;
 import com.freezhub.subscription.Plan;
 import com.freezhub.subscription.Subscription;
@@ -11,6 +14,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import java.time.Instant;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -39,10 +44,40 @@ public class BillingController {
 
     private final StripeCheckout checkout;
     private final SubscriptionService subscriptions;
+    private final ApplicationRepository applications;
+    private final ApiKeyRepository apiKeys;
+    private final IntegrationRepository integrations;
 
-    public BillingController(StripeCheckout checkout, SubscriptionService subscriptions) {
+    public BillingController(StripeCheckout checkout, SubscriptionService subscriptions,
+                             ApplicationRepository applications, ApiKeyRepository apiKeys,
+                             IntegrationRepository integrations) {
         this.checkout = checkout;
         this.subscriptions = subscriptions;
+        this.applications = applications;
+        this.apiKeys = apiKeys;
+        this.integrations = integrations;
+    }
+
+    /**
+     * The plan, its limits, and how much of each is used (FZ-085).
+     *
+     * <p>Deliberately <strong>not</strong> administrator-only, unlike everything else here.
+     * The trial banner has to reach every member, and a member who cannot see why a
+     * creation was refused files a bug instead of asking their administrator to upgrade.
+     *
+     * <p>Counts are read here rather than trusted from the client, and the same counts the
+     * limit checks use: a usage bar that disagrees with the thing that actually refuses is
+     * worse than no usage bar.
+     */
+    @GetMapping("/subscription")
+    public SubscriptionView subscription(@AuthenticationPrincipal AuthenticatedUser caller) {
+        Long organizationId = caller.organizationId();
+        return SubscriptionView.of(
+                subscriptions.of(organizationId),
+                applications.countByOrganizationId(organizationId),
+                apiKeys.countByOrganizationIdAndRevokedAtIsNull(organizationId),
+                integrations.countByOrganizationId(organizationId),
+                Instant.now());
     }
 
     @PostMapping("/checkout-session")

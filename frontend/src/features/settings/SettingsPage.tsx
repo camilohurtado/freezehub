@@ -1,4 +1,5 @@
 import { ApiKeysSection } from './ApiKeysSection'
+import { BillingSection } from './BillingSection'
 import { IntegrationsSection } from './IntegrationsSection'
 import { OrganizationSection } from './OrganizationSection'
 import styles from './SettingsPage.module.css'
@@ -15,6 +16,7 @@ export function SettingsPage() {
     <main className={styles.page}>
       <h1 className={styles.title}>Settings</h1>
 
+      <BillingSection />
       <IntegrationsSection />
       <ApiKeysSection />
       <OrganizationSection />

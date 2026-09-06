@@ -83,3 +83,69 @@ describe('apiRequest error handling', () => {
     expect(error.message).toBe('Request failed (500)')
   })
 })
+
+describe('plan limits', () => {
+  test('a 402 reads as the limit it hit, not as a generic failure', async () => {
+    // The acceptance criterion FZ-085 exists for: "10 of 10 applications used", with the
+    // way out, rather than "Request failed (402)".
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify({
+              status: 402,
+              detail: 'The STARTER plan allows 10 applications; this organization has 10.',
+              plan: 'STARTER',
+              resource: 'applications',
+              limit: 10,
+              current: 10,
+            }),
+            { status: 402, headers: { 'Content-Type': 'application/problem+json' } },
+          ),
+        ),
+      ),
+    )
+
+    const caught = await apiRequest('/api/applications', { method: 'POST', token: 't' }).catch(
+      (error: unknown) => error,
+    )
+
+    expect(caught).toBeInstanceOf(ApiError)
+    const error = caught as ApiError
+    expect(error.isPlanLimit).toBe(true)
+    expect(error.planLimit).toEqual({
+      plan: 'STARTER',
+      resource: 'applications',
+      limit: 10,
+      current: 10,
+    })
+    expect(error.message).toContain('STARTER')
+    expect(error.message).toContain('10 applications')
+    expect(error.message).toContain('Settings')
+  })
+
+  test('a 402 without the extensions still says something useful', async () => {
+    // A 402 from anywhere but our own handler has no numbers to render, and a usage
+    // figure invented from a missing field would be a confident lie.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(JSON.stringify({ detail: 'Payment required' }), {
+            status: 402,
+            headers: { 'Content-Type': 'application/problem+json' },
+          }),
+        ),
+      ),
+    )
+
+    const caught = await apiRequest('/api/applications', { method: 'POST', token: 't' }).catch(
+      (error: unknown) => error,
+    )
+
+    const error = caught as ApiError
+    expect(error.planLimit).toBeNull()
+    expect(error.message).toBe('Payment required')
+  })
+})

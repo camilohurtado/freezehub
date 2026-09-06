@@ -1,5 +1,6 @@
 import { NavLink, Outlet } from 'react-router'
 import { useAuth } from '../features/auth/authContext'
+import { TrialBanner } from '../features/billing/TrialBanner'
 import styles from './AppLayout.module.css'
 
 export function AppLayout() {
@@ -7,6 +8,9 @@ export function AppLayout() {
 
   return (
     <div className={styles.shell}>
+      {/* Above the header, and above every page: the whole point is that a member sees
+          it without going looking for it (FZ-085). */}
+      <TrialBanner />
       <header className={styles.header}>
         <span className={styles.brand}>FreezeHub</span>
         <nav className={styles.nav}>
