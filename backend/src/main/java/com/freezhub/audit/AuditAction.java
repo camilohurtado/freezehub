@@ -62,6 +62,18 @@ public enum AuditAction {
     SUBSCRIPTION_SUSPENDED,
 
     /**
+     * Driven by the payment provider (FZ-084), with a system actor: Stripe did it, not a
+     * person here.
+     *
+     * <p>Audited so that "why did we get downgraded on the 3rd" is answerable without
+     * reading someone else's dashboard, and so a change to what a customer is allowed to
+     * do has a record on our side of the boundary.
+     */
+    SUBSCRIPTION_PLAN_CHANGED,
+    SUBSCRIPTION_PAYMENT_FAILED,
+    SUBSCRIPTION_CANCELLED,
+
+    /**
      * A deployment was refused because it named an application or environment this
      * organization has not registered (decision {@code D-14}).
      *

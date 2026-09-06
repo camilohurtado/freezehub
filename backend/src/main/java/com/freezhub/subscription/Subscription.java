@@ -42,6 +42,23 @@ public class Subscription {
     @Column(name = "application_limit_override")
     private Integer applicationLimitOverride;
 
+    /**
+     * The payment provider's identifiers (FZ-084).
+     *
+     * <p>Stripe is the source of truth for payment; FreezeHub is the source of truth for
+     * entitlement. These are how the two are joined, and they are written only from a
+     * signature-verified webhook — never from a Checkout redirect, which is a browser
+     * navigation anyone can forge.
+     */
+    @Column(name = "stripe_customer_id")
+    private String stripeCustomerId;
+
+    @Column(name = "stripe_subscription_id")
+    private String stripeSubscriptionId;
+
+    @Column(name = "current_period_ends_at")
+    private Instant currentPeriodEndsAt;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -155,6 +172,52 @@ public class Subscription {
      */
     void setApplicationLimitOverride(Integer applicationLimitOverride) {
         this.applicationLimitOverride = applicationLimitOverride;
+    }
+
+    public String getStripeCustomerId() {
+        return stripeCustomerId;
+    }
+
+    public String getStripeSubscriptionId() {
+        return stripeSubscriptionId;
+    }
+
+    public Instant getCurrentPeriodEndsAt() {
+        return currentPeriodEndsAt;
+    }
+
+    /**
+     * A paid subscription began or changed plan (FZ-084).
+     *
+     * <p>Public because the billing module drives it, and named for what happened rather
+     * than for the fields it sets — the caller should not be choosing a status.
+     */
+    public void activate(Plan plan, String stripeCustomerId, String stripeSubscriptionId,
+                         Instant currentPeriodEndsAt) {
+        this.plan = plan;
+        this.status = SubscriptionStatus.ACTIVE;
+        if (stripeCustomerId != null) {
+            this.stripeCustomerId = stripeCustomerId;
+        }
+        if (stripeSubscriptionId != null) {
+            this.stripeSubscriptionId = stripeSubscriptionId;
+        }
+        this.currentPeriodEndsAt = storable(currentPeriodEndsAt);
+    }
+
+    /**
+     * A payment failed.
+     *
+     * <p>Still writable, deliberately: dunning is a conversation, and locking an
+     * organization out on the first failed charge punishes an expired card.
+     */
+    public void markPastDue() {
+        this.status = SubscriptionStatus.PAST_DUE;
+    }
+
+    /** The subscription ended at the provider. */
+    public void cancel() {
+        this.status = SubscriptionStatus.CANCELLED;
     }
 
     void suspend() {

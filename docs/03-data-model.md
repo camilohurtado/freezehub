@@ -24,11 +24,12 @@ Covered now:
 - `deployment_check`, added by `FZ-070`
 - `subscription`, added by `FZ-081`
 - `demo_request`, added by `FZ-083` — **the one table with no `organization_id`**
+- `stripe_event`, and `subscription`'s Stripe columns, added by `FZ-084`
 - `integration.signing_secret`, added by `FZ-048`
 
 Deliberately deferred, added just-in-time before their own backlog items:
 
-- The processed-Stripe-event ledger, added by `FZ-084`. (`subscription` landed with `FZ-081`, `demo_request` with `FZ-083`.)
+Nothing outstanding — every table specified here exists.
 
 Their purpose and their rules are specified in `11-commercial.md`; committing to a physical schema here would be speculative ahead of the stories that implement them. `demo_request` is worth flagging now for one reason: it is the only table in the system with **no `organization_id`**, because a demo request belongs to no tenant yet. It is read by operators and is never reachable from the tenant API.
 

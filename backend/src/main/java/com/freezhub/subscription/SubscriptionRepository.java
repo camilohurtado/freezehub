@@ -11,6 +11,11 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, Long
 
     Optional<Subscription> findByOrganizationId(Long organizationId);
 
+    /** Both unique, so a webhook resolves to exactly one organization or to none (FZ-084). */
+    Optional<Subscription> findByStripeSubscriptionId(String stripeSubscriptionId);
+
+    Optional<Subscription> findByStripeCustomerId(String stripeCustomerId);
+
     /**
      * Trials that have run out.
      *

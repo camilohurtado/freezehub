@@ -70,6 +70,41 @@ Discoverability — a Marketplace or Catalog listing — is a separate and lesse
 
 Not urgent — nobody is billed yet — but it means a row of the pricing table is currently fiction. `FZ-085` owns it, since that is where plan-aware settings surface.
 
+### OI-15 — The deployed cost posture, and which AWS services are actually needed
+**Severity:** Decision · **Owner:** needs a story · **Raised:** 2026-09-05
+
+`FZ-063` designed a production-shaped AWS environment and it has never been applied. Nothing is deployed and the account spends **$0.007 a month, all S3** (AWS Cost Explorer, four months). Applying it as written costs about **$96 a month with no customers.**
+
+**Where that goes, and why it is worth revisiting:**
+
+| | $/month | |
+|---|---|---|
+| NAT Gateway | 32.85 | so two idle containers can reach ECR and CloudWatch |
+| Fargate, 2 tasks | 28.84 | `backend_desired_count = 2` |
+| ALB | 16.43 | TLS and a stable hostname |
+| RDS `db.t4g.micro` + 20 GB | 13.98 | |
+| Secrets, logs, Route 53, CloudFront, S3, ECR | ~4.40 | |
+
+**64% is redundancy and network plumbing for zero customers.** One task in a public subnet behind the same strict security group removes about $47 and is reversible before any customer's security review. VPC interface endpoints — the "proper" replacement for the NAT — run about $7.20 each for ECR, ECR-DKR, CloudWatch and Secrets Manager, which is *worse* than the NAT at this scale.
+
+**Free tier does not apply.** The account dates from 2022-10-23, so the twelve-month window covering 750 hrs of both ALB and `db.t4g.micro` expired years ago.
+
+**Other providers were assessed and AWS is retained.** Worth recording what the assessment found rather than re-deriving it: the backend has **no AWS coupling at all** — no SDK, nothing in `pom.xml`, nothing in `application.yml`. It needs Postgres over JDBC, an OIDC issuer, SMTP and outbound HTTPS. Every "Cognito" reference is a comment, the `cognito_subject` column name, or the `IdentityProvider` port. Cloud Run, Fly, Render and Railway all bundle TLS and egress, so the $49 of ALB-plus-NAT does not exist as a line item there; the saving against a reduced AWS posture is roughly $15–25 a month. Not decisive, and the portability means this stays cheap to revisit.
+
+**Two things block closing this**, and both are the operator's:
+
+1. Which AWS services are genuinely needed — the open question, deliberately not answered by default.
+2. Whether the beta posture becomes real: `backend_desired_count`, subnet placement, and relaxable deletion protection would all have to become variables. As it stands `terraform destroy` cannot run at all, because `deletion_protection` on RDS and Cognito, `skip_final_snapshot = false`, and `prevent_destroy` on both secrets deliberately block it — correct for production, wrong for a pre-customer beta.
+
+Nothing is urgent while nothing is deployed. It becomes urgent the day someone outside the team needs a URL.
+
+### OI-16 — `cognito_subject` leaks a vendor name into the schema
+**Severity:** Gap · **Owner:** needs a story · **Found in:** `OI-15` assessment
+
+`users.cognito_subject` names a provider rather than a concept, and the backend is not actually coupled to that provider — the column holds whatever subject an OIDC issuer put in a JWT. `identity_subject` or `external_subject` would say what it is.
+
+Cosmetic, and worth doing anyway: the name makes the next reader assume a coupling that does not exist, and it is a rename migration plus a handful of accessors while there is no production data to migrate.
+
 ## Resolved
 
 | Issue | Found in | Resolved by |
