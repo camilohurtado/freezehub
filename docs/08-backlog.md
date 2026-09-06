@@ -1099,7 +1099,7 @@ They come from the environment, populated from Secrets Manager at deploy time. N
 - `getDataObjectDeserializer().getObject()` returns empty whenever the event's API version differs from the SDK's — **which happens in production every time an account's version and the library drift apart**, not only in tests. Silently doing nothing there means a customer pays and is never activated. The documented escape hatch is used, and only a genuinely unreadable payload is skipped.
 
 ### FZ-085 — Billing and Plan UI
-**Status:** TODO
+**Status:** DONE · **Resolves:** `OI-14`
 
 A Billing section in Settings, Administrator-only: current plan, usage against each limit, trial days remaining, and the buttons that open Stripe.
 
@@ -1110,6 +1110,19 @@ Acceptance:
 - Usage against limits is visible before a limit is hit, not only when a creation is refused.
 - A `402` refusal renders as the limit it hit, with the upgrade path, never as a generic error.
 - Nothing in the UI decides entitlement — every limit shown comes from the backend.
+
+**Nothing exposed subscription state**, so this story started in the backend: `GET /api/billing/subscription` returns the plan, its limits, the counts, and the trial countdown. Deliberately **not** administrator-only, unlike the rest of `/api/billing` — the banner has to reach everyone, and a member who cannot see why a creation was refused files a bug instead of asking their administrator to upgrade.
+
+The counts are the same ones the limit checks use. A usage bar that disagrees with the code that actually refuses is worse than no usage bar.
+
+**A `402` is composed into a sentence where the error is built**, not at each call site, so every screen that already renders `error.message` gets "Your STARTER plan allows 10 applications, and you are using 10. Upgrade under Settings → Billing" — and no future screen can forget to.
+
+**Two mistakes of mine, both caught by tests:**
+
+- Making `deploymentCheckRetentionDays` a required field turned `PATCH` into a `PUT` and broke three existing callers with a `400`. It is optional and applied only when sent, which is what PATCH means.
+- `percentUsed` and `atLimit` were plain accessors on a record. Jackson serialises components, so they never reached the JSON and the usage bar had no percentage in it. They are components now.
+
+**`OI-14` is closed.** Retention is settable and capped by plan, so the priced lever is no longer fiction: Starter is refused at 365 days with a `402` naming the cap, and Enterprise may keep seven years.
 
 ### FZ-086 — Operator Provisioning
 **Status:** TODO

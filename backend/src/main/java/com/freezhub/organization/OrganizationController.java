@@ -4,6 +4,7 @@ import com.freezhub.audit.AuditAction;
 import com.freezhub.audit.AuditActor;
 import com.freezhub.audit.AuditResourceType;
 import com.freezhub.audit.AuditTrail;
+import com.freezhub.subscription.SubscriptionService;
 import com.freezhub.audit.FieldChanges;
 import com.freezhub.shared.security.AuthenticatedUser;
 import jakarta.validation.Valid;
@@ -36,10 +37,13 @@ public class OrganizationController {
 
     private final OrganizationRepository organizationRepository;
     private final AuditTrail auditTrail;
+    private final SubscriptionService subscriptions;
 
-    public OrganizationController(OrganizationRepository organizationRepository, AuditTrail auditTrail) {
+    public OrganizationController(OrganizationRepository organizationRepository, AuditTrail auditTrail,
+                                  SubscriptionService subscriptions) {
         this.organizationRepository = organizationRepository;
         this.auditTrail = auditTrail;
+        this.subscriptions = subscriptions;
     }
 
     @GetMapping
@@ -54,12 +58,26 @@ public class OrganizationController {
                                                @Valid @RequestBody SettingsRequest request) {
         Organization organization = owned(caller);
 
-        FieldChanges changes = FieldChanges.builder().compare(
-                "startingSoonLeadTimeMinutes",
-                organization.getStartingSoonLeadTimeMinutes(),
-                request.startingSoonLeadTimeMinutes());
+        // PATCH is a partial update, so a field that was not sent is not a change. An
+        // earlier version of this made retention mandatory, which quietly turned every
+        // existing caller's request into a 400.
+        int retention = request.deploymentCheckRetentionDays() != null
+                ? request.deploymentCheckRetentionDays()
+                : organization.getDeploymentCheckRetentionDays();
+
+        // The plan caps this, so a Starter customer cannot quietly keep a year of
+        // deployment checks (FZ-085, OI-14). Checked before anything is written.
+        subscriptions.requireRetentionAllowed(caller.organizationId(), retention);
+
+        FieldChanges changes = FieldChanges.builder()
+                .compare("startingSoonLeadTimeMinutes",
+                        organization.getStartingSoonLeadTimeMinutes(),
+                        request.startingSoonLeadTimeMinutes())
+                .compare("deploymentCheckRetentionDays",
+                        organization.getDeploymentCheckRetentionDays(), retention);
 
         organization.setStartingSoonLeadTimeMinutes(request.startingSoonLeadTimeMinutes());
+        organization.setDeploymentCheckRetentionDays(retention);
         Organization saved = organizationRepository.save(organization);
 
         // Transactional so the change and its record commit together, which is the whole
@@ -86,17 +104,30 @@ public class OrganizationController {
     public record SettingsRequest(
             @Min(Organization.MIN_STARTING_SOON_LEAD_TIME_MINUTES)
             @Max(Organization.MAX_STARTING_SOON_LEAD_TIME_MINUTES)
-            int startingSoonLeadTimeMinutes
+            int startingSoonLeadTimeMinutes,
+
+            /**
+             * How long deployment checks are kept.
+             *
+             * <p>The database bounds are the absolute ones; the plan's cap is narrower and
+             * is enforced in the service, because it depends on what the organization pays
+             * rather than on what the column can hold.
+             */
+            @Min(Organization.MIN_DEPLOYMENT_CHECK_RETENTION_DAYS)
+            @Max(Organization.MAX_DEPLOYMENT_CHECK_RETENTION_DAYS)
+            Integer deploymentCheckRetentionDays
     ) {
     }
 
-    public record OrganizationResponse(Long id, String name, int startingSoonLeadTimeMinutes) {
+    public record OrganizationResponse(Long id, String name, int startingSoonLeadTimeMinutes,
+                                       int deploymentCheckRetentionDays) {
 
         static OrganizationResponse from(Organization organization) {
             return new OrganizationResponse(
                     organization.getId(),
                     organization.getName(),
-                    organization.getStartingSoonLeadTimeMinutes());
+                    organization.getStartingSoonLeadTimeMinutes(),
+                    organization.getDeploymentCheckRetentionDays());
         }
     }
 

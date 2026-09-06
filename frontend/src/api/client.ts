@@ -23,11 +23,25 @@ export class ApiError extends Error {
   /** Empty unless the backend rejected specific fields. */
   readonly fieldErrors: ApiFieldError[]
 
-  constructor(status: number, message: string, fieldErrors: ApiFieldError[] = []) {
+  /**
+   * The plan limit that refused this, when the backend sent one (`FZ-081`).
+   *
+   * Carried so a 402 can render as "10 of 10 applications used" with the upgrade path,
+   * rather than as a generic error. Absent on every other status.
+   */
+  readonly planLimit: PlanLimitRefusal | null
+
+  constructor(
+    status: number,
+    message: string,
+    fieldErrors: ApiFieldError[] = [],
+    planLimit: PlanLimitRefusal | null = null,
+  ) {
     super(message)
     this.name = 'ApiError'
     this.status = status
     this.fieldErrors = fieldErrors
+    this.planLimit = planLimit
   }
 
   /** Token missing, invalid, or resolving to no user — the caller must sign in again. */
@@ -44,6 +58,11 @@ export class ApiError extends Error {
   get isConflict(): boolean {
     return this.status === 409
   }
+
+  /** Refused by the plan, not by validation or permission (`D-22`). */
+  get isPlanLimit(): boolean {
+    return this.status === 402
+  }
 }
 
 interface ProblemDetail {
@@ -52,6 +71,19 @@ interface ProblemDetail {
   errors?: ApiFieldError[]
   /** Pre-FZ-061 shape. Kept only so an older backend does not produce a blank message. */
   message?: string
+  /** 402 extensions (`FZ-081`). Present only on a plan refusal. */
+  plan?: unknown
+  resource?: unknown
+  limit?: unknown
+  current?: unknown
+}
+
+/** What refused, and by how much (`FZ-081`). */
+export interface PlanLimitRefusal {
+  plan: string
+  resource: string
+  limit: number
+  current: number
 }
 
 /**
@@ -63,6 +95,37 @@ interface ProblemDetail {
  * load balancer in front of the API is out of the backend's hands entirely — so this must
  * never depend on the body being what it should be.
  */
+/**
+ * The numbers a 402 carries as Problem Details extensions.
+ *
+ * Read defensively: a 402 from anywhere but our own handler will not have them, and a
+ * usage figure rendered from a missing field would be a confident lie.
+ */
+function planLimitFrom(body: ProblemDetail): PlanLimitRefusal | null {
+  if (typeof body.plan !== 'string' || typeof body.limit !== 'number') return null
+  return {
+    plan: body.plan,
+    resource: typeof body.resource === 'string' ? body.resource : 'resources',
+    limit: body.limit,
+    current: typeof body.current === 'number' ? body.current : body.limit,
+  }
+}
+
+/**
+ * A plan refusal, in words someone can act on.
+ *
+ * Composed here rather than at each call site, so every screen that already renders
+ * `error.message` gets the useful version without being changed — and no future screen
+ * can forget to. The backend's own `detail` is accurate but written for an API client;
+ * this is written for the person who just clicked a button.
+ */
+function describePlanLimit(limit: PlanLimitRefusal): string {
+  return (
+    `Your ${limit.plan} plan allows ${limit.limit} ${limit.resource}, ` +
+    `and you are using ${limit.current}. Upgrade under Settings → Billing to add more.`
+  )
+}
+
 async function toApiError(response: Response): Promise<ApiError> {
   const fallback = `Request failed (${response.status})`
   try {
@@ -80,10 +143,17 @@ async function toApiError(response: Response): Promise<ApiError> {
         ? fieldErrors.map((error) => `${error.field} ${error.message}`).join(', ')
         : stated
 
+      const planLimit = planLimitFrom(body)
+
       return new ApiError(
         response.status,
-        message && message.trim() ? message : fallback,
+        planLimit
+          ? describePlanLimit(planLimit)
+          : message && message.trim()
+            ? message
+            : fallback,
         fieldErrors,
+        planLimit,
       )
     } catch {
       // Not JSON — use the raw text if it is short enough to be a useful message.

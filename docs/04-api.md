@@ -25,6 +25,14 @@ The two credentials do not overlap, and that is enforced rather than merely inte
 - A JWT is not accepted on `/api/policy/**`. A signed-in browser session cannot reach the machine boundary.
 - Both mismatches are `401`, indistinguishable from no credential at all.
 
+### Billing
+
+`/api/billing/**` is Administrator-only **except** `GET /api/billing/subscription`, which any member may read (`FZ-085`). The trial banner has to reach everyone, and a member who cannot see why a creation was refused has no way to act on it.
+
+It is also the one path that stays writable while an organization is suspended (`FZ-081`), because it is how an organization stops being suspended. A read-only mode that locks out the only route to fixing it is a trap.
+
+`PATCH /api/organization/settings` accepts `deploymentCheckRetentionDays`, capped by plan and refused with `402` beyond it. It is a partial update: a field that is not sent is not a change.
+
 ### Unauthenticated endpoints
 
 `/actuator/health` and its probes, and **`POST /api/demo-requests`** (`FZ-083`) — "book a demo", which by its nature is used by someone with no account.

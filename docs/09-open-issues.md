@@ -61,15 +61,6 @@ So every guideline currently names an image that does not exist, and the README 
 
 Discoverability — a Marketplace or Catalog listing — is a separate and lesser problem, deferred to `FZ-096`.
 
-### OI-14 — The deployment-check retention lever cannot be used
-**Severity:** Gap · **Owner:** `FZ-085` · **Found in:** `FZ-081`
-
-`11-commercial.md` prices deployment-check retention as a paid lever — 90 days on Starter, a year on Growth, up to ten on Enterprise — and `Plan` carries the number. Nothing can set it.
-
-`organization.deployment_check_retention_days` is a column with a default, and `PATCH /api/organization/settings` exposes only `startingSoonLeadTimeMinutes`. So every organization sits on the 365-day default regardless of plan: Starter customers get more than they pay for, and an Enterprise customer who needs seven years cannot ask for it.
-
-Not urgent — nobody is billed yet — but it means a row of the pricing table is currently fiction. `FZ-085` owns it, since that is where plan-aware settings surface.
-
 ### OI-15 — The deployed cost posture, and which AWS services are actually needed
 **Severity:** Decision · **Owner:** needs a story · **Raised:** 2026-09-05
 
@@ -110,6 +101,7 @@ Cosmetic, and worth doing anyway: the name makes the next reader assume a coupli
 | Issue | Found in | Resolved by |
 |---|---|---|
 | **No rate limiting anywhere** — defensible while `/actuator/health` was the only endpoint reachable without a credential, and a prerequisite for signup, which creates a Cognito identity and sends an email | `FZ-080` | `FZ-087` — per-IP fixed window, in application; it also found that forwarded headers were unconfigured, so a limiter would have bucketed every customer together behind the load balancer |
+| **The deployment-check retention lever could not be used** — priced per plan in `11-commercial.md` and carried by `Plan`, but nothing could set it, so every organization sat on the 365-day default whatever they paid | `FZ-081` | `FZ-085` — settable on the settings endpoint and capped by plan, refused with the same `402` as any other limit |
 | **The audit trail recorded changes that never happened** — a no-op update compared the client's nanosecond timestamps against the microsecond values PostgreSQL had already truncated them to, and wrote an entry whose `to` value was never persisted | first CI run, `FZ-092` | `FZ-098` — decided (`D-25`): instants are normalised to storable precision at the boundary |
 | Deleting a catalog entry referenced by a restriction returned `500` instead of `409` | `FZ-020` | `FZ-036` |
 | Deliberate rejection reasons never reached clients — Spring omits `message` from its error body, so every `ResponseStatusException` reason in the API arrived as a bare status code | `FZ-036` | `FZ-036` |

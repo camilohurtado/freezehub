@@ -17,12 +17,26 @@ const integration = (overrides: Partial<Integration> = {}): Integration => ({
 
 function stubApi(list: Integration[], writeResponse?: () => Response) {
   const spy = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
-    void input
+    const url = String(input)
     if (init?.method && init.method !== 'GET') {
       return Promise.resolve(writeResponse?.() ?? new Response(null, { status: 204 }))
     }
+    // The page loads several sections, each with its own endpoint. Answering every GET
+    // with the integration list gave BillingSection a body it could not read.
+    const body = url.includes('/api/billing/subscription')
+      ? {
+          plan: 'GROWTH',
+          status: 'ACTIVE',
+          canUpgradeSelfServe: true,
+          hasBillingAccount: true,
+          trialEndsAt: null,
+          trialDaysRemaining: null,
+          currentPeriodEndsAt: null,
+          usage: [{ resource: 'applications', current: 4, limit: 50, percentUsed: 8, atLimit: false }],
+        }
+      : list
     return Promise.resolve(
-      new Response(JSON.stringify(list), {
+      new Response(JSON.stringify(body), {
         status: 200,
         headers: { 'Content-Type': 'application/json' },
       }),

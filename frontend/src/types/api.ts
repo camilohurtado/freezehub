@@ -179,3 +179,24 @@ export interface AuditEvent {
   details: Record<string, unknown> | null
   occurredAt: string
 }
+
+/** One countable resource, and how close the plan is to refusing the next one (`FZ-085`). */
+export interface PlanUsage {
+  resource: string
+  current: number
+  /** Null means unlimited, which is why it is not a number. */
+  limit: number | null
+  percentUsed: number | null
+  atLimit: boolean
+}
+
+export interface Subscription {
+  plan: string
+  status: "TRIALING" | "ACTIVE" | "PAST_DUE" | "SUSPENDED" | "CANCELLED"
+  canUpgradeSelfServe: boolean
+  hasBillingAccount: boolean
+  trialEndsAt: string | null
+  trialDaysRemaining: number | null
+  currentPeriodEndsAt: string | null
+  usage: PlanUsage[]
+}

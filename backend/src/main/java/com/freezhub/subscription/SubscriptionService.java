@@ -111,6 +111,26 @@ public class SubscriptionService {
                 subscription.getPlan().notificationDestinations(), currentCount);
     }
 
+    /**
+     * Refuses a retention longer than the plan allows (FZ-085, closes {@code OI-14}).
+     *
+     * <p>Retention is priced per tier in {@code 11-commercial.md} and {@link Plan} has
+     * carried the number since {@code FZ-081} — but nothing could set it, so every
+     * organization sat on the 365-day default whatever they paid. A row of the pricing
+     * table was fiction.
+     *
+     * <p>Answered as {@code 402} like any other plan limit: the request is well-formed and
+     * the caller is permitted, and it is the plan that refuses.
+     */
+    @Transactional(readOnly = true)
+    public void requireRetentionAllowed(Long organizationId, int requestedDays) {
+        Plan plan = of(organizationId).getPlan();
+        if (requestedDays > plan.deploymentCheckRetentionDays()) {
+            throw new PlanLimitExceededException(plan, "days of deployment-check retention",
+                    plan.deploymentCheckRetentionDays(), requestedDays);
+        }
+    }
+
     /** Null is unlimited, and unlimited never counts — the query is not even run. */
     private void enforce(Plan plan, String resource, Integer limit, LongSupplier currentCount) {
         if (limit == null) {

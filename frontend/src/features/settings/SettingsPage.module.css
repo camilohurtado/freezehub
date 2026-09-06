@@ -243,3 +243,28 @@
   background: transparent;
   cursor: pointer;
 }
+
+/* Plan usage (FZ-085). A bar as well as a number, so "nearly out" reads at a glance
+   rather than having to be worked out from two figures. */
+
+.meter,
+.meterFull {
+  display: inline-block;
+  width: 6rem;
+  height: 0.4rem;
+  border-radius: 0.2rem;
+  background: var(--fh-surface-strong);
+  overflow: hidden;
+}
+
+.meter > span,
+.meterFull > span {
+  display: block;
+  height: 100%;
+  border-radius: 0.2rem;
+  background: var(--fh-accent);
+}
+
+.meterFull > span {
+  background: var(--fh-danger);
+}
