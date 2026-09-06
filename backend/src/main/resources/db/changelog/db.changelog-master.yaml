@@ -37,3 +37,5 @@ databaseChangeLog:
       file: db/changelog/018-subscription.yaml
   - include:
       file: db/changelog/019-demo-request.yaml
+  - include:
+      file: db/changelog/020-stripe.yaml

@@ -50,6 +50,22 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-mail</artifactId>
         </dependency>
+        <!--
+            The payment provider's own SDK (FZ-084).
+
+            Added rather than hand-rolled for one reason above the others: Webhook
+            .constructEvent is the reference implementation of signature verification,
+            including the timestamp tolerance that stops a captured delivery being
+            replayed. Getting that subtly wrong in our own code would be a security bug in
+            the one place entitlement changes, and payment integration is the wrong place
+            to save a dependency.
+        -->
+        <dependency>
+            <groupId>com.stripe</groupId>
+            <artifactId>stripe-java</artifactId>
+            <version>29.2.0</version>
+        </dependency>
+
         <dependency>
             <groupId>org.liquibase</groupId>
             <artifactId>liquibase-core</artifactId>

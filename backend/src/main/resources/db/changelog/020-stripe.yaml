@@ -1,0 +1,60 @@
+databaseChangeLog:
+  - changeSet:
+      id: 020-subscription-stripe
+      author: freezehub
+      changes:
+        # Deliberately absent from 018: FZ-081 had nothing to write into them, and nullable
+        # columns nothing populates are a lie about what the system does.
+        - addColumn:
+            tableName: subscription
+            columns:
+              - column:
+                  name: stripe_customer_id
+                  type: varchar(255)
+              - column:
+                  name: stripe_subscription_id
+                  type: varchar(255)
+              # When the paid period runs out. Written from webhooks only.
+              - column:
+                  name: current_period_ends_at
+                  type: timestamptz
+        - addUniqueConstraint:
+            tableName: subscription
+            columnNames: stripe_customer_id
+            constraintName: uq_subscription_stripe_customer
+        - addUniqueConstraint:
+            tableName: subscription
+            columnNames: stripe_subscription_id
+            constraintName: uq_subscription_stripe_subscription
+
+  - changeSet:
+      id: 020-stripe-event
+      author: freezehub
+      changes:
+        # Every delivery Stripe has already been credited for.
+        #
+        # Stripe redelivers on any non-2xx, and sometimes on a 2xx it did not see. Without
+        # this, a redelivered checkout.session.completed double-counts a conversion and a
+        # redelivered subscription.deleted suspends a customer who has already
+        # re-subscribed. The event id is the primary key, so a duplicate is refused by the
+        # database rather than by a check that could race.
+        - createTable:
+            tableName: stripe_event
+            columns:
+              - column:
+                  name: event_id
+                  type: varchar(255)
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: type
+                  type: varchar(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: received_at
+                  type: timestamptz
+                  defaultValueComputed: now()
+                  constraints:
+                    nullable: false

@@ -15,6 +15,9 @@ public interface UserRepository extends JpaRepository<User, Long> {
      */
     List<User> findAllByEmail(String email);
 
+    /** Who to tell when something commercial happens to the organization (FZ-084). */
+    List<User> findAllByOrganizationIdAndRole(Long organizationId, UserRole role);
+
     boolean existsByOrganizationIdAndEmail(Long organizationId, String email);
 
 }

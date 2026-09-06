@@ -1072,7 +1072,7 @@ Acceptance:
 - Storage is not tenant-scoped — a demo request belongs to no organization yet, which makes it the one table outside the tenant boundary. It is read by operators, never by the tenant API.
 
 ### FZ-084 — Stripe Checkout and Subscription Lifecycle
-**Status:** TODO
+**Status:** DONE
 
 Checkout sessions, portal sessions, and the webhook that is the only thing allowed to change entitlement.
 
@@ -1085,7 +1085,18 @@ Acceptance:
 - An invalid or missing signature is `401`.
 - A redelivered event is ignored: every processed `event_id` is stored.
 - `invoice.payment_failed` moves the subscription to `PAST_DUE` and notifies the administrator.
-- The Stripe secret key and endpoint signing secret are held the way destination credentials are (`D-3`), never in configuration in plaintext.
+~~- The Stripe secret key and endpoint signing secret are held the way destination credentials are (`D-3`), never in configuration in plaintext.~~
+
+**That criterion could not be implemented as written, and the difference is not cosmetic.** `D-3` encrypts values that live in database rows and belong to tenants, using a key supplied to the application. These are FreezeHub's own credentials and they *are* what the application is configured with — encrypting them would need a key, which would have to be configured, which is the same problem again.
+
+They come from the environment, populated from Secrets Manager at deploy time. Nothing is committed, nothing is defaulted, nothing is logged, and absent configuration disables billing rather than starting with a blank key that would fail on the first customer instead of on startup.
+
+**Four defects found by the tests, all in code that looked right:**
+
+- A null `Stripe-Signature` header made the SDK throw `NullPointerException`, surfacing as `500` — telling a caller the server broke when their delivery was simply unsigned.
+- `received_at` was populated in `@PrePersist`, which does not fire dependably: the id is assigned rather than generated, so Spring Data treats `save()` as a merge.
+- Idempotency by catching the constraint violation does not work inside a transaction — the violation has already marked it rollback-only, so the request fails anyway as an `UnexpectedRollbackException`. It is now a check first, with the primary key as the real guarantee: a genuine race fails one request, and Stripe's redelivery is absorbed by the check.
+- `getDataObjectDeserializer().getObject()` returns empty whenever the event's API version differs from the SDK's — **which happens in production every time an account's version and the library drift apart**, not only in tests. Silently doing nothing there means a customer pays and is never activated. The documented escape hatch is used, and only a genuinely unreadable payload is skipped.
 
 ### FZ-085 — Billing and Plan UI
 **Status:** TODO
