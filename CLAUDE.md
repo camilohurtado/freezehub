@@ -380,18 +380,28 @@ The human operator decides when the commit is created.
 
 Do not automatically:
 
-* push branches;
 * merge into `master`;
-* create pull requests;
 * delete branches;
 * rewrite history;
 * force push.
 
 These operations require explicit instruction.
 
-**Standing instruction, granted during `FZ-031`:** merging a *finished* story into `master` is pre-approved. Once a story has passed its Definition of Done and been committed on its own branch, merge it with `git merge --no-ff` and branch the next story from the updated `master`.
+Pushing a finished story's branch and opening a pull request for it are **expected**, not exceptional — see the standing instruction below.
 
-This covers merging only. Everything else in the list above — pushing, pull requests, deleting branches, rewriting history, force pushing — still requires explicit instruction each time, as does committing work that is not a completed story.
+**Superseded on 2026-09-06.** The pre-approval to merge finished stories straight into `master` (granted during `FZ-031`) no longer applies. Every fix and every feature goes through a pull request the human operator approves.
+
+**Standing instruction — pull requests:** once a story has passed its Definition of Done and been committed on its own branch:
+
+1. Push the branch.
+2. Open a pull request against `master` with `gh pr create`.
+3. Report the PR link and stop.
+
+Do **not** merge it. Do not merge your own pull request, and do not branch the next story from an unmerged one — branch from `master` and say so if that means the next story starts without the previous one's changes.
+
+The pull request body carries what a reviewer needs to disagree with the work: what was decided and why, anything found in passing, anything left undone, and what was actually executed to verify it. A PR that only restates the diff wastes the review.
+
+Still requiring explicit instruction each time: deleting branches, rewriting history, force pushing, and committing work that is not a completed story.
 
 ### Story Completion
 
