@@ -1443,9 +1443,17 @@ Sizes are taken from the mockup, not chosen: h1 34/36.7, h2 21/25.2, body 15/23.
 Frontend only.
 
 ### FZ-104 — Scope Names in the API
-**Status:** TODO
+**Status:** NOT NEEDED · **Investigated, not built**
 
-`ScopeResponse` returns `Set<Long>` ids. `1d` shows scope as `production`, `staging`; `1e` needs names for its live "this will match…" summary. The UI cannot render a name it was never given, and resolving ids client-side would mean the frontend holding a copy of the catalog.
+Planned on an assumption the code disproves. `ScopeResponse` does return ids only — but the detail page already resolves them, against the team, application and environment catalogs it loads anyway, and renders `production` today. The mockup's scope sentence is already in the page verbatim, from `FZ-022`.
+
+Verified in a browser against a real restriction rather than by reading: the Environments row reads `production`, and empty dimensions read `Any`.
+
+Resolving an id to a name is a lookup, not a domain rule, so doing it client-side does not put the frontend in charge of anything (`CLAUDE.md` §5). The create form needs the same catalogs for its pickers, so it has names too.
+
+The only cost is three catalog requests per detail view, which is not worth an API change at this size. Reopen if a screen ever needs a name without already holding the catalog.
+
+**What `1d` actually needs is layout, not data** — the two-column definition grid, hairline rules instead of boxes, letterspaced labels, scope values as tags, and GMT times. That is `FZ-107`.
 
 ### FZ-105 — Deployment Check Aggregates
 **Status:** TODO
@@ -1467,12 +1475,12 @@ All read from `deployment_check`, which already records every evaluation (`FZ-07
 Plus `1b`'s four metrics, and `1c`'s **"Then what"** — a forward list of transitions as date plus plain sentence, ending "Clear from here." It reads from the restrictions already loaded; the value is that it says what happens rather than listing what exists.
 
 ### FZ-107 — Restriction Detail
-**Status:** TODO · **Needs:** `FZ-104`
+**Status:** TODO
 
 `1d`, taken as drawn: the two-column definition grid, scope resolved to names, and the scope explanation — *"A deployment is affected when it matches **every** dimension below. 'Any' means the dimension places no constraint."* That sentence documents the AND-across-dimensions rule (`FZ-020`) where somebody will actually read it.
 
 ### FZ-108 — Create Restriction
-**Status:** TODO · **Needs:** `FZ-104`
+**Status:** TODO
 
 `1e`. Two things beyond a restyle:
 
