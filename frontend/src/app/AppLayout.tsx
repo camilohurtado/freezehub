@@ -51,7 +51,7 @@ export function AppLayout() {
             Settings
           </NavLink>
         </nav>
-        <button className={styles.signOut} type="button" onClick={signOut}>
+        <button className={`btn btn-secondary ${styles.signOut}`} type="button" onClick={signOut}>
           Sign out
         </button>
       </header>

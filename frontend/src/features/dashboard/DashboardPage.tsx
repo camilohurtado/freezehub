@@ -27,7 +27,7 @@ export function DashboardPage() {
         <h1 className={styles.title}>Dashboard</h1>
         <div className={styles.state} role="alert">
           <p className={styles.errorText}>Could not load restrictions. {error.message}</p>
-          <button className={styles.retry} type="button" onClick={() => refetch()}>
+          <button className={`btn btn-secondary ${styles.retry}`} type="button" onClick={() => refetch()}>
             Try again
           </button>
         </div>

@@ -3,65 +3,50 @@
   align-items: center;
   justify-content: center;
   min-height: 100vh;
-  padding: 1.5rem;
+  padding: var(--space-6);
 }
 
+/* Frame and marks come from <Blueprint>; the extra inset is so the corner marks are not
+   crowded by the viewport edge on a small screen. */
 .card {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
   width: 100%;
-  max-width: 22rem;
-  padding: 2rem;
-  border: 1px solid var(--fh-border);
-  border-radius: 0.5rem;
-  background: var(--fh-surface);
+  max-width: 24rem;
+  padding: var(--space-8);
 }
 
 .title {
-  margin: 0;
-  font-size: 1.5rem;
+  margin: 0 0 var(--space-1);
+  font-size: 26px;
+  letter-spacing: 0.02em;
 }
 
 .hint {
-  margin: 0 0 0.75rem;
+  margin: 0 0 var(--space-6);
   color: var(--fh-text-muted);
-  font-size: 0.8125rem;
+  font-size: 12.5px;
 }
 
 .label {
-  font-size: 0.8125rem;
-  font-weight: 600;
+  display: block;
+  font-size: 12px;
+  margin-bottom: 5px;
+  color: color-mix(in srgb, var(--color-text) 70%, transparent);
 }
 
+/* Uses the global .input; nothing to add. */
 .input {
-  padding: 0.5rem 0.625rem;
-  border: 1px solid var(--fh-border);
-  border-radius: 0.25rem;
-  background: var(--fh-bg);
-  color: inherit;
-  font: inherit;
+  composes: input from global;
 }
 
 .error {
-  margin: 0.25rem 0 0;
+  margin: var(--space-2) 0 0;
   color: var(--fh-danger);
-  font-size: 0.8125rem;
+  font-size: 12.5px;
+  font-weight: 500;
 }
 
 .button {
-  margin-top: 0.75rem;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid transparent;
-  border-radius: 0.25rem;
-  background: var(--fh-accent);
-  color: #fff;
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.button:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
+  margin-top: var(--space-4);
 }

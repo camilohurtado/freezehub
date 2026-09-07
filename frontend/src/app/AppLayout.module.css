@@ -2,48 +2,47 @@
   min-height: 100vh;
 }
 
+/* Industry's .nav pattern, with the app's own sticky behaviour on top. */
 .header {
   display: flex;
   align-items: center;
-  gap: 1.5rem;
-  padding: 0.75rem 1.5rem;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--fh-border);
-  background: var(--fh-surface);
+  background: var(--fh-bg);
 }
 
 .brand {
-  font-weight: 700;
+  font-family: var(--font-heading);
+  font-weight: var(--font-heading-weight);
+  font-size: 18px;
+  letter-spacing: 0.02em;
 }
 
 .nav {
   display: flex;
-  gap: 1rem;
+  gap: var(--space-4);
   flex: 1;
 }
 
 .link,
 .linkActive {
-  color: var(--fh-text-muted);
-  font-size: 0.875rem;
+  color: var(--fh-text);
+  font-size: 14px;
   text-decoration: none;
 }
 
-.linkActive {
-  color: var(--fh-text);
-  font-weight: 600;
-}
-
 .link:hover {
-  color: var(--fh-text);
+  color: var(--fh-accent-ink);
 }
 
+.linkActive {
+  color: var(--fh-accent-ink);
+  border-bottom: 2px solid var(--fh-accent);
+  padding-bottom: 2px;
+}
+
+/* Uses the global .btn .btn-secondary in the TSX; only placement lives here. */
 .signOut {
-  padding: 0.3125rem 0.625rem;
-  border: 1px solid var(--fh-border-strong);
-  border-radius: 0.25rem;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  font-size: 0.8125rem;
-  cursor: pointer;
+  margin-left: var(--space-2);
 }

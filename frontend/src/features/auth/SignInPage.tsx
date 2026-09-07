@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router'
 import { apiRequest, ApiError } from '../../api/client'
 import type { DevSignInResponse } from '../../types/api'
 import { useAuth } from './authContext'
+import { Blueprint } from '../../components/Blueprint'
 import styles from './SignInPage.module.css'
 
 /**
@@ -48,7 +49,7 @@ export function SignInPage() {
 
   return (
     <main className={styles.page}>
-      <form className={styles.card} onSubmit={handleSubmit}>
+      <Blueprint as="form" className={styles.card} onSubmit={handleSubmit}>
         <h1 className={styles.title}>FreezeHub</h1>
         <p className={styles.hint}>
           Development sign-in. Replaced by Cognito when the user pool exists.
@@ -73,10 +74,10 @@ export function SignInPage() {
           </p>
         )}
 
-        <button className={styles.button} type="submit" disabled={submitting || !email}>
+        <button className={`btn btn-primary btn-block ${styles.button}`} type="submit" disabled={submitting || !email}>
           {submitting ? 'Signing in…' : 'Sign in'}
         </button>
-      </form>
+      </Blueprint>
     </main>
   )
 }

@@ -8,3 +8,9 @@ backend/target/
 .idea/
 *.iml
 .vscode/
+
+# Design hand-offs: reference material, not source. The change set they carry is applied
+# to frontend/src and reviewed there; keeping a second copy in the repo invites edits to
+# the copy nobody builds.
+design_handoff_*/
+*.zip

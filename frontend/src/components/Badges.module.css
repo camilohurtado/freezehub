@@ -1,45 +1,54 @@
+/*
+ * Level and status badges, on Industry's tag classes.
+ *
+ * Industry is a mono system: there is no red to spend on "this blocks you". Emphasis
+ * comes from fill vs outline vs plain, which is why a blocking level reads as a filled
+ * accent tag and an advisory one as a neutral tag. See the PR's "One decision you should
+ * confirm" if you would rather keep a functional red.
+ */
 .levelBlocking,
 .levelAdvisory,
 .statusActive,
 .statusScheduled,
 .statusCompleted,
 .statusCancelled {
-  display: inline-block;
-  padding: 0.125rem 0.5rem;
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
   border: 1px solid transparent;
-  border-radius: 999px;
-  font-size: 0.6875rem;
-  font-weight: 700;
+  border-radius: 0;
+  font-size: 11px;
+  font-weight: 500;
   letter-spacing: 0.02em;
-  text-transform: uppercase;
   white-space: nowrap;
 }
 
 .levelBlocking {
-  border-color: var(--fh-danger);
-  color: var(--fh-danger);
+  background: var(--color-accent-100);
+  color: var(--color-accent-800);
 }
 
 .levelAdvisory {
-  border-color: var(--fh-border-strong);
-  color: var(--fh-text-muted);
+  background: var(--color-neutral-100);
+  color: var(--color-neutral-800);
 }
 
+/* Active is the one status that is a state of the world, not a label: it takes the
+   solid accent, the same weight the primary button gets. */
 .statusActive {
-  border-color: var(--fh-danger);
-  background: var(--fh-danger);
-  color: #fff;
+  background: var(--color-accent);
+  color: var(--color-bg);
 }
 
 .statusScheduled {
-  border-color: var(--fh-accent);
-  color: var(--fh-accent);
+  border-color: var(--color-accent);
+  color: var(--color-accent-800);
 }
 
 .statusCompleted,
 .statusCancelled {
-  border-color: var(--fh-border-strong);
-  color: var(--fh-text-muted);
+  background: var(--color-neutral-100);
+  color: var(--color-neutral-800);
 }
 
 .statusCancelled {
