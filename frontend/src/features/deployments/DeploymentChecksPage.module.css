@@ -93,8 +93,9 @@
 
 .decisionBlock {
   composes: decisionAllow;
-  background: var(--color-neutral-900);
-  color: var(--color-bg);
+  background: var(--fh-danger-surface);
+  color: var(--fh-danger);
+  font-weight: 600;
 }
 
 .state {

@@ -1,10 +1,9 @@
 /*
- * Level and status badges, on Industry's tag classes.
+ * Level and status badges (FZ-103), following the brief's one rule for colour.
  *
- * Industry is a mono system: there is no red to spend on "this blocks you". Emphasis
- * comes from fill vs outline vs plain, which is why a blocking level reads as a filled
- * accent tag and an advisory one as a neutral tag. See the PR's "One decision you should
- * confirm" if you would rather keep a functional red.
+ * Magenta is spent on the LEVEL, because that is the field that says a deployment gets
+ * stopped. "active" takes a cyan outline instead: it is a state you can act on, and
+ * giving it magenta too would put two claims of "in force" on one card.
  */
 .levelBlocking,
 .levelAdvisory,
@@ -24,20 +23,21 @@
 }
 
 .levelBlocking {
-  background: var(--color-accent-100);
-  color: var(--color-accent-800);
+  background: var(--fh-danger-surface);
+  color: var(--fh-danger);
 }
 
 .levelAdvisory {
-  background: var(--color-neutral-100);
+  background: var(--color-neutral-200);
   color: var(--color-neutral-800);
 }
 
-/* Active is the one status that is a state of the world, not a label: it takes the
-   solid accent, the same weight the primary button gets. */
+/* An outline, not a fill: "active" is a state you can open, so it takes the actionable
+   colour. The magenta on the same card is on the level beside it. */
 .statusActive {
-  background: var(--color-accent);
-  color: var(--color-bg);
+  background: transparent;
+  border-color: var(--color-accent);
+  color: var(--color-accent-800);
 }
 
 .statusScheduled {
