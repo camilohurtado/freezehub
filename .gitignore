@@ -14,3 +14,4 @@ backend/target/
 # the copy nobody builds.
 design_handoff_*/
 *.zip
+FreezeHub?UI?mockups/

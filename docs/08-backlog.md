@@ -1358,3 +1358,37 @@ Acceptance:
 - Errors remain red everywhere they were red.
 
 **Most of the app is unported.** Restriction list, detail, create, checks, settings, catalog and audit still carry the old layout on the new tokens — they inherit the palette and type but not the Industry layout. Two of those carry product changes rather than restyles and must not be smuggled in as design work: the create form replaces the native `<select multiple>` scope pickers with chip toggles (`05-frontend.md` accepted the native control knowingly), and the checks screen wants a 14-day bar chart needing a per-day aggregate **the API does not expose**.
+
+### FZ-101 — Broadsheet Design System
+**Status:** DONE · **Replaces:** `FZ-100`
+
+The look and feel changed direction. Broadsheet is newsprint set for the web — near-black Source Serif 4 on paper, cyan used small like spot colour — and it **inverts** Industry rather than varying it: *"do not structure the page with rules, borders or boxes"* and *"do not introduce a sans-serif for UI chrome; the serif is the chrome"* are both direct contradictions of what `FZ-100` shipped.
+
+`Blueprint.tsx` is deleted with it. Corner registration marks are Industry's signature, and Broadsheet forbids the frames they decorate.
+
+**Unlike `FZ-100` there was no change set** — Broadsheet ships the system and the mockups, not ready-to-commit modules. This is a port, not a copy, so more of it is judgement.
+
+**Fully mono, decided.** Broadsheet carries cyan and magenta but no red, and this port distinguishes a refusal by weight rather than hue. That puts real load on the rest: a hard freeze is a filled tag and an advisory an outlined one; a refused deployment check is the heaviest ink on the sheet reversed out to paper; error text is full-strength ink at heading weight. Wherever that distinction gets flattened, a refusal stops reading as one — the failure to watch for in a product whose job is refusing deployments. Reversing it is one line, noted in `index.css`.
+
+**Three things found that no theme could have fixed:**
+
+1. **Audit and Deployment Checks were never on the token system at all.** Both carried a Tailwind-ish palette inline — `#4b5563`, `#1d4ed8`, `#e5e7eb`. That, not "old layout on new tokens", is why neither theme reached them. Converted by role rather than by nearest colour, so they follow the system from here.
+2. **`--color-warning`, `--color-warning-surface` and `--color-warning-text` were never defined.** The one-time API key reveal had always rendered its amber fallbacks, unreachable by any theme. It now carries its loudness in ink.
+3. **A raw `#9ca3af`** in a button border — exactly what the system's own adherence config forbids.
+
+Every colour in every module now comes from a token; the only hex left in the frontend is the token definitions themselves.
+
+**Radius was normalised** onto `--radius-md`. The modules carried five different values predating either theme.
+
+Acceptance:
+
+- 117 frontend tests pass untouched; every `styles.X` reference resolves; `tsc`, `oxlint` and `vite build` clean.
+
+**Two things in the mockups deliberately NOT built**, because they are product changes wearing design clothes and belong to their own stories:
+
+- **Create restriction** — the mock replaces the native `<select multiple>` scope pickers with chip toggles and adds a live "this will match…" summary. `05-frontend.md` accepted the native control knowingly.
+- **Deployment checks** — the mock adds a 14-day allowed/refused bar chart. That needs a per-day aggregate **the API does not expose**.
+
+**Also not built: the landing page.** The mockups include one, but there is no public marketing route — Milestone 8 deliberately deferred the public site (`FZ-080`), so there is nothing for it to live in yet.
+
+**Spacing is still literal.** 120 padding/gap/margin declarations use rem values rather than `--space-*`, so Broadsheet's 1.25× density reaches the app only through the type scale. Converting them is a large mechanical change with real breakage risk and is left for its own story (`OI-18`).

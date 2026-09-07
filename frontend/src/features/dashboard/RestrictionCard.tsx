@@ -2,7 +2,6 @@ import { Link } from 'react-router'
 import type { RestrictionSummary } from '../../types/api'
 import { LevelBadge } from '../../components/Badges'
 import { formatInstant } from '../../utils/datetime'
-import { Blueprint } from '../../components/Blueprint'
 import styles from './RestrictionCard.module.css'
 
 /**
@@ -16,8 +15,7 @@ export function RestrictionCard({ restriction }: { restriction: RestrictionSumma
   const isBlockingNow = restriction.level === 'HARD_FREEZE' && restriction.status === 'ACTIVE'
 
   return (
-    <Blueprint
-      as="li"
+    <li
       className={
         // A freeze that is blocking deployments right now gets an accent frame. Industry
         // is mono, so emphasis is weight and colour of line rather than a different hue —
@@ -41,6 +39,6 @@ export function RestrictionCard({ restriction }: { restriction: RestrictionSumma
         <dt className={styles.term}>Until</dt>
         <dd className={styles.value}>{formatInstant(restriction.endsAt)}</dd>
       </dl>
-    </Blueprint>
+    </li>
   )
 }

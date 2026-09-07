@@ -1,106 +1,113 @@
 /*
- * Global tokens and baseline. Everything component-specific lives in a CSS Module
- * alongside its component (05-frontend.md).
+ * Broadsheet (FZ-101), replacing Industry (FZ-100).
  *
- * The --color-* block below is the Industry design system's token sheet, copied verbatim
- * so it can be re-pasted when the system is retuned. The --fh-* names the app already
- * uses are then defined ON TOP of it: no component had to be renamed, and Industry stays
- * the single source of visual truth.
+ * Newsprint set for the web: near-black Source Serif 4 on paper white, cyan used small
+ * and deliberately like spot colour. Structure comes from the serif scale and negative
+ * space — not from rules, borders or boxes.
+ *
+ * Same architecture as before, and the reason the swap is cheap: Broadsheet's token block
+ * is verbatim below, and the app's own --fh-* names are redefined on top of it. Every CSS
+ * Module keeps working without an edit; only the ones with Industry-specific *structure*
+ * needed rewriting.
  */
-@import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;700&family=Barlow+Condensed:wght@400;600&display=swap');
+
+@import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,wght@0,400;0,600;1,400&display=swap');
 
 :root {
-  --color-bg: #f2f2f3;
-  --color-surface: #e9e9ea;
-  --color-text: #1d1f20;
-  --color-accent: #5980a6;
-  --color-accent-2: #728fab;
-  --color-divider: color-mix(in srgb, #1d1f20 16%, transparent);
+  --color-bg: #f3f2f2;
+  --color-surface: #eae9e9;
+  --color-text: #201e1d;
+  --color-accent: #0088b0;
+  --color-accent-2: #d6006c;
+  --color-divider: color-mix(in srgb, #201e1d 16%, transparent);
 
-  /* Tonal ramps — generated in OKLCH on one shared lightness scale, so the
-     same step of any role matches the others in visual value. */
-  --color-neutral-100: #f5f5f8;
-  --color-neutral-200: #e7e7ea;
-  --color-neutral-300: #d4d4d7;
-  --color-neutral-400: #b7b7ba;
-  --color-neutral-500: #98989b;
-  --color-neutral-600: #7a7a7d;
-  --color-neutral-700: #5d5d60;
-  --color-neutral-800: #424244;
-  --color-neutral-900: #2b2b2d;
+  /* Tonal ramps — generated in OKLCH on one shared lightness scale, so the same step of
+     any role matches the others in visual value. */
+  --color-neutral-100: #f8f4f4;
+  --color-neutral-200: #eae7e7;
+  --color-neutral-300: #d7d3d3;
+  --color-neutral-400: #bab6b6;
+  --color-neutral-500: #9b9797;
+  --color-neutral-600: #7d7979;
+  --color-neutral-700: #605d5d;
+  --color-neutral-800: #444141;
+  --color-neutral-900: #2d2b2b;
 
-  --color-accent-100: #eef6ff;
-  --color-accent-200: #d6ebff;
-  --color-accent-300: #b5d9fd;
-  --color-accent-400: #94bce3;
-  --color-accent-500: #749dc4;
-  --color-accent-600: #597ea3;
-  --color-accent-700: #416180;
-  --color-accent-800: #2c455d;
-  --color-accent-900: #1d2d3d;
+  --color-accent-100: #e9f8ff;
+  --color-accent-200: #cbeeff;
+  --color-accent-300: #99e0ff;
+  --color-accent-400: #62c5ee;
+  --color-accent-500: #38a6cf;
+  --color-accent-600: #1186ac;
+  --color-accent-700: #006786;
+  --color-accent-800: #004961;
+  --color-accent-900: #0a303e;
 
-  --color-accent-2-100: #eef6ff;
-  --color-accent-2-200: #d6ebff;
-  --color-accent-2-300: #bdd8f2;
-  --color-accent-2-400: #9ebbd8;
-  --color-accent-2-500: #7e9cb8;
-  --color-accent-2-600: #627d98;
-  --color-accent-2-700: #486077;
-  --color-accent-2-800: #314457;
-  --color-accent-2-900: #1f2d3a;
+  --color-accent-2-100: #fff1f4;
+  --color-accent-2-200: #ffdee6;
+  --color-accent-2-300: #ffc0d0;
+  --color-accent-2-400: #ff90b1;
+  --color-accent-2-500: #ff458e;
+  --color-accent-2-600: #d82071;
+  --color-accent-2-700: #aa0b56;
+  --color-accent-2-800: #790e3d;
+  --color-accent-2-900: #4b1528;
 
-  --font-heading: "Barlow Condensed", system-ui, sans-serif;
+  --font-heading: "Source Serif 4", Georgia, "Times New Roman", serif;
   --font-heading-weight: 600;
-  --font-body: "Barlow", system-ui, sans-serif;
+  --font-body: "Source Serif 4", Georgia, "Times New Roman", serif;
 
-  --space-1: 3.4px;
-  --space-2: 6.8px;
-  --space-3: 10.2px;
-  --space-4: 13.6px;
-  --space-6: 20.4px;
-  --space-8: 27.2px;
+  --space-1: 5px;
+  --space-2: 10px;
+  --space-3: 15px;
+  --space-4: 20px;
+  --space-6: 30px;
+  --space-8: 40px;
 
-  --radius-sm: 2px;
-  --radius-md: 4px;
-  --radius-lg: 7px;
+  --radius-sm: 1px;
+  --radius-md: 2px;
+  --radius-lg: 4px;
 
-  /* Elevation — derived from the ground: soft ink-tinted shadows on a
-     light theme, a hairline edge + ambient darkness on a dark one. */
-  --shadow-sm: 0 1px 2px color-mix(in srgb, #2b2b2d 14%, transparent);
-  --shadow-md: 0 3px 10px color-mix(in srgb, #2b2b2d 16%, transparent);
-  --shadow-lg: 0 12px 32px color-mix(in srgb, #2b2b2d 22%, transparent);
+  --shadow-sm: 0 1px 2px color-mix(in srgb, #2d2b2b 14%, transparent);
+  --shadow-md: 0 3px 10px color-mix(in srgb, #2d2b2b 16%, transparent);
+  --shadow-lg: 0 12px 32px color-mix(in srgb, #2d2b2b 22%, transparent);
 }
 
 :root {
   /* App-level aliases. Change a mapping here, not in a module. */
   --fh-bg: var(--color-bg);
-  --fh-surface: transparent;          /* Industry cards are line drawings, not fills */
-  --fh-surface-strong: var(--color-neutral-100);
+  --fh-surface: var(--color-surface);
+  --fh-surface-strong: var(--color-neutral-200);
   --fh-border: var(--color-divider);
   --fh-border-strong: var(--color-neutral-400);
   --fh-text: var(--color-text);
   --fh-text-muted: var(--color-neutral-700);
   --fh-accent: var(--color-accent);
-  --fh-accent-ink: var(--color-accent-700);  /* accent at paragraph size — see readme */
+  --fh-accent-ink: var(--color-accent-700);  /* accent at paragraph size — 3:1 is chrome only */
 
-  /* The one documented exception to Industry's no-decorative-colour rule (FZ-100).
-     
-     Industry is mono and the handoff mapped this to deep steel. Kept red deliberately:
-     --fh-danger is not decoration, it is state, and it carries 22 declarations across
-     nine stylesheets — every validation error and every .actionError in the product, not
-     just the badges the handoff's README weighed. In a tool whose entire job is telling
-     someone they may not deploy, a refusal that renders in the same steel as ordinary
-     chrome is a legibility regression rather than a stylistic trade.
-     
-     Everything else stays mono. If a new surface wants colour, it does not get it here. */
-  --fh-danger: #b4232b;
+  /*
+   * Fully mono, decided for this port.
+   *
+   * Broadsheet carries cyan and magenta but no red, and the decision taken was that a
+   * refusal is not distinguished by hue. So --fh-danger is the darkest neutral: an error
+   * is the heaviest ink on the page rather than a different colour from it.
+   *
+   * The load this puts on the rest of the design: since hue cannot say "blocked",
+   * weight, fill and type have to. A hard freeze is a filled tag, an advisory an outlined
+   * one; error text is the full-strength ink at heading weight, not a tint. Anywhere that
+   * distinction gets flattened, a refusal stops reading as a refusal — which in a product
+   * whose job is refusing deployments is the failure to watch for.
+   *
+   * Reversing this is one line: --fh-danger: #b4232b, as Industry carried it.
+   */
+  --fh-danger: var(--color-neutral-900);
 
-  --fh-radius: 0;                     /* square corners are the system's signature */
+  --fh-radius: var(--radius-md);
 
   font-family: var(--font-body);
-  font-size: 15px;
-  line-height: 1.55;
-  color-scheme: light;                /* Industry ships no dark ramp — see README */
+  font-size: 16px;
+  line-height: 1.6;
+  color-scheme: light;   /* Broadsheet shows no dark surfaces — OI-17 */
 }
 
 * {
@@ -109,33 +116,68 @@
 
 body {
   margin: 0;
-  min-height: 100vh;
   background: var(--fh-bg);
   color: var(--fh-text);
   font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
+/*
+ * The serif is the chrome. Headings are the same family as body text, and the hierarchy
+ * is carried by size and measure alone — the system forbids a sans for interface chrome.
+ */
 h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-heading);
   font-weight: var(--font-heading-weight);
-  line-height: 1.12;
-  letter-spacing: -0.015em;
+  line-height: 1.15;
+  text-wrap: balance;
+  margin: 0;
 }
+
+h1 { font-size: 2.4rem; letter-spacing: -0.012em; }
+h2 { font-size: 1.75rem; letter-spacing: -0.008em; }
+h3 { font-size: 1.3rem; }
+h4 { font-size: 1.1rem; }
+
+p { margin: 0; }
 
 a {
   color: var(--fh-accent-ink);
-  text-underline-offset: 3px;
+  text-underline-offset: 2px;
 }
 
 a:hover {
-  color: var(--color-accent-900);
+  color: var(--color-accent-800);
 }
 
+/* Never the browser default ring — the system asks for its own, on every focusable. */
 :focus-visible {
-  outline: 2px solid var(--fh-accent);
+  outline: 2px solid var(--color-accent);
   outline-offset: 2px;
 }
 
 ::selection {
-  background: color-mix(in srgb, var(--color-accent) 30%, transparent);
+  background: var(--color-accent-200);
+  color: var(--color-accent-900);
+}
+
+/* Instants, ids, key prefixes and app → env pairs. Digits have to line up in a table. */
+.mono,
+code,
+kbd,
+samp {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.9em;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

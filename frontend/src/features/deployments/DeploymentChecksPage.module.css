@@ -10,7 +10,7 @@
 .description {
   margin: 0 0 1.25rem;
   max-width: 60ch;
-  color: #4b5563;
+  color: var(--fh-text-muted);
   font-size: 0.9rem;
 }
 
@@ -20,20 +20,20 @@
   gap: 0.5rem;
   margin: 0 0 1rem;
   padding: 0.75rem;
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
+  border: 1px solid var(--fh-border);
+  border-radius: var(--radius-md);
 }
 
 .legend {
   padding: 0 0.35rem;
-  color: #4b5563;
+  color: var(--fh-text-muted);
   font-size: 0.8rem;
 }
 
 .filter {
   padding: 0.3rem 0.7rem;
-  border: 1px solid #d1d5db;
-  border-radius: 999px;
+  border: 1px solid var(--fh-border-strong);
+  border-radius: calc(var(--radius-md) * 0.75);
   background: transparent;
   cursor: pointer;
   font-size: 0.85rem;
@@ -41,9 +41,9 @@
 
 .filterActive {
   composes: filter;
-  border-color: #1d4ed8;
-  background: #eff6ff;
-  color: #1d4ed8;
+  border-color: var(--color-accent);
+  background: var(--color-accent-100);
+  color: var(--color-accent);
   font-weight: 600;
 }
 
@@ -59,7 +59,7 @@
   gap: 0.5rem 1rem;
   align-items: baseline;
   padding: 0.75rem 0;
-  border-bottom: 1px solid #f3f4f6;
+  border-bottom: 1px solid var(--color-neutral-200);
 }
 
 .target {
@@ -67,7 +67,7 @@
 }
 
 .meta {
-  color: #6b7280;
+  color: var(--fh-text-muted);
   font-size: 0.85rem;
 }
 
@@ -78,40 +78,40 @@
 
 .blockedBy {
   flex-basis: 100%;
-  color: #b91c1c;
+  color: var(--fh-danger);
   font-size: 0.85rem;
 }
 
 .decisionAllow {
   padding: 0.15rem 0.5rem;
-  border-radius: 999px;
-  background: #ecfdf5;
-  color: #065f46;
+  border-radius: calc(var(--radius-md) * 0.75);
+  background: var(--color-neutral-100);
+  color: var(--fh-text-muted);
   font-size: 0.75rem;
   font-weight: 600;
 }
 
 .decisionBlock {
   composes: decisionAllow;
-  background: #fef2f2;
-  color: #991b1b;
+  background: var(--color-neutral-900);
+  color: var(--color-bg);
 }
 
 .state {
   padding: 1rem 0;
-  color: #4b5563;
+  color: var(--fh-text-muted);
 }
 
 .errorText {
-  color: #b91c1c;
+  color: var(--fh-danger);
 }
 
 .more,
 .retry {
   margin-top: 1rem;
   padding: 0.45rem 0.9rem;
-  border: 1px solid #d1d5db;
-  border-radius: 4px;
+  border: 1px solid var(--fh-border-strong);
+  border-radius: var(--radius-md);
   background: transparent;
   cursor: pointer;
 }

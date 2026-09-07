@@ -107,6 +107,17 @@ Recorded rather than silently removed, because taking away something an applicat
 
 
 
+### OI-18 — Module spacing does not use the design system's scale
+**Severity:** Gap · **Owner:** needs a story · **Found in:** `FZ-101`
+
+120 `padding` / `gap` / `margin` declarations across the CSS Modules use rem literals; 21 use `var(--space-*)`. The modules were written before either design system and never converted.
+
+The consequence is that a system's density is unreachable by changing tokens. Broadsheet specifies a 1.25× airier scale, and the application receives it only through the type scale — the layout keeps the spacing it has always had, whatever the tokens say.
+
+Not urgent and not visible as a defect; it is why the app will keep looking approximately-themed rather than exactly-themed. Converting is mechanical but touches every screen at once, which is precisely the change most likely to break layout in ways tests asserting on text and roles cannot catch.
+
+## Resolved
+
 | Issue | Found in | Resolved by |
 |---|---|---|
 | **No rate limiting anywhere** — defensible while `/actuator/health` was the only endpoint reachable without a credential, and a prerequisite for signup, which creates a Cognito identity and sends an email | `FZ-080` | `FZ-087` — per-IP fixed window, in application; it also found that forwarded headers were unconfigured, so a limiter would have bucketed every customer together behind the load balancer |
