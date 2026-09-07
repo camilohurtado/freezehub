@@ -1319,3 +1319,30 @@ Acceptance:
 - A real change to the window is still recorded, with both values at storable precision.
 - The API returns what was stored, so a client that sends nanoseconds is told plainly what it got.
 - The macOS/Linux split is gone: the regression test supplies nanoseconds explicitly rather than depending on the host clock's precision.
+
+## Milestone 11 — Visual Identity
+
+### FZ-100 — Industry Design System
+**Status:** DONE
+
+A design hand-off in `design_handoff_industry_theme/` puts the **Industry** system behind the frontend: steel-blue on a light technical ground, Barlow Condensed over Barlow, square corners, hairline frames with "+" registration marks, one solid accent object per screen.
+
+**The architecture is the part worth keeping.** The repo already centralises tokens as `--fh-*`, so Industry's token block is pasted above them and the aliases are redefined on top — every existing CSS Module inherits the new look with no edit at all. Component classes (`.btn`, `.card`, `.tag`, `.blueprint`) arrive as one global sheet; the modules keep only layout. **Look comes from the global layer, layout from the module**, and that split is what the next screen should follow.
+
+**Three defects in the change set, found before applying it:**
+
+1. **`main.tsx` would not compile.** It changed `import App from './app/App.tsx'` to a named import, but `App` is a default export. Only the one `industry.css` import its README describes was taken.
+2. **Losing red is bigger than its README weighed.** It presents the mono decision as being about badges. `--fh-danger` carries **22 declarations across nine stylesheets** — every validation error and every `.actionError` in the product, most of them in routes the change set does not touch. Decided: **red stays** for errors and blocking states, as a documented functional exception. It is state, not decoration, and in a tool whose job is refusing deployments a refusal rendered in ordinary chrome is a legibility regression.
+3. `.cardBlocking` shipped in the CSS but was never wired. It now keys on `HARD_FREEZE` **and** `ACTIVE` — a scheduled freeze has not stopped anything yet, and framing it the same way cries wolf.
+
+**A claim of mine that was wrong, corrected:** I reported that `--fh-surface: transparent` would break two unported stylesheets. It does not. My grep used `fh-surface\b`, which also matches `--fh-surface-strong` — a real neutral tint. Exactly one rule uses `var(--fh-surface)`, a button that already has a border, where transparent is correct Industry styling. The hand-off's claim was right.
+
+**Dark mode is dropped**, as the hand-off intends: Industry ships no dark ramp, so `color-scheme` is pinned to light. Reinstating it means choosing dark values for every role — design work, not a port (`OI-17`).
+
+Acceptance:
+
+- Tests pass **untouched** — 117 of them, asserting text and roles rather than class names. That was the hand-off's own proposed signal that this is style-only, and it holds.
+- Every `styles.X` reference in the six rewritten modules resolves, and no class ships unused.
+- Errors remain red everywhere they were red.
+
+**Most of the app is unported.** Restriction list, detail, create, checks, settings, catalog and audit still carry the old layout on the new tokens — they inherit the palette and type but not the Industry layout. Two of those carry product changes rather than restyles and must not be smuggled in as design work: the create form replaces the native `<select multiple>` scope pickers with chip toggles (`05-frontend.md` accepted the native control knowingly), and the checks screen wants a 14-day bar chart needing a per-day aggregate **the API does not expose**.

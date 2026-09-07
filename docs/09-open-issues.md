@@ -96,7 +96,16 @@ Nothing is urgent while nothing is deployed. It becomes urgent the day someone o
 
 Cosmetic, and worth doing anyway: the name makes the next reader assume a coupling that does not exist, and it is a rename migration plus a handful of accessors while there is no production data to migrate.
 
-## Resolved
+### OI-17 — Dark mode was removed with the Industry theme
+**Severity:** Gap · **Owner:** needs a story · **Found in:** `FZ-100`
+
+The frontend supported `prefers-color-scheme: dark` through the `--fh-*` tokens. Industry ships no dark ramp, so `FZ-100` pinned `color-scheme: light` and dropped the block.
+
+Anyone on a dark OS now gets a light application with no warning. Reinstating it is not a port — it means choosing dark values for every role in the system, including how the accent-as-field treatment and the hairline frames read on a dark ground.
+
+Recorded rather than silently removed, because taking away something an application already did is the kind of change nobody remembers making.
+
+
 
 | Issue | Found in | Resolved by |
 |---|---|---|

@@ -1,33 +1,34 @@
 /*
  * Two tones, because the two situations are not equally urgent (FZ-085).
  *
- * Built from the --fh-* tokens rather than fresh literals, so both themes follow the rest
- * of the app instead of needing their own dark-mode block to be remembered later.
+ * Industry is mono, so urgency cannot be a hue change. The urgent variant takes the
+ * accent as a *field* — steel ground, type reversed to paper — which is the system's own
+ * way of making a band shout. The warning variant stays a tinted strip.
  */
-
 .warning,
 .urgent {
   display: flex;
   align-items: center;
   justify-content: center;
   flex-wrap: wrap;
-  gap: 0.75rem;
-  padding: 0.6rem 1rem;
-  font-size: 0.875rem;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  font-size: 12.5px;
   border-bottom: 1px solid var(--fh-border);
-  background: var(--fh-surface-strong);
-  color: var(--fh-text);
+  background: var(--color-accent-100);
+  color: var(--color-accent-900);
 }
 
 .urgent {
-  border-bottom-color: var(--fh-danger);
-  color: var(--fh-danger);
+  background: var(--color-accent-900);
+  border-bottom-color: var(--color-accent-900);
+  color: var(--color-bg);
 }
 
 .warning a,
 .urgent a {
   color: inherit;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .warning a:focus-visible,
