@@ -1125,7 +1125,7 @@ The counts are the same ones the limit checks use. A usage bar that disagrees wi
 **`OI-14` is closed.** Retention is settable and capped by plan, so the priced lever is no longer fiction: Starter is refused at 365 days with a `402` naming the cap, and Enterprise may keep seven years.
 
 ### FZ-086 — Operator Provisioning
-**Status:** TODO
+**Status:** DONE
 
 `scripts/provision-organization.sh`, following `seed-demo.sh`: create an organization on an agreed plan, invite its first Administrator, mark the originating demo request converted.
 
@@ -1137,6 +1137,18 @@ Acceptance:
 - It refuses to run twice for the same company.
 - It goes through the API wherever the API allows it, matching `seed-demo.sh`.
 - The operational prerequisites — which credentials, which access — are written down, because whoever runs this is not necessarily whoever wrote it.
+
+**Two guards, because there are two ways to duplicate a customer.** A name already in use, and an email that already belongs to somebody. The second matters more: a person exists once, and inviting them into a second organization is a different feature this product does not have.
+
+**One SQL statement, in a transaction.** An organization with no administrator is unreachable and one with no subscription is unbilled, so a part-way failure has to leave nothing rather than either of those.
+
+**It reads back through the API before claiming success**, rather than trusting its own inserts — that is the only check proving the organization resolves from a credential, which every later request depends on.
+
+**`--applications` is refused on anything but ENTERPRISE.** Every other plan's limit is a published number; overriding one here would mean a customer paying for Starter with a limit nobody can look up, and the pricing page quietly becoming untrue. `TRIAL` is not provisionable either — a trial is something an organization starts for itself at signup, not something sales hands out.
+
+**A bug found by running it, not by reading it:** the closing summary used an unquoted heredoc, so a backtick-quoted `local` was executed as a command. The word vanished from the operator's instructions and `local: can only be used in a function` leaked into them.
+
+**What it honestly cannot do.** Outside the `local` profile there is no real `IdentityProvider` (`OI-2`), so no Cognito user is created and no invitation is sent — the customer cannot sign in. The script says so in its closing summary rather than reporting a success that is only half true.
 
 ### FZ-088 — Organization Domain Claiming
 **Status:** DEFERRED · **Owns:** `OI-12`
