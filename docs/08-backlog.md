@@ -1448,7 +1448,7 @@ Frontend only.
 `ScopeResponse` returns `Set<Long>` ids. `1d` shows scope as `production`, `staging`; `1e` needs names for its live "this will match…" summary. The UI cannot render a name it was never given, and resolving ids client-side would mean the frontend holding a copy of the catalog.
 
 ### FZ-105 — Deployment Check Aggregates
-**Status:** TODO
+**Status:** DONE
 
 Four figures the mockups show and no endpoint produces:
 

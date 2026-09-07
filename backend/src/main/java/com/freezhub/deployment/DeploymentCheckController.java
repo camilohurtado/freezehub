@@ -2,6 +2,7 @@ package com.freezhub.deployment;
 
 import com.freezhub.policy.PolicyDecision;
 import com.freezhub.shared.security.AuthenticatedUser;
+import java.time.Instant;
 import java.util.List;
 import org.springframework.data.domain.Limit;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -26,9 +27,27 @@ public class DeploymentCheckController {
     private static final int MAX_LIMIT = 200;
 
     private final DeploymentCheckRepository deploymentCheckRepository;
+    private final DeploymentCheckSummaryService summaries;
 
-    public DeploymentCheckController(DeploymentCheckRepository deploymentCheckRepository) {
+    public DeploymentCheckController(DeploymentCheckRepository deploymentCheckRepository,
+                                     DeploymentCheckSummaryService summaries) {
         this.deploymentCheckRepository = deploymentCheckRepository;
+        this.summaries = summaries;
+    }
+
+    /**
+     * What the checks add up to (FZ-105).
+     *
+     * <p>Open to any member, like the list beside it: a team looking at whether their own
+     * deployment got through has the same reason to see how often anything is refused.
+     *
+     * <p>One response rather than four endpoints because the dashboard draws three of
+     * these figures in a single row, and four round trips to paint one row is four
+     * chances for it to paint inconsistently.
+     */
+    @GetMapping("/summary")
+    public DeploymentCheckSummary summary(@AuthenticationPrincipal AuthenticatedUser caller) {
+        return summaries.summarise(caller.organizationId(), Instant.now());
     }
 
     /**

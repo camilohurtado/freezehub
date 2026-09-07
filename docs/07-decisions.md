@@ -573,3 +573,41 @@ What is sold is the answer the image fetches. Nothing in it checks a licence, a 
 
 And a permissive licence on a thin client means anyone can point it at their own implementation of the Policy API, or fork it. That is the honest consequence, and it is worth less to a competitor than it looks: the client is the easy part.
 
+
+## D-27 — Aggregates bucket by UTC day, and the bucketing lives in SQL
+
+`FZ-105`
+
+Every screen prints "all times GMT". The aggregates behind them — today's checks by
+decision, the 14-day series — therefore bucket by **UTC calendar day**, not by the viewer's
+day and not by the server's.
+
+### Why not a local day
+
+A local day is more comfortable to read and produces a figure two people can disagree
+about. "How many deployments were refused yesterday" is a question asked in an incident
+review, and an answer that depends on which office the person asking is sitting in is
+worse than an answer that needs a mental offset. One answer beats a convenient one.
+
+### Why in SQL, spelled out
+
+The first implementation grouped in JPQL with `cast(c.checkedAt as LocalDate)`. On a
+`timestamptz` that truncates in whatever zone the JDBC session carries — the server's —
+so the same rows bucketed differently depending on where the process happened to run, and
+the endpoint's own "today" (computed in Java, in UTC) could name a day the series had
+split. It passed every test on a developer machine and would have passed CI, because both
+sit close enough to UTC for a midday fixture to hide it.
+
+It was caught by running the suite under `TZ=Asia/Tokyo`, and the query is now native with
+`at time zone 'UTC'` written out. `DeploymentCheckSummaryTest` pins it with checks at
+02:00Z and 23:00Z — the two instants where a UTC day and a local one disagree.
+
+### Consequence
+
+Any future aggregate over an instant column inherits this: bucket in SQL, name the zone,
+and test at a boundary instant rather than at midday. A test whose fixtures all sit at
+noon cannot tell the two implementations apart.
+
+This is the daily-grain sibling of `D-25`, which normalises instants to the precision the
+database stores. Both exist because a timestamp read back is not automatically the
+timestamp written.
