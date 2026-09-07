@@ -1392,3 +1392,22 @@ Acceptance:
 **Also not built: the landing page.** The mockups include one, but there is no public marketing route — Milestone 8 deliberately deferred the public site (`FZ-080`), so there is nothing for it to live in yet.
 
 **Spacing is still literal.** 120 padding/gap/margin declarations use rem values rather than `--space-*`, so Broadsheet's 1.25× density reaches the app only through the type scale. Converting them is a large mechanical change with real breakage risk and is left for its own story (`OI-18`).
+
+## Developer Tooling
+
+### FZ-102 — Test Accounts Helper
+**Status:** DONE
+
+`scripts/test-users.sh` — who can sign in locally, what each account is for, and what cannot be tested with the accounts that exist.
+
+**Reads the database, not a document.** A list of test accounts written down is wrong the first time anybody seeds, provisions or resets, and this question had been asked three times.
+
+**It names the gap, which is the useful half.** With no `MEMBER` account the product cannot be checked at all from a non-administrator's side — the trial banner shown to every member (`FZ-085`), the member-visible billing read, and how a `402` looks to someone who cannot fix it. `--add-member` closes that, and the difference is real: a member gets `200` on `GET /api/billing/subscription` and `403` on `POST /api/api-keys`, verified live.
+
+It also reports whether more than one organization exists, since cross-tenant leakage cannot be tested against a single tenant.
+
+Acceptance:
+
+- Lists every account with its organization, plan, status and trial end.
+- States what is untestable with the current set rather than only what is present.
+- Needs Postgres but not the backend, so it answers even when the app will not start.
