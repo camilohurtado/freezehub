@@ -1411,3 +1411,76 @@ Acceptance:
 - Lists every account with its organization, plan, status and trial end.
 - States what is untestable with the current set rather than only what is present.
 - Needs Postgres but not the backend, so it answers even when the app will not start.
+
+## Milestone 12 — Build the Mockups
+
+`FreezeHub UI mockups/FreezeHub Screens.dc.html` is the design of record. `FZ-101` swapped the tokens; this milestone builds what the screens actually specify, including the parts that need the backend.
+
+**The dashboard is a composition, decided by the operator:** `1a` as the base, plus `1b`'s metrics row, plus `1c`'s "Then what" timeline. `1b`'s left rail and `1c`'s answer-first hero are not taken.
+
+**Everything else is taken as drawn:** `1d` detail, `1e` create, `1f` checks, `1g` notifications, `1h` settings, `1i` sign-in, `1j` landing, `1k` mobile.
+
+### FZ-103 — The Colour Rule, Density and Furniture
+**Status:** TODO · **Closes:** `OI-18`
+
+The brief states one rule and `FZ-101` broke it:
+
+> *"Magenta means a restriction is in force — a block, a refusal, a failed delivery. Cyan means you can act on it: links, buttons, the thing you press. Nothing else is coloured, so a colour on the page always carries meaning."*
+
+`FZ-101` shipped fully mono on an earlier decision, so refusals render in the same ink as ordinary chrome. Reversed here.
+
+Two more things `FZ-101` deferred that the brief specifies: **density** — body copy 15px, the airy 1.25× spacing scale, nothing under 12px anywhere — and **furniture** — a thick-thin rule pair marking the one status line per screen. "No boxes" was read too broadly; the system does print rules, as front-page furniture.
+
+Frontend only.
+
+### FZ-104 — Scope Names in the API
+**Status:** TODO
+
+`ScopeResponse` returns `Set<Long>` ids. `1d` shows scope as `production`, `staging`; `1e` needs names for its live "this will match…" summary. The UI cannot render a name it was never given, and resolving ids client-side would mean the frontend holding a copy of the catalog.
+
+### FZ-105 — Deployment Check Aggregates
+**Status:** TODO
+
+Four figures the mockups show and no endpoint produces:
+
+- **checks refused per restriction** — `1a`'s completed table
+- **today's checks by decision** — `1b`'s "86 · 9 refused, 77 allowed"
+- **applications seen in checks, against the catalog total** — `1b`'s "11 of 14 applications"
+- **a 14-day allowed/refused series** — `1f`'s bar chart
+
+All read from `deployment_check`, which already records every evaluation (`FZ-070`).
+
+### FZ-106 — Dashboard
+**Status:** TODO · **Needs:** `FZ-105`
+
+`1a` with the status line ("Deploys are blocked in production and staging" — a derived sentence naming the blocked environments), the active card with its magenta spine, upcoming cards, and the completed **table** with `CHECKS REFUSED`.
+
+Plus `1b`'s four metrics, and `1c`'s **"Then what"** — a forward list of transitions as date plus plain sentence, ending "Clear from here." It reads from the restrictions already loaded; the value is that it says what happens rather than listing what exists.
+
+### FZ-107 — Restriction Detail
+**Status:** TODO · **Needs:** `FZ-104`
+
+`1d`, taken as drawn: the two-column definition grid, scope resolved to names, and the scope explanation — *"A deployment is affected when it matches **every** dimension below. 'Any' means the dimension places no constraint."* That sentence documents the AND-across-dimensions rule (`FZ-020`) where somebody will actually read it.
+
+### FZ-108 — Create Restriction
+**Status:** TODO · **Needs:** `FZ-104`
+
+`1e`. Two things beyond a restyle:
+
+- **Chip toggles replace the native `<select multiple>`.** `05-frontend.md` accepted the native control knowingly, so this reverses a recorded decision rather than ignoring one. Common options show as chips; **"n more…" opens a dialog listing every value**, per the operator's direction.
+- **An overlap warning.** Overlapping restrictions are deliberately allowed (`FZ-020`), so this is advisory and must not block submission — it says another restriction already covers this window and scope.
+
+### FZ-109 — Checks, Notifications and Settings
+**Status:** TODO · **Needs:** `FZ-105`
+
+`1f` including the 14-day bar chart, `1g`, `1h`.
+
+### FZ-110 — Sign-in and Mobile
+**Status:** TODO
+
+`1i` and `1k`. `1k` is the dashboard at 390px, so it is responsive work on `FZ-106` rather than a separate screen.
+
+### FZ-111 — Landing Page
+**Status:** TODO · **Blocked:** no public route exists
+
+`1j`. Milestone 8 deferred the public marketing site, so there is nowhere to put this yet. It also raises the question that story left open: whether the site is part of this application or separate.

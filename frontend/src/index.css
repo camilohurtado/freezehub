@@ -86,26 +86,33 @@
   --fh-accent-ink: var(--color-accent-700);  /* accent at paragraph size — 3:1 is chrome only */
 
   /*
-   * Fully mono, decided for this port.
+   * ONE RULE FOR COLOUR, from the design brief:
    *
-   * Broadsheet carries cyan and magenta but no red, and the decision taken was that a
-   * refusal is not distinguished by hue. So --fh-danger is the darkest neutral: an error
-   * is the heaviest ink on the page rather than a different colour from it.
+   *   "Magenta means a restriction is in force — a block, a refusal, a failed delivery.
+   *    Cyan means you can act on it: links, buttons, the thing you press. Nothing else
+   *    is coloured, so a colour on the page always carries meaning."
    *
-   * The load this puts on the rest of the design: since hue cannot say "blocked",
-   * weight, fill and type have to. A hard freeze is a filled tag, an advisory an outlined
-   * one; error text is the full-strength ink at heading weight, not a tint. Anywhere that
-   * distinction gets flattened, a refusal stops reading as a refusal — which in a product
-   * whose job is refusing deployments is the failure to watch for.
+   * FZ-101 shipped this mono on an earlier decision, which put refusals in the same ink
+   * as ordinary chrome and broke the rule the whole palette rests on. Reversed here.
    *
-   * Reversing this is one line: --fh-danger: #b4232b, as Industry carried it.
+   * The consequence to hold on to: colour is now load-bearing, not decoration. Anything
+   * that takes magenta is claiming a deployment is being stopped, and anything that takes
+   * cyan is claiming it can be clicked. A third colour, or either of these used for
+   * emphasis, empties both of meaning.
+   *
+   * --fh-danger is the "in force" ink; --fh-accent stays the actionable one.
    */
-  --fh-danger: var(--color-neutral-900);
+  --fh-danger: var(--color-accent-2-700);
+
+  /* The tinted fill behind an in-force tag, so a chip reads as one object. */
+  --fh-danger-surface: var(--color-accent-2-100);
 
   --fh-radius: var(--radius-md);
 
   font-family: var(--font-body);
-  font-size: 16px;
+  /* The brief: body copy up from 13px to 15px, and nothing smaller than 12px anywhere.
+     The airy 1.25x spacing is the --space-* scale; FZ-103 converts the modules onto it. */
+  font-size: 15px;
   line-height: 1.6;
   color-scheme: light;   /* Broadsheet shows no dark surfaces — OI-17 */
 }
@@ -180,4 +187,35 @@ samp {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/*
+ * Front-page furniture (FZ-103).
+ *
+ * The one place this system prints rules. A thick-thin pair marks the single status line
+ * on a screen — the sentence that says what is true right now — and nothing else on the
+ * page is ruled. Used sparingly is the point: a second one would stop the first meaning
+ * "read this first".
+ */
+.statusRule {
+  border-top: 3px solid var(--color-text);
+  border-bottom: 1px solid var(--color-text);
+  padding: var(--space-2) 0;
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+/* Small letterspaced labels name every field and section. */
+.fieldLabel {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fh-text-muted);
+}
+
+/* Times and counts are set in tabular figures so columns align down the page. */
+.figures {
+  font-variant-numeric: tabular-nums;
 }
