@@ -221,8 +221,9 @@ It is not published yet — `FZ-099` — so build it locally to try a guideline.
 
 ### Scripts (`scripts/`)
 
-Both need `curl`, `jq`, a running backend on the `local` profile, and `docker compose` for
-database access.
+All three need `docker compose` for database access. The first two also need `curl`, `jq`
+and a running backend on the `local` profile; `test-users.sh` deliberately does not, so it
+still answers when the application will not start.
 
 ```bash
 # a believable organization to demo against (FZ-074)
@@ -230,6 +231,9 @@ database access.
 
 # turn a demo into a customer (FZ-086)
 ./scripts/provision-organization.sh --company "Contoso" --admin ops@contoso.test --plan GROWTH
+
+# who can sign in, and what cannot be tested with them (FZ-102) — see Test accounts below
+./scripts/test-users.sh
 ```
 
 Provisioning is a script and not an admin console on purpose (`D-23`), so it needs database
@@ -249,6 +253,24 @@ terraform plan                                        # read-only, needs credent
 
 Nothing here has been applied. `terraform apply` creates billable resources and is a
 human decision.
+
+### Test accounts
+
+There are no passwords. Under the `local` profile the sign-in page posts an email to
+`/api/dev/token` and gets a signed JWT back (`FZ-035`), so **the email is the credential**.
+
+```bash
+./scripts/test-users.sh              # who can sign in, and what each one can test
+./scripts/test-users.sh --add-member # add a MEMBER, needed for the non-administrator view
+```
+
+It reads the database rather than a list written down, because any list of test accounts
+is wrong the first time anybody seeds, provisions or resets. It also names what is
+*missing* — with no `MEMBER` account the trial banner, the member-visible billing read and
+a `402` seen by a non-administrator cannot be checked at all.
+
+None of these accounts can sign in to a deployed environment: there is no real identity
+provider yet (`OI-2`).
 
 ### Complete local startup
 
