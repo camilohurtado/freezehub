@@ -219,6 +219,22 @@ sh connectors/test/image-smoke.sh freeze-check:test
 The image is the connector (`D-26`): every CI system in `connectors/README.md` runs it.
 It is not published yet — `FZ-099` — so build it locally to try a guideline.
 
+### Scripts (`scripts/`)
+
+Both need `curl`, `jq`, a running backend on the `local` profile, and `docker compose` for
+database access.
+
+```bash
+# a believable organization to demo against (FZ-074)
+./scripts/seed-demo.sh
+
+# turn a demo into a customer (FZ-086)
+./scripts/provision-organization.sh --company "Contoso" --admin ops@contoso.test --plan GROWTH
+```
+
+Provisioning is a script and not an admin console on purpose (`D-23`), so it needs database
+access — which in a deployed environment means an operator with production credentials.
+
 ### Infrastructure (`infra/`)
 
 Requires Terraform >= 1.6 and AWS credentials. See `infra/README.md` for the full runbook
