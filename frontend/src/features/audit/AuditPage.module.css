@@ -1,5 +1,5 @@
 .page { padding: 1.5rem; }
-.title { margin: 0 0 0.35rem; font-size: 1.5rem; }
+.title { margin: 0 0 0.35rem; }
 .description { margin: 0 0 1.25rem; max-width: 62ch; color: var(--fh-text-muted); font-size: 0.9rem; }
 
 .filters {

@@ -1431,6 +1431,15 @@ The brief states one rule and `FZ-101` broke it:
 
 Two more things `FZ-101` deferred that the brief specifies: **density** — body copy 15px, the airy 1.25× spacing scale, nothing under 12px anywhere — and **furniture** — a thick-thin rule pair marking the one status line per screen. "No boxes" was read too broadly; the system does print rules, as front-page furniture.
 
+**The type scale was not reaching any screen.** Two causes, both found by measuring the running app against the mockup rather than by reading:
+
+- `:root { font-size: 15px }` — set by `FZ-101` to express "body copy is 15px". The modules are authored in rem, so it silently rescaled **every one of them by 6%**. The root is not the place to say that; the body is.
+- Every page set its own `.title` size — `1.5rem`, `27px`, `26px` — so `h1` rendered at 27px against the mockup's 34px, and the system's scale reached nothing. All nine sit on real `<h1>` elements, so the overrides are removed and the scale applies.
+
+Sizes are taken from the mockup, not chosen: h1 34/36.7, h2 21/25.2, body 15/23.25.
+
+**The brief contradicts its own mockup, and the mockup wins.** It states *"nothing is smaller than 12px anywhere"*; screen `1a` renders twelve elements at 11px — the small letterspaced labels. The mockup is the design of record, so 11px labels stay.
+
 Frontend only.
 
 ### FZ-104 — Scope Names in the API

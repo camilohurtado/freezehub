@@ -344,13 +344,18 @@ The human operator decides when to commit.
 
 ### Before Starting a Story
 
+**Always sync first.** Before anything else, `git fetch` and fast-forward `master`, and confirm what actually landed rather than assuming the local copy is current. Branches merged elsewhere, commits that did not make it into a merge, and work that looks present locally but is absent on the remote are all invisible until you look.
+
 Before modifying code for a backlog item:
 
-1. Inspect the current Git status.
-2. Confirm there are no unexpected uncommitted changes.
-3. Confirm the requested backlog item exists in `docs/08-backlog.md`.
-4. Switch to `master`.
-5. Create a new feature branch from `master` using the backlog ID.
+1. `git fetch --prune origin` and `git pull --ff-only origin master`.
+2. Confirm the previous story's work is genuinely on `master` — check for the change, not just for a merge commit. A pull request merged while a later commit was still being pushed leaves that commit behind, and the branch it came from is the only place it survives.
+3. Inspect the current Git status.
+4. Confirm there are no unexpected uncommitted changes.
+5. Confirm the requested backlog item exists in `docs/08-backlog.md`.
+6. Create a new feature branch from the freshly pulled `master` using the backlog ID.
+
+If something is missing from `master`, say so and recover it before starting new work. Building on a branch that is behind produces a diff nobody can review.
 
 Conceptually:
 

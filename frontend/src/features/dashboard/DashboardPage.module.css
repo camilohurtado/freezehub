@@ -7,7 +7,6 @@
 
 .title {
   margin: 0 0 var(--space-6);
-  font-size: 27px;
 }
 
 /* Empty and error states are drawn, not filled: a dashed hairline rectangle reads as an
