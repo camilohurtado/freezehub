@@ -52,7 +52,7 @@ async function fillValidForm(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByLabelText('Reason'), 'Revenue-critical period')
   await user.type(screen.getByLabelText('Starts'), '2026-11-27T09:00')
   await user.type(screen.getByLabelText('Ends'), '2026-12-02T09:00')
-  await user.selectOptions(await screen.findByLabelText('Environments'), ['3'])
+  await user.click(await screen.findByRole('button', { name: /^production/ }))
 }
 
 describe('CreateRestrictionPage', () => {
@@ -110,7 +110,7 @@ describe('CreateRestrictionPage', () => {
     renderRoute(<CreateRestrictionPage />, { path: '/restrictions/new' })
 
     await fillValidForm(user)
-    await user.selectOptions(screen.getByLabelText('Teams'), ['1'])
+    await user.click(await screen.findByRole('button', { name: /^Payments/ }))
     await user.click(screen.getByRole('button', { name: /create restriction/i }))
 
     await waitFor(() => expect(postedBody(spy)).toBeDefined())
@@ -143,7 +143,7 @@ describe('CreateRestrictionPage', () => {
     await user.type(await screen.findByLabelText('Name'), 'No reason given')
     await user.type(screen.getByLabelText('Starts'), '2026-11-27T09:00')
     await user.type(screen.getByLabelText('Ends'), '2026-12-02T09:00')
-    await user.selectOptions(await screen.findByLabelText('Environments'), ['3'])
+    await user.click(await screen.findByRole('button', { name: /^production/ }))
     await user.click(screen.getByRole('button', { name: /create restriction/i }))
 
     expect(await screen.findByText(/reason is required/i)).toBeInTheDocument()
@@ -159,7 +159,7 @@ describe('CreateRestrictionPage', () => {
     await user.type(screen.getByLabelText('Reason'), 'Reason')
     await user.type(screen.getByLabelText('Starts'), '2026-12-02T09:00')
     await user.type(screen.getByLabelText('Ends'), '2026-11-27T09:00')
-    await user.selectOptions(await screen.findByLabelText('Environments'), ['3'])
+    await user.click(await screen.findByRole('button', { name: /^production/ }))
     await user.click(screen.getByRole('button', { name: /create restriction/i }))
 
     expect(await screen.findByText(/end must be after the start/i)).toBeInTheDocument()
@@ -175,7 +175,7 @@ describe('CreateRestrictionPage', () => {
     await user.type(screen.getByLabelText('Reason'), 'Reason')
     await user.type(screen.getByLabelText('Starts'), '2020-01-01T09:00')
     await user.type(screen.getByLabelText('Ends'), '2020-01-02T09:00')
-    await user.selectOptions(await screen.findByLabelText('Environments'), ['3'])
+    await user.click(await screen.findByRole('button', { name: /^production/ }))
     await user.click(screen.getByRole('button', { name: /create restriction/i }))
 
     expect(await screen.findByText(/entirely in the past/i)).toBeInTheDocument()
@@ -228,5 +228,143 @@ describe('CreateRestrictionPage', () => {
     renderRoute(<CreateRestrictionPage />, { path: '/restrictions/new' })
 
     expect(await screen.findByRole('status')).toHaveTextContent(/nothing to scope a restriction to/i)
+  })
+
+  test('shows the common options as chips and the rest behind "n more…"', async () => {
+    // The native multi-select hid what was selected once a catalog outgrew its box
+    // (FZ-108). Five applications is already past the four kept inline.
+    const user = userEvent.setup()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL) => {
+        const url = String(input)
+        const json = (body: unknown) =>
+          new Response(JSON.stringify(body), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          })
+        if (url.includes('/api/applications')) {
+          return Promise.resolve(
+            json(
+              ['payments-api', 'ledger-service', 'checkout-web', 'docs-site', 'status-page'].map(
+                (name, index) => ({ ...entry(10 + index, name), teamIds: [] }),
+              ),
+            ),
+          )
+        }
+        return Promise.resolve(json([]))
+      }),
+    )
+
+    renderRoute(<CreateRestrictionPage />)
+
+    expect(await screen.findByRole('button', { name: /^payments-api/ })).toBeInTheDocument()
+    const more = await screen.findByRole('button', { name: /1 more…/ })
+
+    await user.click(more)
+
+    // The dialog lists every value, including the one that was hidden.
+    const dialog = await screen.findByRole('dialog', { name: /choose applications/i })
+    expect(dialog).toBeInTheDocument()
+    expect(await screen.findByRole('checkbox', { name: 'status-page' })).toBeInTheDocument()
+  })
+
+  test('a chip carries its selected state where a screen reader can reach it', async () => {
+    // The × and + are decorative and aria-hidden, so pressed state is what conveys
+    // selection — a chip whose only signal is a glyph is a chip only sighted users can read.
+    const user = userEvent.setup()
+    stubApi(created)
+    renderRoute(<CreateRestrictionPage />)
+
+    const chip = await screen.findByRole('button', { name: 'Payments' })
+    expect(chip).toHaveAttribute('aria-pressed', 'false')
+
+    await user.click(chip)
+
+    expect(await screen.findByRole('button', { name: 'Payments' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+  })
+
+  test('warns about an overlapping restriction without refusing it', async () => {
+    // Overlaps are deliberately allowed (FZ-020), so this must never block submission.
+    const user = userEvent.setup()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input)
+        const json = (body: unknown) =>
+          new Response(JSON.stringify(body), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          })
+
+        if (url.includes('/api/restrictions') && init?.method === 'POST') {
+          return Promise.resolve(created())
+        }
+        if (url.match(/\/api\/restrictions\/\d+/)) {
+          return Promise.resolve(
+            json({
+              id: 7,
+              name: 'Year-end close',
+              level: 'HARD_FREEZE',
+              status: 'SCHEDULED',
+              startsAt: '2026-11-28T00:00:00Z',
+              endsAt: '2026-12-05T00:00:00Z',
+              scope: { teamIds: [], applicationIds: [], environmentIds: [3] },
+            }),
+          )
+        }
+        if (url.includes('/api/restrictions')) {
+          return Promise.resolve(
+            json([
+              {
+                id: 7,
+                name: 'Year-end close',
+                level: 'HARD_FREEZE',
+                status: 'SCHEDULED',
+                startsAt: '2026-11-28T00:00:00Z',
+                endsAt: '2026-12-05T00:00:00Z',
+              },
+            ]),
+          )
+        }
+        if (url.includes('/api/environments')) return Promise.resolve(json([entry(3, 'production')]))
+        return Promise.resolve(json([]))
+      }),
+    )
+
+    renderRoute(<CreateRestrictionPage />)
+    await fillValidForm(user)
+
+    expect(await screen.findByText(/Year-end close/)).toBeInTheDocument()
+    expect(screen.getByText(/could match the same deployments/i)).toBeInTheDocument()
+    expect(screen.getByText(/warning, not a refusal/i)).toBeInTheDocument()
+
+    // And it is still submittable.
+    expect(screen.getByRole('button', { name: /create restriction/i })).toBeEnabled()
+  })
+
+  test('says plainly when nothing overlaps', async () => {
+    const user = userEvent.setup()
+    stubApi(created)
+    renderRoute(<CreateRestrictionPage />)
+    await fillValidForm(user)
+
+    expect(
+      await screen.findByText('No overlap with an existing restriction.'),
+    ).toBeInTheDocument()
+  })
+
+  test('counts the applications the scope will actually match', async () => {
+    const user = userEvent.setup()
+    stubApi(created)
+    renderRoute(<CreateRestrictionPage />)
+
+    await user.click(await screen.findByRole('button', { name: /^production/ }))
+
+    // One application in the catalog, unconstrained by the environment choice.
+    expect(await screen.findByText('1 of 1')).toBeInTheDocument()
   })
 })
