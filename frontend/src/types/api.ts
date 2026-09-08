@@ -214,4 +214,9 @@ export interface DeploymentCheckSummary {
   daily: { date: string; allowed: number; refused: number }[]
   /** All-time, per restriction. Only hard freezes are credited with a refusal. */
   refusalsByRestriction: { restrictionId: number; refused: number }[]
+  /**
+   * Refused over the same window as `daily` because a name was not recognised — a
+   * different problem from a freeze, and a different fix.
+   */
+  unregistered: number
 }

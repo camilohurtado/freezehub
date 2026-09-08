@@ -1487,10 +1487,14 @@ Plus `1b`'s four metrics, and `1c`'s **"Then what"** — a forward list of trans
 - **Chip toggles replace the native `<select multiple>`.** `05-frontend.md` accepted the native control knowingly, so this reverses a recorded decision rather than ignoring one. Common options show as chips; **"n more…" opens a dialog listing every value**, per the operator's direction.
 - **An overlap warning.** Overlapping restrictions are deliberately allowed (`FZ-020`), so this is advisory and must not block submission — it says another restriction already covers this window and scope.
 
-### FZ-109 — Checks, Notifications and Settings
-**Status:** TODO · **Needs:** `FZ-105`
+### FZ-109 — Checks Console
+**Status:** DONE
 
-`1f` including the 14-day bar chart, `1g`, `1h`.
+`1f`: the fortnight of decisions charted above the list, so a refusal spike is visible before a single row is read. The four figures beneath it, the URL-carried filter, and the list as a table.
+
+**Split from what this story used to be.** It covered `1f`, `1g` and `1h` together. `1g` needs a notifications endpoint that does not exist, and `1h` is a page that already exists and only needs re-setting — three different kinds of work in one branch. They are now `FZ-115` and `FZ-116`.
+
+One figure needs backend work: **refused as unregistered** is a count of `blocked_reason = UNREGISTERED` over the window, and nothing aggregates it. Small, and strictly required by the screen.
 
 ### FZ-110 — Sign-in and Mobile
 **Status:** TODO
@@ -1547,3 +1551,19 @@ No fourth tile invented to fill the row. "Clear runway" was considered and rejec
 Consequences: `deployment_check` grows without bound, and the per-organization retention window — priced per plan in `11-commercial.md` and settable since `FZ-085` — does nothing at all.
 
 The fix is small. The test that goes with it is the point: it has to drive the **scheduled entry point**, not the method underneath it, or the same bug returns unnoticed.
+
+### FZ-115 — Notifications
+**Status:** TODO · **Blocked:** there is no notifications endpoint
+
+`1g` — lifecycle events with per-channel delivery, because *"was Slack actually told?"* is the question that gets asked after a freeze goes wrong.
+
+The data exists: `notification` rows carry `restrictionId`, an integration, a status and an attempt count, and `FZ-044` gave them a terminal state. **Nothing exposes them.** There is no notifications controller at all, so this story is an endpoint before it is a screen.
+
+Decide when starting it: whether delivery is listed per notification or per restriction, and whether a failed delivery can be retried by hand from the screen. The second is a new capability, not a view.
+
+### FZ-116 — Settings
+**Status:** TODO
+
+`1h` — organization, integrations and API keys on one page, with the section rail the settings page already implies.
+
+Unlike the other screens in this milestone this is a re-set of a page that already works: `SettingsPage` has its sections, and what changes is how they are laid out and led into.

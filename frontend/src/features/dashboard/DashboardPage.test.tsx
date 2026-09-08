@@ -30,6 +30,7 @@ const emptySummary: DeploymentCheckSummary = {
   applications: { seen: 0, total: 0 },
   daily: [],
   refusalsByRestriction: [],
+  unregistered: 0,
 }
 
 interface World {
@@ -218,6 +219,7 @@ describe('DashboardPage', () => {
           { date: '2026-09-03', allowed: 17, refused: 3 },
         ],
         refusalsByRestriction: [],
+        unregistered: 0,
       },
     })
 

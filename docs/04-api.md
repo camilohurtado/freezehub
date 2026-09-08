@@ -1,3 +1,4 @@
+| `GET` | `/api/deployment-checks/summary` | any member; what the checks add up to — today by decision, applications seen vs catalogued, a 14-day series, refusals per restriction, and how many were refused as unregistered over the window. Days are **UTC** |
 # FreezeHub — API Contract
 
 ## Purpose
