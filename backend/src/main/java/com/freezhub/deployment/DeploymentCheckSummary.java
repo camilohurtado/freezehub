@@ -19,7 +19,12 @@ public record DeploymentCheckSummary(
         DecisionCounts today,
         Applications applications,
         List<Day> daily,
-        List<RestrictionRefusals> refusalsByRestriction
+        List<RestrictionRefusals> refusalsByRestriction,
+        /**
+         * Checks refused across the same window as {@code daily} because a name was not
+         * recognised — a different problem from a freeze, and a different fix.
+         */
+        long unregistered
 ) {
 
     /**

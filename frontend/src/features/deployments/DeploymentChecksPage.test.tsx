@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { DeploymentChecksPage } from './DeploymentChecksPage'
 import { renderRoute } from '../../test/renderRoute'
-import type { DeploymentCheck } from '../../types/api'
+import type { DeploymentCheck, DeploymentCheckSummary } from '../../types/api'
 
 const check = (overrides: Partial<DeploymentCheck> = {}): DeploymentCheck => ({
   id: 1,
@@ -20,18 +20,43 @@ const check = (overrides: Partial<DeploymentCheck> = {}): DeploymentCheck => ({
   ...overrides,
 })
 
-function stubApi(pages: DeploymentCheck[][]) {
+/** A fortnight of nothing, unless a test says otherwise. */
+const emptySummary: DeploymentCheckSummary = {
+  today: { total: 0, allowed: 0, refused: 0 },
+  applications: { seen: 0, total: 0 },
+  daily: Array.from({ length: 14 }, (_, index) => ({
+    date: `2026-08-${String(18 + index).padStart(2, '0')}`,
+    allowed: 0,
+    refused: 0,
+  })),
+  refusalsByRestriction: [],
+  unregistered: 0,
+}
+
+/**
+ * Pages of checks, plus the summary the chart and figures read.
+ *
+ * The two are routed apart by URL rather than by call order: the summary request is not
+ * the paging request, and answering it with a page of checks is how this stub used to
+ * crash the page.
+ */
+function stubApi(pages: DeploymentCheck[][], summary: DeploymentCheckSummary = emptySummary) {
   let call = 0
   const spy = vi.fn((input: RequestInfo | URL) => {
-    void input
+    const url = String(input)
+    const json = (body: unknown) =>
+      Promise.resolve(
+        new Response(JSON.stringify(body), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      )
+
+    if (url.includes('/api/deployment-checks/summary')) return json(summary)
+
     const page = pages[Math.min(call, pages.length - 1)]
     call += 1
-    return Promise.resolve(
-      new Response(JSON.stringify(page), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      }),
-    )
+    return json(page)
   })
   vi.stubGlobal('fetch', spy)
   return spy
@@ -45,12 +70,13 @@ describe('DeploymentChecksPage', () => {
     stubApi([[check()]])
     renderRoute(<DeploymentChecksPage />, { path: '/deployment-checks' })
 
-    const list = await screen.findByRole('list', { name: 'Deployment checks' })
+    const list = await screen.findByRole('table', { name: 'Deployment checks' })
     expect(within(list).getByText('payments-api → production')).toBeInTheDocument()
     expect(within(list).getByText('alice@acme.test')).toBeInTheDocument()
     // Truncated: a full SHA is noise in a list, and the first characters identify it.
     expect(within(list).getByText('a1b2c3d4e5f6')).toBeInTheDocument()
-    expect(within(list).getByRole('link', { name: /view run/i })).toHaveAttribute(
+    // The reference is the link to the run — one column doing both jobs (1f).
+    expect(within(list).getByRole('link', { name: 'a1b2c3d4e5f6' })).toHaveAttribute(
       'href',
       'https://gitlab.acme.test/pipelines/9182',
     )
@@ -90,9 +116,9 @@ describe('DeploymentChecksPage', () => {
     stubApi([[check({ actor: null, reference: null, source: null })]])
     renderRoute(<DeploymentChecksPage />, { path: '/deployment-checks' })
 
-    const list = await screen.findByRole('list', { name: 'Deployment checks' })
+    const list = await screen.findByRole('table', { name: 'Deployment checks' })
     expect(within(list).getByText('gitlab-ci')).toBeInTheDocument()
-    expect(within(list).queryByRole('link', { name: /view run/i })).not.toBeInTheDocument()
+    expect(within(list).queryByRole('link')).not.toBeInTheDocument()
   })
 
   test('filters to what was refused, and puts it in the URL', async () => {
@@ -101,7 +127,7 @@ describe('DeploymentChecksPage', () => {
     const spy = stubApi([[check({ decision: 'BLOCK', blockedReason: 'RESTRICTION' })]])
     const { router } = renderRoute(<DeploymentChecksPage />, { path: '/deployment-checks' })
 
-    await user.click(await screen.findByRole('button', { name: 'Refused' }))
+    await user.click(await screen.findByRole('radio', { name: 'Refused' }))
 
     await waitFor(() => expect(router.state.location.search).toContain('decision=BLOCK'))
     await waitFor(() =>
@@ -119,7 +145,7 @@ describe('DeploymentChecksPage', () => {
     await waitFor(() =>
       expect(spy.mock.calls.some(([input]) => String(input).includes('decision=BLOCK'))).toBe(true),
     )
-    expect(screen.getByRole('button', { name: 'Refused' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('radio', { name: 'Refused' })).toBeChecked()
   })
 
   test('pages by cursor rather than by offset', async () => {
@@ -166,5 +192,62 @@ describe('DeploymentChecksPage', () => {
     })
 
     expect(await screen.findByText(/no pipeline has been stopped by a freeze/i)).toBeInTheDocument()
+  })
+
+  test('charts the fortnight and states it in words for a reader who cannot see it', async () => {
+    stubApi([[check()]], {
+      ...emptySummary,
+      applications: { seen: 11, total: 14 },
+      unregistered: 4,
+      daily: [
+        ...Array.from({ length: 12 }, (_, index) => ({
+          date: `2026-08-${String(18 + index).padStart(2, '0')}`,
+          allowed: 0,
+          refused: 0,
+        })),
+        { date: '2026-08-30', allowed: 60, refused: 6 },
+        { date: '2026-08-31', allowed: 17, refused: 3 },
+      ],
+    })
+    renderRoute(<DeploymentChecksPage />, { path: '/deployment-checks' })
+
+    // A bar chart is a shape; without this a screen reader gets fourteen empty divs.
+    expect(
+      await screen.findByRole('img', { name: /86 checks over 14 days, 9 of them refused/i }),
+    ).toBeInTheDocument()
+  })
+
+  test('the figures describe the fortnight, not the page of rows below them', async () => {
+    stubApi([[check()]], {
+      ...emptySummary,
+      applications: { seen: 11, total: 14 },
+      unregistered: 4,
+      daily: [
+        ...Array.from({ length: 13 }, (_, index) => ({
+          date: `2026-08-${String(18 + index).padStart(2, '0')}`,
+          allowed: 0,
+          refused: 0,
+        })),
+        { date: '2026-08-31', allowed: 679, refused: 63 },
+      ],
+    })
+    renderRoute(<DeploymentChecksPage />, { path: '/deployment-checks' })
+
+    expect(await screen.findByText('742')).toBeInTheDocument()
+    expect(screen.getByText('63')).toBeInTheDocument()
+    expect(screen.getByText('refused (8%)')).toBeInTheDocument()
+    expect(screen.getByText('11')).toBeInTheDocument()
+    expect(screen.getByText('refused as unregistered')).toBeInTheDocument()
+  })
+
+  test('an empty fortnight draws no bars rather than dividing by zero', async () => {
+    // Every day is 0, so the busiest day is 0. A percentage of nothing is undefined, and
+    // the naive scale would draw every column full.
+    stubApi([[]], emptySummary)
+    renderRoute(<DeploymentChecksPage />, { path: '/deployment-checks' })
+
+    const chart = await screen.findByRole('img', { name: /no checks in the last 14 days/i })
+    const bars = chart.querySelectorAll('div[style*="height"]')
+    bars.forEach((bar) => expect((bar as HTMLElement).style.height).toBe('0%'))
   })
 })

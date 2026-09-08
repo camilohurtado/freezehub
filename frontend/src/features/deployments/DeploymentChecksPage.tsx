@@ -1,6 +1,9 @@
 import { useSearchParams } from 'react-router'
-import { formatInstant } from '../../utils/datetime'
+import { formatShort } from '../../utils/datetime'
 import { useDeploymentChecks } from './useDeploymentChecks'
+import { useDeploymentCheckSummary } from '../dashboard/useDashboard'
+import { checkTotals } from '../dashboard/dashboardSentences'
+import { ChecksChart } from './ChecksChart'
 import type { DeploymentCheck } from '../../types/api'
 import styles from './DeploymentChecksPage.module.css'
 
@@ -45,6 +48,12 @@ export function DeploymentChecksPage() {
   const { data, isPending, isError, error, refetch, fetchNextPage, hasNextPage, isFetchingNextPage } =
     useDeploymentChecks({ decision })
 
+  // The chart and the figures describe the whole fortnight, so they do not move when the
+  // list below them is filtered — the filter is about which rows to read, not about what
+  // happened.
+  const summary = useDeploymentCheckSummary()
+  const fortnight = checkTotals(summary.data?.daily ?? [])
+
   const checks = data?.pages.flat() ?? []
 
   function select(value: string) {
@@ -62,20 +71,48 @@ export function DeploymentChecksPage() {
         went ahead afterwards.
       </p>
 
-      <fieldset className={styles.filters}>
-        <legend className={styles.legend}>Show</legend>
-        {FILTERS.map((option) => (
-          <button
-            key={option.value || 'all'}
-            type="button"
-            aria-pressed={(decision ?? '') === option.value}
-            className={(decision ?? '') === option.value ? styles.filterActive : styles.filter}
-            onClick={() => select(option.value)}
-          >
-            {option.label}
-          </button>
-        ))}
-      </fieldset>
+      {summary.data && <ChecksChart days={summary.data.daily} />}
+
+      {summary.data && (
+        <div className={styles.figures}>
+          <Figure value={fortnight.checks} label="checks in 14 days" />
+          <Figure
+            value={fortnight.refused}
+            label={
+              fortnight.refusedShare === null
+                ? 'refused'
+                : `refused (${fortnight.refusedShare}%)`
+            }
+            alarming={fortnight.refused > 0}
+          />
+          <Figure value={summary.data.applications.seen} label="pipelines asking" />
+          <Figure
+            value={summary.data.unregistered}
+            label="refused as unregistered"
+            alarming={summary.data.unregistered > 0}
+          />
+        </div>
+      )}
+
+      <div className={styles.filters}>
+        <span className={styles.filterLabel} id="show-label">
+          Show
+        </span>
+        <div className="seg" role="radiogroup" aria-labelledby="show-label">
+          {FILTERS.map((option) => (
+            <label className="seg-opt" key={option.value || 'all'}>
+              <input
+                type="radio"
+                name="decision"
+                checked={(decision ?? '') === option.value}
+                onChange={() => select(option.value)}
+              />
+              {option.label}
+            </label>
+          ))}
+        </div>
+        <span className={styles.filterHint}>Filter is in the URL — send this view to anyone.</span>
+      </div>
 
       {isPending && (
         <p className={styles.state} role="status">
@@ -86,7 +123,7 @@ export function DeploymentChecksPage() {
       {isError && (
         <div className={styles.state} role="alert">
           <p className={styles.errorText}>Could not load deployment checks. {error.message}</p>
-          <button className={styles.retry} type="button" onClick={() => refetch()}>
+          <button className="btn btn-secondary" type="button" onClick={() => refetch()}>
             Try again
           </button>
         </div>
@@ -101,42 +138,67 @@ export function DeploymentChecksPage() {
       )}
 
       {checks.length > 0 && (
-        <ul className={styles.list} aria-label="Deployment checks">
-          {checks.map((check) => {
-            const reason = refusalReason(check)
-            return (
-              <li key={check.id} className={styles.row}>
-                <span className={check.decision === 'BLOCK' ? styles.decisionBlock : styles.decisionAllow}>
-                  {check.decision === 'BLOCK' ? 'Refused' : 'Allowed'}
-                </span>
-
-                <span className={styles.target}>
-                  {check.application} → {check.environment}
-                </span>
-
-                {/* The person, when the pipeline told us. `checkedBy` is only the credential. */}
-                <span className={styles.meta}>{check.actor ?? check.checkedBy}</span>
-
-                {check.reference && <span className={styles.reference}>{check.reference.slice(0, 12)}</span>}
-
-                <span className={styles.meta}>{formatInstant(check.checkedAt)}</span>
-
-                {check.source && (
-                  <a className={styles.meta} href={check.source} rel="noreferrer noopener" target="_blank">
-                    View run
-                  </a>
-                )}
-
-                {reason && <span className={styles.blockedBy}>{reason}</span>}
-              </li>
-            )
-          })}
-        </ul>
+        <div className={styles.scroller}>
+          <table className="table" aria-label="Deployment checks">
+            <thead>
+              <tr>
+                <th scope="col">Decision</th>
+                <th scope="col">Target</th>
+                <th scope="col">Asked by</th>
+                <th scope="col">Ref</th>
+                <th scope="col">When</th>
+                <th scope="col">Why</th>
+              </tr>
+            </thead>
+            <tbody>
+              {checks.map((check) => {
+                const reason = refusalReason(check)
+                const refused = check.decision === 'BLOCK'
+                return (
+                  <tr key={check.id}>
+                    <td>
+                      <span className={refused ? 'tag tag-accent-2' : 'tag tag-neutral'}>
+                        {refused ? 'Refused' : 'Allowed'}
+                      </span>
+                    </td>
+                    <td>
+                      <span className="mono">
+                        {check.application} → {check.environment}
+                      </span>
+                    </td>
+                    {/* The person, when the pipeline told us. `checkedBy` is only the credential. */}
+                    <td className={styles.meta}>{check.actor ?? check.checkedBy}</td>
+                    <td>
+                      {check.source ? (
+                        <a
+                          className="mono"
+                          href={check.source}
+                          rel="noreferrer noopener"
+                          target="_blank"
+                        >
+                          {check.reference ? check.reference.slice(0, 12) : 'run'}
+                        </a>
+                      ) : (
+                        <span className="mono">
+                          {check.reference ? check.reference.slice(0, 12) : '—'}
+                        </span>
+                      )}
+                    </td>
+                    <td className={styles.when}>{formatShort(check.checkedAt)}</td>
+                    <td className={reason ? styles.why : styles.whyQuiet}>
+                      {reason ?? 'Out of scope'}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
 
       {hasNextPage && (
         <button
-          className={styles.more}
+          className={`btn btn-secondary `}
           type="button"
           disabled={isFetchingNextPage}
           onClick={() => fetchNextPage()}
@@ -145,5 +207,22 @@ export function DeploymentChecksPage() {
         </button>
       )}
     </main>
+  )
+}
+
+function Figure({
+  value,
+  label,
+  alarming = false,
+}: {
+  value: number
+  label: string
+  alarming?: boolean
+}) {
+  return (
+    <div>
+      <div className={alarming ? styles.figureValueAlarming : styles.figureValue}>{value}</div>
+      <div className={styles.figureLabel}>{label}</div>
+    </div>
   )
 }

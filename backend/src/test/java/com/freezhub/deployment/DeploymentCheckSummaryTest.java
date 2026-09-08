@@ -282,4 +282,51 @@ class DeploymentCheckSummaryTest {
         assertThat(apps.total()).isEqualTo(1);
         assertThat(apps.seen()).isLessThanOrEqualTo(apps.total());
     }
+
+    @Test
+    void countsWhatWasRefusedForNotBeingRecognised() {
+        // Kept apart from freeze refusals because they mean opposite things: a freeze
+        // refusal is the product working, an unregistered one is a name this organization
+        // does not have — a typo, or a service nobody catalogued (FZ-109).
+        jdbc.update("""
+                insert into deployment_check
+                  (organization_id, api_key_label, application, environment, decision,
+                   blocked_reason, checked_at)
+                values (?, 'ci', 'paymnets-api', 'production', 'BLOCK', 'UNREGISTERED', ?)
+                """, organizationId, OffsetDateTime.ofInstant(NOW, ZoneOffset.UTC));
+        check(PolicyDecision.BLOCK, "payments-api", NOW, matched(1, RestrictionLevel.HARD_FREEZE));
+
+        var summary = summaries.summarise(organizationId, NOW);
+
+        assertThat(summary.unregistered()).isEqualTo(1);
+        // Both are still refusals; the split is about why, not about whether.
+        assertThat(summary.today().refused()).isEqualTo(2);
+    }
+
+    @Test
+    void anUnregisteredRefusalOutsideTheWindowIsNotCounted() {
+        jdbc.update("""
+                insert into deployment_check
+                  (organization_id, api_key_label, application, environment, decision,
+                   blocked_reason, checked_at)
+                values (?, 'ci', 'paymnets-api', 'production', 'BLOCK', 'UNREGISTERED', ?)
+                """, organizationId,
+                OffsetDateTime.ofInstant(NOW.minus(30, ChronoUnit.DAYS), ZoneOffset.UTC));
+
+        assertThat(summaries.summarise(organizationId, NOW).unregistered()).isZero();
+    }
+
+    @Test
+    void anotherOrganizationsUnregisteredRefusalsAreNotCounted() {
+        Long other = organizations
+                .saveAndFlush(new Organization("Globex " + System.nanoTime())).getId();
+        jdbc.update("""
+                insert into deployment_check
+                  (organization_id, api_key_label, application, environment, decision,
+                   blocked_reason, checked_at)
+                values (?, 'ci', 'their-typo', 'production', 'BLOCK', 'UNREGISTERED', ?)
+                """, other, OffsetDateTime.ofInstant(NOW, ZoneOffset.UTC));
+
+        assertThat(summaries.summarise(organizationId, NOW).unregistered()).isZero();
+    }
 }

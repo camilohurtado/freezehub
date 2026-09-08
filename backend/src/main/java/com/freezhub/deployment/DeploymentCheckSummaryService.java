@@ -41,10 +41,12 @@ public class DeploymentCheckSummaryService {
     public DeploymentCheckSummary summarise(Long organizationId, Instant now) {
         LocalDate today = now.atZone(ZoneOffset.UTC).toLocalDate();
         LocalDate from = today.minusDays(DAYS - 1L);
+        // One instant for the whole window, so every figure below covers exactly the days
+        // the chart draws.
+        Instant windowStart = from.atStartOfDay(ZoneOffset.UTC).toInstant();
 
         Map<LocalDate, DeploymentCheckSummary.Day> counted = new HashMap<>();
-        for (var row : checks.countByDay(
-                organizationId, from.atStartOfDay(ZoneOffset.UTC).toInstant())) {
+        for (var row : checks.countByDay(organizationId, windowStart)) {
             counted.put(row.getDay(), new DeploymentCheckSummary.Day(
                     row.getDay(), row.getAllowed(), row.getRefused()));
         }
@@ -68,6 +70,7 @@ public class DeploymentCheckSummaryService {
                 checks.countRefusalsByRestriction(organizationId).stream()
                         .map(row -> new DeploymentCheckSummary.RestrictionRefusals(
                                 row.getRestrictionId(), row.getRefused()))
-                        .toList());
+                        .toList(),
+                checks.countUnregistered(organizationId, windowStart));
     }
 }

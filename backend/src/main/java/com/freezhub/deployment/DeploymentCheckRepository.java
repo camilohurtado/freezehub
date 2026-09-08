@@ -91,6 +91,24 @@ public interface DeploymentCheckRepository extends JpaRepository<DeploymentCheck
     long countApplicationsSeen(@Param("organizationId") Long organizationId);
 
     /**
+     * Checks refused in the window because a name was not recognised (FZ-109).
+     *
+     * <p>Separated from the freeze refusals beside it because they mean opposite things to
+     * whoever is reading. A freeze refusal is the product working. An unregistered refusal
+     * is a pipeline naming something this organization does not have — a typo, or a
+     * service nobody added to the catalog — and the fix is in the catalog or the pipeline,
+     * not in the freeze.
+     */
+    @Query("""
+            select count(c) from DeploymentCheck c
+             where c.organizationId = :organizationId
+               and c.checkedAt >= :from
+               and c.blockedReason = com.freezhub.deployment.BlockedReason.UNREGISTERED
+            """)
+    long countUnregistered(@Param("organizationId") Long organizationId,
+                           @Param("from") Instant from);
+
+    /**
      * How many deployments each restriction actually refused (FZ-105).
      *
      * <p>Native, because the matched restrictions are stored denormalised as JSON
