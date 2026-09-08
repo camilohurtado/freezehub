@@ -52,7 +52,7 @@ describe('SettingsPage', () => {
 
   test('lists destinations by channel and summary', async () => {
     stubApi([integration(), integration({ id: 2, type: 'EMAIL', summary: '2 recipients' })])
-    renderRoute(<SettingsPage />, { path: '/settings' })
+    renderRoute(<SettingsPage />, { path: '/settings?section=integrations', route: '/settings' })
 
     // Asserted on the summaries, which are unique to the list — "Slack" and "Email" also
     // appear as options in the create form, which renders before the request resolves.
@@ -66,7 +66,7 @@ describe('SettingsPage', () => {
 
   test('warns that nothing is announced without a destination', async () => {
     stubApi([])
-    renderRoute(<SettingsPage />, { path: '/settings' })
+    renderRoute(<SettingsPage />, { path: '/settings?section=integrations', route: '/settings' })
 
     expect(await screen.findByText(/nothing will be announced/i)).toBeInTheDocument()
   })
@@ -74,7 +74,7 @@ describe('SettingsPage', () => {
   test('adds a destination', async () => {
     const user = userEvent.setup()
     const spy = stubApi([])
-    renderRoute(<SettingsPage />, { path: '/settings' })
+    renderRoute(<SettingsPage />, { path: '/settings?section=integrations', route: '/settings' })
 
     await user.type(
       await screen.findByLabelText('Configuration'),
@@ -101,7 +101,7 @@ describe('SettingsPage', () => {
           headers: { 'Content-Type': 'application/json' },
         }),
     )
-    renderRoute(<SettingsPage />, { path: '/settings' })
+    renderRoute(<SettingsPage />, { path: '/settings?section=integrations', route: '/settings' })
 
     await user.type(await screen.findByLabelText('Configuration'), '{{"webhookUrl": "http://x"}')
     await user.click(screen.getByRole('button', { name: /add destination/i }))
@@ -112,7 +112,7 @@ describe('SettingsPage', () => {
   test('disables a destination without deleting it', async () => {
     const user = userEvent.setup()
     const spy = stubApi([integration()])
-    renderRoute(<SettingsPage />, { path: '/settings' })
+    renderRoute(<SettingsPage />, { path: '/settings?section=integrations', route: '/settings' })
 
     await user.click(await screen.findByLabelText('Slack enabled'))
 
@@ -125,7 +125,7 @@ describe('SettingsPage', () => {
   test('deletes a destination', async () => {
     const user = userEvent.setup()
     const spy = stubApi([integration()])
-    renderRoute(<SettingsPage />, { path: '/settings' })
+    renderRoute(<SettingsPage />, { path: '/settings?section=integrations', route: '/settings' })
 
     await user.click(await screen.findByRole('button', { name: /delete slack destination/i }))
 
@@ -147,7 +147,7 @@ describe('SettingsPage', () => {
         ),
       ),
     )
-    renderRoute(<SettingsPage />, { path: '/settings' })
+    renderRoute(<SettingsPage />, { path: '/settings?section=integrations', route: '/settings' })
 
     // Awaited on the message itself: a loading status renders first, so findByRole('status')
     // would resolve against that instead.
@@ -158,10 +158,71 @@ describe('SettingsPage', () => {
     // Belt and braces with the backend test: the API omits config, and the UI has no
     // field that would display one.
     stubApi([integration({ summary: 'hooks.slack.com' })])
-    const { container } = renderRoute(<SettingsPage />, { path: '/settings' })
+    const { container } = renderRoute(<SettingsPage />, { path: '/settings?section=integrations', route: '/settings' })
 
     await screen.findByText('Slack')
     expect(container.textContent).not.toContain('webhookUrl')
     expect(within(container).queryByDisplayValue(/hooks\.slack\.com\/services/)).toBeNull()
+  })
+
+  test('opens on the first section, with the others not on the page', async () => {
+    // The rail switches rather than scrolls (FZ-118), so the sections it does not name
+    // are absent — not merely below the fold.
+    stubApi([integration()])
+    renderRoute(<SettingsPage />, { path: '/settings' })
+
+    expect(await screen.findByRole('heading', { name: /advance warning/i })).toBeInTheDocument()
+    expect(screen.queryByText('hooks.slack.com')).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: /^api keys$/i })).not.toBeInTheDocument()
+  })
+
+  test('clicking a rail entry swaps the section', async () => {
+    const user = userEvent.setup()
+    stubApi([integration()])
+    renderRoute(<SettingsPage />, { path: '/settings' })
+
+    await user.click(screen.getByRole('button', { name: 'Integrations' }))
+
+    expect(await screen.findByText('hooks.slack.com')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: /advance warning/i })).not.toBeInTheDocument()
+  })
+
+  test('puts the chosen section in the URL, so it can be sent to someone', async () => {
+    // The same reasoning as the checks console's filter: a view worth reaching is a view
+    // worth linking.
+    const user = userEvent.setup()
+    stubApi([integration()])
+    const { router } = renderRoute(<SettingsPage />, { path: '/settings' })
+
+    await user.click(screen.getByRole('button', { name: 'API keys' }))
+
+    await waitFor(() => expect(router.state.location.search).toContain('section=api-keys'))
+  })
+
+  test('a section named in the URL is the one that opens', async () => {
+    stubApi([integration()])
+    renderRoute(<SettingsPage />, { path: '/settings?section=billing', route: '/settings' })
+
+    expect(await screen.findByRole('heading', { name: /^billing$/i })).toBeInTheDocument()
+  })
+
+  test('an unknown section falls back to the first rather than to nothing', async () => {
+    // A mistyped or stale link should still show a usable page.
+    stubApi([integration()])
+    renderRoute(<SettingsPage />, { path: '/settings?section=nonsense', route: '/settings' })
+
+    expect(await screen.findByRole('heading', { name: /advance warning/i })).toBeInTheDocument()
+  })
+
+  test('asks only for the data of the section on screen', async () => {
+    // Four sections mounted meant four requests to open a page showing one of them.
+    const spy = stubApi([integration()])
+    renderRoute(<SettingsPage />, { path: '/settings' })
+
+    await screen.findByRole('heading', { name: /advance warning/i })
+
+    await waitFor(() => expect(spy).toHaveBeenCalled())
+    expect(spy.mock.calls.some(([url]) => String(url).includes('/api/integrations'))).toBe(false)
+    expect(spy.mock.calls.some(([url]) => String(url).includes('/api/api-keys'))).toBe(false)
   })
 })

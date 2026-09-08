@@ -29,8 +29,14 @@
 
 .railLink,
 .railLinkActive {
+  /* Buttons, reset to read as the rail entries they are. */
+  appearance: none;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
   padding: 7px 0 7px 12px;
-  text-decoration: none;
+  font-family: var(--font-body);
   font-size: 15px;
   color: var(--color-neutral-800);
 }

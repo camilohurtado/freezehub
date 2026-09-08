@@ -1,55 +1,70 @@
+import { useSearchParams } from 'react-router'
 import { ApiKeysSection } from './ApiKeysSection'
 import { BillingSection } from './BillingSection'
 import { IntegrationsSection } from './IntegrationsSection'
 import { OrganizationSection } from './OrganizationSection'
-import { useActiveSection } from './useActiveSection'
 import styles from './SettingsPage.module.css'
 
 /**
- * Everything an administrator configures for their organization (`1h`, FZ-116).
+ * Everything an administrator configures for their organization (`1h`, FZ-116), one
+ * section at a time (FZ-118).
  *
- * Each section loads and fails independently: a member who can see none of them gets four
- * explanations rather than one blank page, and one section's outage does not hide the
- * others.
+ * The rail switches rather than scrolls. Ordered roughly by how often each is touched,
+ * and Settings opens on the first.
  *
- * Ordered as `1h` orders it — organization, integrations, keys, billing — which is
- * roughly how often they are touched, and the rail beside them is what makes a page this
- * long navigable rather than merely scrollable.
+ * **The chosen section lives in the URL**, as the checks console's filter does: Settings →
+ * API keys is then a link somebody can send, and browser back steps between sections
+ * instead of leaving the page. An unknown or missing value falls back to the first rather
+ * than rendering nothing, because a mistyped URL should still show a usable page.
  */
 const SECTIONS = [
-  { id: 'organization', label: 'Organization' },
-  { id: 'integrations', label: 'Integrations' },
-  { id: 'api-keys', label: 'API keys' },
-  { id: 'billing', label: 'Billing' },
+  { id: 'organization', label: 'Organization', render: () => <OrganizationSection /> },
+  { id: 'integrations', label: 'Integrations', render: () => <IntegrationsSection /> },
+  { id: 'api-keys', label: 'API keys', render: () => <ApiKeysSection /> },
+  { id: 'billing', label: 'Billing', render: () => <BillingSection /> },
 ] as const
 
-const SECTION_IDS = SECTIONS.map((section) => section.id) as unknown as string[]
-
 export function SettingsPage() {
-  const active = useActiveSection(SECTION_IDS)
+  const [searchParams, setSearchParams] = useSearchParams()
+
+  const requested = searchParams.get('section')
+  const current = SECTIONS.find((section) => section.id === requested) ?? SECTIONS[0]
+
+  function show(id: string) {
+    const params = new URLSearchParams(searchParams)
+    params.set('section', id)
+    setSearchParams(params)
+  }
 
   return (
     <main className={styles.page}>
+      {/*
+        * Buttons, not links: this swaps a panel on the page rather than navigating to a
+        * document, and a link that does not go anywhere is a link that middle-click and
+        * "open in new tab" quietly break.
+        */}
       <nav className={styles.rail} aria-label="Settings sections">
         {SECTIONS.map((section) => (
-          <a
+          <button
             key={section.id}
-            href={`#${section.id}`}
-            className={active === section.id ? styles.railLinkActive : styles.railLink}
-            aria-current={active === section.id ? 'true' : undefined}
+            type="button"
+            className={section.id === current.id ? styles.railLinkActive : styles.railLink}
+            aria-current={section.id === current.id ? 'true' : undefined}
+            onClick={() => show(section.id)}
           >
             {section.label}
-          </a>
+          </button>
         ))}
       </nav>
 
       <div className={styles.content}>
         <h1 className={styles.title}>Settings</h1>
-
-        <OrganizationSection />
-        <IntegrationsSection />
-        <ApiKeysSection />
-        <BillingSection />
+        {/*
+          * Only the chosen section is mounted, so only its data is fetched — opening
+          * Settings asks one question rather than four. Each still loads and fails on its
+          * own terms.
+          */}
+        {current.render()}
       </div>
     </main>
   )

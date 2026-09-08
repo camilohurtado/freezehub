@@ -76,7 +76,7 @@ export function OrganizationSection() {
     : LEAD_TIME_CHOICES
 
   return (
-    <section className={styles.section} id="organization" aria-labelledby="organization-heading">
+    <section className={styles.section} aria-labelledby="organization-heading">
       <h2 className={styles.sectionHeading} id="organization-heading">
         Advance warning
       </h2>

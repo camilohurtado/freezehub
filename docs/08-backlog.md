@@ -1580,3 +1580,16 @@ It is not free: the policy check is a read path, and stamping a key on every eva
 **"Failing" on an integration.** `1h` draws a channel whose deliveries are failing in magenta. `integration` carries only `enabled`; whether its last deliveries succeeded lives in `notification` rows. Overlaps with `FZ-115`, which needs the same aggregate for `1g` — do them together or make `FZ-115` first.
 
 Until both exist the settings page shows what it can prove: a key's prefix and whether it is revoked, and a channel's enabled state.
+
+### FZ-118 — Settings Sections, One at a Time
+**Status:** DONE · **Refines:** `FZ-116`
+
+Operator feedback on the shipped rail: **the rail should switch sections, not scroll to them.** Clicking an option shows that section and only that section; Settings opens on the first.
+
+`1h` draws a rail beside a page of stacked sections, which is what `FZ-116` built — and reading it as a table of contents rather than as a switch made the page long enough that the rail existed to compensate for its own length.
+
+Consequences worth taking:
+
+- The `IntersectionObserver` goes. Nothing scrolls past anything, so there is nothing to follow — and a whole file of enhancement-that-degrades disappears with it.
+- **The selected section belongs in the URL**, as the checks console's filter already does (`FZ-071`). Settings → API keys should be a link somebody can send, and browser back should step between sections rather than leaving the page.
+- Only the visible section's data is fetched, because only it is mounted. Four requests on open become one.

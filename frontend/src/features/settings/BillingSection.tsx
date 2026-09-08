@@ -67,7 +67,7 @@ export function BillingSection() {
 
   if (subscription.isPending) {
     return (
-      <section className={styles.section} id="billing">
+      <section className={styles.section}>
         <h2 className={styles.sectionHeading}>Billing</h2>
         <p className={styles.state}>Loading…</p>
       </section>
@@ -76,7 +76,7 @@ export function BillingSection() {
 
   if (subscription.error) {
     return (
-      <section className={styles.section} id="billing">
+      <section className={styles.section}>
         <h2 className={styles.sectionHeading}>Billing</h2>
         <p className={styles.actionError} role="alert">
           {subscription.error instanceof ApiError
@@ -90,7 +90,7 @@ export function BillingSection() {
   const plan = subscription.data
 
   return (
-    <section className={styles.section} id="billing">
+    <section className={styles.section}>
       <h2 className={styles.sectionHeading}>Billing</h2>
 
       <p className={styles.state}>
