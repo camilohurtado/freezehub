@@ -55,7 +55,7 @@ export function ApiKeysSection() {
   const forbidden = keys.error instanceof ApiError && keys.error.status === 403
 
   return (
-    <section className={styles.section} id="api-keys" aria-labelledby="api-keys-heading">
+    <section className={styles.section} aria-labelledby="api-keys-heading">
       <h2 className={styles.sectionHeading} id="api-keys-heading">
         API keys
       </h2>
