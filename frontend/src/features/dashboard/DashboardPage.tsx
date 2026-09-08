@@ -3,7 +3,13 @@ import type { RestrictionSummary } from '../../types/api'
 import { RestrictionCard } from './RestrictionCard'
 import { useDashboardRestrictions, useDeploymentCheckSummary } from './useDashboard'
 import { useEnvironments } from '../catalog/useCatalog'
-import { countsSentence, nextStart, statusLine, thenWhat } from './dashboardSentences'
+import {
+  checkTotals,
+  countsSentence,
+  coverageCaption,
+  statusLine,
+  thenWhat,
+} from './dashboardSentences'
 import { formatShort, localZoneName } from '../../utils/datetime'
 import styles from './DashboardPage.module.css'
 
@@ -54,6 +60,7 @@ export function DashboardPage() {
   const environmentNames = new Map((environments.data ?? []).map((e) => [e.id, e.name]))
   const status = statusLine(data.blocking, environmentNames)
   const transitions = thenWhat(data.active, data.upcoming)
+  const totals = checkTotals(summary.data?.daily ?? [])
   const refusalsById = new Map(
     (summary.data?.refusalsByRestriction ?? []).map((row) => [row.restrictionId, row.refused]),
   )
@@ -87,48 +94,92 @@ export function DashboardPage() {
         )}
       </div>
 
-      <Group
-        heading="Active now"
-        emptyText="Nothing is active. Deploys are not being blocked."
-        restrictions={data.active}
-      />
+      {/*
+        * The present beside the future. Upcoming used to sit under this as its own group
+        * of cards, which meant every scheduled freeze appeared three times on one page —
+        * once as a card, then as its start and its completion below (FZ-113).
+        */}
+      <div className={styles.columns}>
+        <Group
+          heading="Active now"
+          emptyText="Nothing is active. Deploys are not being blocked."
+          restrictions={data.active}
+        />
 
-      <Group
-        heading="Upcoming"
-        note="Editing stays open until a window starts."
-        emptyText="Nothing scheduled."
-        restrictions={data.upcoming}
-      />
+        <section className={styles.group} aria-labelledby="then-what-heading">
+          <h2 className={styles.groupHeading} id="then-what-heading">
+            Then what
+          </h2>
+          {transitions.length === 0 ? (
+            <p className={styles.groupEmpty}>
+              Nothing scheduled. Deploys are clear from here.
+            </p>
+          ) : (
+            <ol className={styles.transitions}>
+              {transitions.map((transition, index) => (
+                <li className={styles.transition} key={`${transition.at}-${index}`}>
+                  <span className={styles.transitionAt}>
+                    {transition.clear ? '' : formatShort(transition.at)}
+                  </span>
+                  <span className={transition.clear ? styles.transitionClear : undefined}>
+                    {/*
+                      * The name links. `1c` draws this line as plain text, but the
+                      * Upcoming cards it replaced were the only route from here to a
+                      * scheduled restriction — plain text would be a dead end.
+                      */}
+                    {transition.restrictionId !== null && transition.name !== null ? (
+                      <>
+                        <Link to={`/restrictions/${transition.restrictionId}`}>
+                          {transition.name}
+                        </Link>{' '}
+                        {transition.detail}
+                      </>
+                    ) : (
+                      transition.detail
+                    )}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          )}
+        </section>
+      </div>
 
       <section className={styles.group} aria-labelledby="metrics-heading">
         <h2 className={styles.groupHeading} id="metrics-heading">
           At a glance
         </h2>
+        {/*
+          * Three tiles, not four. `Active` restated the rail directly above it and
+          * `Scheduled` restated the forward list beside it, so both went; nothing was
+          * invented to fill the row (FZ-113).
+          */}
         <div className={styles.metrics}>
           <Metric
-            label="Active"
-            value={data.active.length}
-            caption={status.blocking ? status.sentence.replace('Deploys are blocked in ', 'blocking ') : 'nothing blocking'}
-            alarming={status.blocking}
+            label="Checks · 14 days"
+            value={summary.data ? totals.checks : undefined}
+            caption={summary.data ? `${summary.data.today.total} today` : 'loading…'}
           />
           <Metric
-            label="Scheduled"
-            value={data.upcoming.length}
-            caption={nextStart(data.upcoming) ?? 'nothing scheduled'}
-          />
-          <Metric
-            label="Checks today"
-            value={summary.data?.today.total}
+            label="Refused"
+            value={summary.data ? totals.refused : undefined}
             caption={
-              summary.data
-                ? `${summary.data.today.refused} refused, ${summary.data.today.allowed} allowed`
-                : 'loading…'
+              !summary.data
+                ? 'loading…'
+                : totals.refusedShare === null
+                  ? 'no checks yet'
+                  : `${totals.refusedShare}% of checks`
             }
+            alarming={totals.refused > 0}
           />
           <Metric
             label="Pipelines integrated"
             value={summary.data?.applications.seen}
-            caption={summary.data ? `of ${summary.data.applications.total} applications` : 'loading…'}
+            caption={
+              summary.data
+                ? coverageCaption(summary.data.applications.seen, summary.data.applications.total)
+                : 'loading…'
+            }
           />
         </div>
         {summary.isError && (
@@ -137,26 +188,6 @@ export function DashboardPage() {
           </p>
         )}
       </section>
-
-      {transitions.length > 0 && (
-        <section className={styles.group} aria-labelledby="then-what-heading">
-          <h2 className={styles.groupHeading} id="then-what-heading">
-            Then what
-          </h2>
-          <ol className={styles.transitions}>
-            {transitions.map((transition, index) => (
-              <li className={styles.transition} key={`${transition.at}-${index}`}>
-                <span className={styles.transitionAt}>
-                  {transition.clear ? '' : formatShort(transition.at)}
-                </span>
-                <span className={transition.clear ? styles.transitionClear : undefined}>
-                  {transition.sentence}
-                </span>
-              </li>
-            ))}
-          </ol>
-        </section>
-      )}
 
       <section className={styles.group} aria-labelledby="completed-heading">
         <h2 className={styles.groupHeading} id="completed-heading">
@@ -238,12 +269,10 @@ function Metric({
 
 function Group({
   heading,
-  note,
   emptyText,
   restrictions,
 }: {
   heading: string
-  note?: string
   emptyText: string
   restrictions: RestrictionSummary[]
 }) {
@@ -258,7 +287,6 @@ function Group({
         {heading}
         <span className={styles.count}>{restrictions.length}</span>
       </h2>
-      {note && <p className={styles.note}>{note}</p>}
 
       {restrictions.length === 0 ? (
         <p className={styles.groupEmpty}>{emptyText}</p>
