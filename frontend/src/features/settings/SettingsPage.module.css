@@ -1,272 +1,315 @@
+/*
+ * Settings — `1h` (FZ-116).
+ *
+ * A sticky rail beside the sections, which is what makes a page this long navigable
+ * rather than merely scrollable. One stylesheet for all four sections, so they are set
+ * the same way rather than drifting apart.
+ */
+
 .page {
   width: 100%;
-  max-width: 56rem;
+  max-width: 64rem;
   margin: 0 auto;
-  padding: 1.5rem;
+  padding: var(--space-4) var(--space-8) calc(var(--space-8) * 2);
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  gap: 48px;
+  align-items: start;
+}
+
+/* — the rail — */
+
+.rail {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  position: sticky;
+  top: 16px;
+}
+
+.railLink,
+.railLinkActive {
+  padding: 7px 0 7px 12px;
+  text-decoration: none;
+  font-size: 15px;
+  color: var(--color-neutral-800);
+}
+
+.railLink:hover {
+  color: var(--color-text);
+}
+
+/* An inset bar rather than a fill: the rail marks where you are, it is not a button. */
+.railLinkActive {
+  font-weight: var(--font-heading-weight);
+  color: var(--color-text);
+  box-shadow: inset 3px 0 0 var(--color-accent);
+}
+
+.content {
+  min-width: 0;
 }
 
 .title {
-  margin: 0 0 0.5rem;
+  margin: 0 0 34px;
 }
 
-.intro {
-  margin: 0 0 2rem;
-  max-width: 42rem;
-  color: var(--fh-text-muted);
-  font-size: 0.875rem;
-}
+/* — sections — */
 
 .section {
-  margin-bottom: var(--space-8);
+  margin-bottom: 42px;
+  /* Cleared by the sticky rail's own offset, so an anchor jump does not land the heading
+     under the top bar. */
+  scroll-margin-top: 80px;
 }
 
 .sectionHeading {
-  margin: 0;
+  margin: 0 0 12px;
 }
 
 .sectionDescription {
-  margin: 0.25rem 0 1rem;
-  color: var(--fh-text-muted);
-  font-size: 0.8125rem;
+  margin: 0 0 20px;
+  max-width: 66ch;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--color-neutral-800);
 }
 
-.state {
-  margin: 0 0 0.75rem;
-  color: var(--fh-text-muted);
-  font-size: 0.875rem;
+.hint {
+  margin: 8px 0 0;
+  max-width: 66ch;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--color-neutral-800);
 }
 
-.actionError {
-  margin: 0 0 0.75rem;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid var(--fh-danger);
+.label {
+  composes: fieldLabel from global;
+  display: block;
+  margin-bottom: 6px;
+}
+
+.input,
+.textarea {
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid var(--color-neutral-400);
   border-radius: var(--radius-md);
-  color: var(--fh-danger);
-  font-size: 0.8125rem;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 14px;
 }
+
+.input:focus-visible,
+.textarea:focus-visible {
+  border-color: var(--color-accent);
+  outline-offset: 0;
+}
+
+.textarea {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 13px;
+  resize: vertical;
+}
+
+/* — rows: integrations, keys, plan limits — */
 
 .list {
-  margin: 0 0 var(--space-4);
+  margin: 0 0 14px;
   padding: 0;
   list-style: none;
+  /* The heavy rule opens the block; each row closes on a hairline. Boxes would make four
+     sections into sixteen. */
+  border-top: 1px solid var(--color-text);
 }
 
 .row {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.625rem 0.75rem;
-  border-bottom: 1px solid var(--fh-border);
-}
-
-.list .row:last-child {
-  border-bottom: none;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--color-divider);
 }
 
 .rowMain {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  flex-wrap: wrap;
   min-width: 0;
 }
 
 .itemName {
-  font-weight: 600;
-  font-size: 0.9375rem;
+  font-weight: var(--font-heading-weight);
+  font-size: 15px;
+}
+
+.summary {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 13px;
+  color: var(--color-neutral-800);
+  word-break: break-all;
 }
 
 .rowActions {
   display: flex;
-  flex-shrink: 0;
-  gap: 0.375rem;
-}
-
-.teamPicker {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  margin-top: 0.375rem;
-}
-
-.teamCheckbox {
-  display: inline-flex;
   align-items: center;
-  gap: 0.3125rem;
-  color: var(--fh-text-muted);
-  font-size: 0.8125rem;
-  cursor: pointer;
-}
-
-.teamHint {
-  color: var(--fh-text-muted);
-  font-size: 0.8125rem;
-  font-style: italic;
-}
-
-.createForm,
-.editForm {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.editForm {
-  flex: 1;
-}
-
-.input {
-  flex: 1;
-  min-width: 0;
-  padding: 0.375rem 0.5rem;
-  border: 1px solid var(--fh-border);
-  border-radius: var(--radius-md);
-  background: var(--fh-bg);
-  color: inherit;
-  font: inherit;
-  font-size: 0.875rem;
-}
-
-.primary,
-.secondary,
-.danger {
-  padding: 0.375rem 0.75rem;
-  border: 1px solid transparent;
-  border-radius: var(--radius-md);
-  font: inherit;
-  font-size: 0.8125rem;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.primary {
-  background: var(--fh-accent);
-  color: var(--color-bg);
-  font-weight: 600;
-}
-
-.primary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.secondary {
-  border-color: var(--fh-border-strong);
-  background: transparent;
-  color: inherit;
-}
-
-.danger {
-  border-color: var(--fh-border-strong);
-  background: transparent;
-  color: var(--fh-danger);
-}
-
-.summary {
-  display: block;
-  margin-top: 0.125rem;
-  color: var(--fh-text-muted);
-  font-size: 0.8125rem;
+  gap: var(--space-3);
+  margin-left: auto;
 }
 
 .toggle {
   display: inline-flex;
   align-items: center;
-  gap: 0.375rem;
-  font-size: 0.8125rem;
+  gap: 8px;
+  font-size: 14px;
   cursor: pointer;
 }
 
-.label {
-  display: block;
-  margin: 1rem 0 0.25rem;
-  font-size: 0.8125rem;
-  font-weight: 600;
+/* — plan limit meters — */
+
+.meter {
+  height: 4px;
+  margin-top: 6px;
+  background: var(--color-neutral-200);
 }
 
-.textarea {
-  width: 100%;
-  padding: 0.4375rem 0.5rem;
-  border: 1px solid var(--fh-border);
-  border-radius: var(--radius-md);
-  background: var(--fh-bg);
-  color: inherit;
-  font-family: ui-monospace, monospace;
-  font-size: 0.8125rem;
-  resize: vertical;
+/* Magenta only at the limit: a full meter is a refusal waiting to happen. */
+.meterFull {
+  height: 4px;
+  margin-top: 6px;
+  background: var(--color-accent-2-700);
 }
 
-.hint {
-  margin: 0.375rem 0 0.875rem;
-  color: var(--fh-text-muted);
-  font-size: 0.8125rem;
-}
+/* — the key shown once — */
 
-.createForm {
-  display: block;
-}
-
-/*
- * The one-time reveal of an API key. Deliberately loud: it cannot be recovered.
- *
- * These rules referenced --color-warning, --color-warning-surface and
- * --color-warning-text, none of which has ever been defined — so they had always
- * rendered their amber fallbacks, and no theme could reach them. Broadsheet carries no
- * amber, and this port is mono, so the loudness is carried by ink instead: the heaviest
- * rule on the sheet and the warning set in the heading weight.
- */
 .revealedKey {
-  margin: var(--space-4) 0;
-  padding: var(--space-4);
-  border: 2px solid var(--color-neutral-900);
-  border-radius: var(--radius-md);
-  background: var(--color-neutral-100);
-}
-
-.revealedKeyWarning {
-  margin: 0 0 var(--space-2);
-  font-family: var(--font-heading);
-  font-weight: var(--font-heading-weight);
-  color: var(--color-neutral-900);
+  margin: 0 0 var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface);
+  border-left: 3px solid var(--color-accent-2-700);
 }
 
 .revealedKeyValue {
   display: block;
-  padding: 0.6rem;
+  margin-bottom: 8px;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 14px;
+  word-break: break-all;
+}
+
+.revealedKeyWarning {
+  margin: 0;
+  font-size: 14px;
+  color: var(--color-accent-2-700);
+}
+
+/* — forms and actions — */
+
+.createForm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  max-width: 34rem;
+}
+
+.primary,
+.secondary,
+.danger {
+  /* These sit inside column flex forms, which would otherwise stretch them edge to
+     edge — a submit button the width of the page reads as a banner. */
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: var(--space-2) calc(var(--space-3) * 1.2);
+  border: 1px solid transparent;
   border-radius: var(--radius-md);
-  background: var(--color-neutral-900);
+  font-family: var(--font-heading);
+  font-weight: var(--font-heading-weight);
+  font-size: 14px;
+  line-height: 1.2;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.primary {
+  background: var(--color-accent);
   color: var(--color-bg);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 0.85rem;
-  overflow-wrap: anywhere;
+}
+
+.primary:hover {
+  background: var(--color-accent-600);
 }
 
 .secondary {
-  margin-top: 0.75rem;
-  padding: 0.4rem 0.9rem;
-  border: 1px solid var(--fh-border-strong);
-  border-radius: var(--radius-md);
   background: transparent;
-  cursor: pointer;
+  border-color: var(--color-divider);
+  color: var(--color-text);
 }
 
-/* Plan usage (FZ-085). A bar as well as a number, so "nearly out" reads at a glance
-   rather than having to be worked out from two figures. */
-
-.meter,
-.meterFull {
-  display: inline-block;
-  width: 6rem;
-  height: 0.4rem;
-  border-radius: var(--radius-md);
-  background: var(--fh-surface-strong);
-  overflow: hidden;
+.secondary:hover {
+  background: color-mix(in srgb, var(--color-text) 7%, transparent);
 }
 
-.meter > span,
-.meterFull > span {
-  display: block;
-  height: 100%;
-  border-radius: var(--radius-md);
-  background: var(--fh-accent);
+/* Revoking a key breaks a pipeline, so it is set in the ink that means "this stops
+   something" — and it is a ghost, not a fill, so it is not the easiest thing to hit. */
+.danger {
+  background: transparent;
+  color: var(--color-accent-2-700);
 }
 
-.meterFull > span {
-  background: var(--fh-danger);
+.danger:hover {
+  background: var(--color-accent-2-100);
+}
+
+.primary:disabled,
+.secondary:disabled,
+.danger:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* — states — */
+
+.state {
+  margin: 0 0 var(--space-3);
+  font-size: 14px;
+  color: var(--color-neutral-700);
+}
+
+.actionError {
+  margin: 0 0 var(--space-3);
+  font-size: 14px;
+  color: var(--fh-danger);
+}
+
+@media (max-width: 52rem) {
+  .page {
+    grid-template-columns: 1fr;
+    gap: var(--space-4);
+    padding: var(--space-4);
+  }
+
+  /* A rail that scrolls with the page is just a list; at this width it becomes one. */
+  .rail {
+    position: static;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: var(--space-3);
+    border-bottom: 1px solid var(--color-divider);
+    padding-bottom: var(--space-3);
+  }
+
+  .railLink,
+  .railLinkActive {
+    padding: 4px 0;
+  }
+
+  .railLinkActive {
+    box-shadow: inset 0 -2px 0 var(--color-accent);
+  }
 }

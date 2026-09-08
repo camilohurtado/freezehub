@@ -89,7 +89,7 @@ export function IntegrationsSection() {
   const forbidden = integrations.error instanceof ApiError && integrations.error.status === 403
 
   return (
-    <section className={styles.section} aria-labelledby="integrations-heading">
+    <section className={styles.section} id="integrations" aria-labelledby="integrations-heading">
         <h2 className={styles.sectionHeading} id="integrations-heading">
           Notification destinations
         </h2>
@@ -132,7 +132,7 @@ export function IntegrationsSection() {
           <ul className={styles.list} aria-label="Notification destinations">
             {integrations.data.map((integration) => (
               <li key={integration.id} className={styles.row}>
-                <div>
+                <div className={styles.rowMain}>
                   <span className={styles.itemName}>{CONFIG_HELP[integration.type].label}</span>
                   <span className={styles.summary}>{integration.summary}</span>
                 </div>
