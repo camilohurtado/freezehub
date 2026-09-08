@@ -1475,7 +1475,7 @@ All read from `deployment_check`, which already records every evaluation (`FZ-07
 Plus `1b`'s four metrics, and `1c`'s **"Then what"** — a forward list of transitions as date plus plain sentence, ending "Clear from here." It reads from the restrictions already loaded; the value is that it says what happens rather than listing what exists.
 
 ### FZ-107 — Restriction Detail
-**Status:** TODO
+**Status:** DONE · **Except:** "What it has done", split out as `FZ-112`
 
 `1d`, taken as drawn: the two-column definition grid, scope resolved to names, and the scope explanation — *"A deployment is affected when it matches **every** dimension below. 'Any' means the dimension places no constraint."* That sentence documents the AND-across-dimensions rule (`FZ-020`) where somebody will actually read it.
 
@@ -1501,3 +1501,20 @@ Plus `1b`'s four metrics, and `1c`'s **"Then what"** — a forward list of trans
 **Status:** TODO · **Blocked:** no public route exists
 
 `1j`. Milestone 8 deferred the public marketing site, so there is nowhere to put this yet. It also raises the question that story left open: whether the site is part of this application or separate.
+
+### FZ-112 — What a Restriction Has Done
+**Status:** TODO · **Needs:** `FZ-105`
+
+The one block of `1d` that `FZ-107` could not build, because it is the only part that is not layout. Three figures under **"What it has done"**, for one restriction:
+
+| Figure | Where the data is |
+|---|---|
+| **Checks refused** — "since it activated" | `FZ-105` already counts this, per restriction, in `GET /api/deployment-checks/summary`. Org-wide though, so a detail page pulls the whole list to read one row |
+| **Pipelines affected** | **Does not exist.** Distinct applications among the checks this restriction refused. `deployment_check` holds it; nothing counts it |
+| **Notified** — "Slack, email, webhook" | **Not exposed.** `notification` rows carry `restrictionId` and a channel, and there is no notifications endpoint at all — `FZ-109` needs one for `1g` too |
+
+Worth doing as one story because all three are the same question — *what did this restriction actually do?* — and answering it needs one endpoint scoped to a restriction rather than three org-wide aggregates read and filtered client-side.
+
+**Decide when starting it:** whether this is `GET /api/restrictions/{id}/impact`, or extra fields on the restriction detail response. The endpoint is probably right — the detail response is a domain object, and these are counts about it — but that is a real choice and not a foregone one.
+
+The three figures are also the reason a restriction is worth reviewing after the fact, so this is the story that makes a completed freeze more than a row in a list.

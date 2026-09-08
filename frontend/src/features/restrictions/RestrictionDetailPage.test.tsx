@@ -116,16 +116,40 @@ describe('RestrictionDetailPage', () => {
     ['CANCELLED', false, false],
   ])('offers the right actions when %s', async (status, canEdit, canCancel) => {
     // Affordances mirror the backend rules: edit only while SCHEDULED (FZ-023), cancel
-    // only while SCHEDULED or ACTIVE (FZ-024). Offering an action that can only be
-    // refused wastes the user's time.
+    // only while SCHEDULED or ACTIVE (FZ-024). The control stays on the page when the
+    // rule forbids it — disabled, with the reason beside it (FZ-107, `1d`) — so what is
+    // asserted here is whether it can be used, not whether it exists.
     const restriction = detail({ status })
     stubApi(restriction)
     render()
 
     await screen.findByRole('heading', { name: 'Black Friday Freeze' })
 
-    expect(!!screen.queryByRole('link', { name: 'Edit' })).toBe(canEdit)
-    expect(!!screen.queryByRole('button', { name: /cancel restriction/i })).toBe(canCancel)
+    if (canEdit) {
+      expect(screen.getByRole('link', { name: 'Edit' })).toBeInTheDocument()
+    } else {
+      expect(screen.getByRole('button', { name: 'Edit' })).toBeDisabled()
+    }
+
+    const cancelButton = screen.getByRole('button', { name: /cancel restriction/i })
+    if (canCancel) {
+      expect(cancelButton).toBeEnabled()
+    } else {
+      expect(cancelButton).toBeDisabled()
+    }
+  })
+
+  test('says why an action is closed rather than leaving a dead control', async () => {
+    // A disabled button with no reason beside it is a dead end. The sentence is what
+    // makes showing the control better than hiding it.
+    stubApi(detail({ status: 'COMPLETED' }))
+    render()
+
+    await screen.findByRole('heading', { name: 'Black Friday Freeze' })
+
+    expect(screen.getByRole('button', { name: 'Edit' })).toHaveAccessibleDescription(
+      /completed and can no longer be changed/i,
+    )
   })
 
   test('cancels through the API', async () => {
@@ -161,5 +185,26 @@ describe('RestrictionDetailPage', () => {
     renderRoute(<RestrictionDetailPage />, { path: '/restrictions/7', route: '/restrictions/:restrictionId' })
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/does not exist/i)
+  })
+
+  test.each<[RestrictionStatus, 'HARD_FREEZE' | 'ADVISORY', boolean]>([
+    ['ACTIVE', 'HARD_FREEZE', true],
+    ['ACTIVE', 'ADVISORY', false],
+    ['SCHEDULED', 'HARD_FREEZE', false],
+    ['COMPLETED', 'HARD_FREEZE', false],
+  ])('colours scope magenta only while %s/%s is actually stopping deploys', async (
+    status,
+    level,
+    expectMagenta,
+  ) => {
+    // The design's one rule for colour: magenta claims a deployment is being stopped
+    // here. The mockup draws an ACTIVE hard freeze, so its scope is magenta — copying
+    // that onto every restriction would make the colour mean "this is a scope", which
+    // is what the rule exists to prevent.
+    stubApi(detail({ status, level, scope: { teamIds: [], applicationIds: [], environmentIds: [3] } }))
+    render()
+
+    const tag = await screen.findByText('production')
+    expect(tag.className).toContain(expectMagenta ? 'tag-accent-2' : 'tag-neutral')
   })
 })
