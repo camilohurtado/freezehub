@@ -21,9 +21,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class ChangeRestrictionController {
 
     private final ChangeRestrictionService changeRestrictionService;
+    private final RestrictionImpactService impacts;
 
-    public ChangeRestrictionController(ChangeRestrictionService changeRestrictionService) {
+    public ChangeRestrictionController(ChangeRestrictionService changeRestrictionService,
+                                       RestrictionImpactService impacts) {
         this.changeRestrictionService = changeRestrictionService;
+        this.impacts = impacts;
     }
 
     @PostMapping
@@ -63,6 +66,24 @@ public class ChangeRestrictionController {
     public RestrictionResponse get(@AuthenticationPrincipal AuthenticatedUser caller,
                                    @PathVariable Long restrictionId) {
         return RestrictionResponse.from(changeRestrictionService.get(caller.organizationId(), restrictionId));
+    }
+
+    /**
+     * What this restriction actually did (FZ-112).
+     *
+     * <p>Separate from the restriction itself on purpose: these are counts drawn from the
+     * deployment checks and the notification outbox, and folding them into the detail
+     * response would make every read of a restriction pay for aggregates it does not show —
+     * including the dashboard's, which reads the in-force ones on every load.
+     *
+     * <p>Resolved through the service first, so an unknown restriction and another
+     * organization's both 404 before any counting happens.
+     */
+    @GetMapping("/{restrictionId}/impact")
+    public RestrictionImpact impact(@AuthenticationPrincipal AuthenticatedUser caller,
+                                    @PathVariable Long restrictionId) {
+        changeRestrictionService.get(caller.organizationId(), restrictionId);
+        return impacts.of(caller.organizationId(), restrictionId);
     }
 
     /**

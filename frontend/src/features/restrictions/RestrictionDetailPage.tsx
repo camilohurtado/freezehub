@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { ApiError } from '../../api/client'
-import { cancelRestriction, getRestriction } from '../../api/restrictions'
+import { cancelRestriction, getRestriction, getRestrictionImpact } from '../../api/restrictions'
 import { LevelBadge, StatusBadge } from '../../components/Badges'
 import { useAuth } from '../auth/authContext'
 import { useApplications, useEnvironments, useTeams } from '../catalog/useCatalog'
@@ -70,6 +70,16 @@ export function RestrictionDetailPage() {
   const restriction = useQuery<RestrictionDetail>({
     queryKey: ['restriction', id],
     queryFn: ({ signal }) => getRestriction(token, id, signal),
+  })
+
+  /*
+   * Its own query, so the page renders as soon as the restriction arrives. The counts
+   * come from two other tables and are worth waiting for, but not worth making the scope
+   * wait for.
+   */
+  const impact = useQuery({
+    queryKey: ['restriction', id, 'impact'],
+    queryFn: ({ signal }) => getRestrictionImpact(token, id, signal),
   })
 
   const teams = useTeams()
@@ -194,6 +204,67 @@ export function RestrictionDetailPage() {
           />
         </dl>
       </section>
+
+      {/*
+        * "What it has done" (`1d`, FZ-112). Only for a restriction that has had the
+        * chance: a scheduled freeze has refused nothing yet, and three noughts under that
+        * heading read as a failure rather than as a restriction that has not started.
+        */}
+      {detail.status !== 'SCHEDULED' && (
+        <section className={styles.impact} aria-labelledby="impact-heading">
+          <h2 className={styles.sectionHeading} id="impact-heading">
+            What it has done
+          </h2>
+
+          {impact.isError ? (
+            <p className={styles.impactState}>
+              Could not load what this restriction did. {impact.error.message}
+            </p>
+          ) : (
+            <div className={styles.figures}>
+              <div>
+                <div className={styles.label}>Checks refused</div>
+                <div
+                  className={
+                    (impact.data?.checksRefused ?? 0) > 0
+                      ? styles.figureAlarming
+                      : styles.figure
+                  }
+                >
+                  {impact.data?.checksRefused ?? '—'}
+                </div>
+                <p className={styles.figureCaption}>
+                  {detail.level === 'HARD_FREEZE'
+                    ? 'deployments it stopped'
+                    : 'an advisory refuses nothing'}
+                </p>
+              </div>
+
+              <div>
+                <div className={styles.label}>Pipelines affected</div>
+                <div className={styles.figure}>{impact.data?.pipelinesAffected ?? '—'}</div>
+                <p className={styles.figureCaption}>
+                  <Link to={`/deployment-checks?decision=BLOCK`}>see checks</Link>
+                </p>
+              </div>
+
+              <div>
+                <div className={styles.label}>Announced</div>
+                <div className={styles.figure}>{impact.data?.notificationsSent ?? '—'}</div>
+                <p className={styles.figureCaption}>
+                  {impact.data && impact.data.notificationsFailed > 0 ? (
+                    <Link className={styles.failedLink} to="/notifications?show=failed">
+                      {impact.data.notificationsFailed} did not arrive
+                    </Link>
+                  ) : (
+                    'to your channels'
+                  )}
+                </p>
+              </div>
+            </div>
+          )}
+        </section>
+      )}
 
       {actionError && (
         <p className={styles.actionError} role="alert">

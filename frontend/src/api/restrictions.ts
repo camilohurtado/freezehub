@@ -2,6 +2,7 @@ import { apiRequest } from './client'
 import type {
   CreateRestrictionBody,
   RestrictionDetail,
+  RestrictionImpact,
   RestrictionStatus,
   RestrictionSummary,
 } from '../types/api'
@@ -52,4 +53,19 @@ export function listRestrictions(
     token,
     signal,
   })
+}
+
+/**
+ * What one restriction did (`FZ-112`).
+ *
+ * A separate request from the restriction itself: these are counts drawn from the
+ * deployment checks and the notification outbox, and the detail page renders without
+ * waiting for them.
+ */
+export function getRestrictionImpact(
+  token: string | null,
+  id: number,
+  signal?: AbortSignal,
+): Promise<RestrictionImpact> {
+  return apiRequest<RestrictionImpact>(`/api/restrictions/${id}/impact`, { token, signal })
 }

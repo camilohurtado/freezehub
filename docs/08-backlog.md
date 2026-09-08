@@ -1507,7 +1507,7 @@ One figure needs backend work: **refused as unregistered** is a count of `blocke
 `1j`. Milestone 8 deferred the public marketing site, so there is nowhere to put this yet. It also raises the question that story left open: whether the site is part of this application or separate.
 
 ### FZ-112 — What a Restriction Has Done
-**Status:** TODO · **Needs:** `FZ-105`
+**Status:** DONE
 
 The one block of `1d` that `FZ-107` could not build, because it is the only part that is not layout. Three figures under **"What it has done"**, for one restriction:
 

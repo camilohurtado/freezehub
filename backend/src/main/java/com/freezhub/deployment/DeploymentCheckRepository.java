@@ -109,6 +109,39 @@ public interface DeploymentCheckRepository extends JpaRepository<DeploymentCheck
                            @Param("from") Instant from);
 
     /**
+     * What one restriction refused, and how far it reached (FZ-112).
+     *
+     * <p>Native for the same reason as its org-wide sibling: the matched restrictions are
+     * stored denormalised as JSON so the record stays true to what matched at check time,
+     * and Postgres can read that where JPQL cannot.
+     *
+     * <p>Counted only where this restriction was a <strong>hard freeze</strong> at the
+     * moment of the check. A blocked check lists every restriction that matched, advisories
+     * included — crediting one with a refusal would say an advisory stopped a deployment.
+     */
+    @Query(nativeQuery = true, value = """
+            select count(*) as refused,
+                   count(distinct c.application) as applications
+              from deployment_check c,
+                   lateral jsonb_array_elements(c.matched_restrictions::jsonb) as r(value)
+             where c.organization_id = :organizationId
+               and c.decision = 'BLOCK'
+               and c.matched_restrictions is not null
+               and (r.value ->> 'id')::bigint = :restrictionId
+               and r.value ->> 'level' = 'HARD_FREEZE'
+            """)
+    RestrictionRefusalDetail countRefusalsForRestriction(
+            @Param("organizationId") Long organizationId,
+            @Param("restrictionId") Long restrictionId);
+
+    /** Projection: one restriction's refusals and the applications behind them. */
+    interface RestrictionRefusalDetail {
+        long getRefused();
+
+        long getApplications();
+    }
+
+    /**
      * How many deployments each restriction actually refused (FZ-105).
      *
      * <p>Native, because the matched restrictions are stored denormalised as JSON
