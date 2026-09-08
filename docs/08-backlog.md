@@ -1536,3 +1536,14 @@ Operator feedback on the shipped dashboard: **Upcoming and "Then what" say the s
 | **Pipelines integrated** | `applications` | Coverage. The gap is the risk: services whose pipelines sail through a freeze |
 
 No fourth tile invented to fill the row. "Clear runway" was considered and rejected: "Then what" already answers it in words, and saying it twice in two forms is what this story exists to remove.
+
+### FZ-114 — The Retention Purge Never Ran
+**Status:** DONE · **Fixes:** a defect in `FZ-070`
+
+`DeploymentCheckRetention.purgeScheduled()` calls `purge()` on `this`. `@Transactional` is proxy-based, so a self-invocation never reaches the proxy, no transaction starts, and the `@Modifying` delete throws `TransactionRequiredException` — every day, five minutes after boot, for as long as the application has existed.
+
+**The test passes because it exercises the wrong path.** `DeploymentCheckTest` calls `retention.purge(...)` on the *injected* bean, which does go through the proxy. The only path that runs in production is the only one nothing covered.
+
+Consequences: `deployment_check` grows without bound, and the per-organization retention window — priced per plan in `11-commercial.md` and settable since `FZ-085` — does nothing at all.
+
+The fix is small. The test that goes with it is the point: it has to drive the **scheduled entry point**, not the method underneath it, or the same bug returns unnoticed.

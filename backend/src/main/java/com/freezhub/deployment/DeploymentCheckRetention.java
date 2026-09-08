@@ -45,9 +45,18 @@ public class DeploymentCheckRetention {
      * Daily, and deliberately not more often: nothing depends on a record disappearing
      * promptly, and a delete sweep competing with the write path once per deployment is
      * worth avoiding.
+     *
+     * <p><strong>{@code @Transactional} belongs here, not only on {@link #purge}.</strong>
+     * This method calls that one on {@code this}, and {@code @Transactional} is applied by
+     * a proxy — a self-invocation never reaches it. Without the annotation on the method
+     * the scheduler actually calls, no transaction starts and the {@code @Modifying}
+     * delete throws {@code TransactionRequiredException}. It did, once a day, from
+     * {@code FZ-070} until {@code FZ-114}, while the tests passed: they called
+     * {@code purge} on the injected bean, which does go through the proxy.
      */
     @Scheduled(fixedDelayString = "${freezehub.deployment-checks.retention.interval:PT24H}",
             initialDelayString = "PT5M")
+    @Transactional
     public void purgeScheduled() {
         purge(Instant.now());
     }

@@ -1,6 +1,7 @@
 package com.freezhub.deployment;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatNoException;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
@@ -271,6 +272,28 @@ class DeploymentCheckTest {
 
         assertThat(removed).isGreaterThanOrEqualTo(1);
         assertThat(deploymentCheckRepository.findById(id)).isEmpty();
+    }
+
+    @Test
+    void theScheduledSweepRunsInATransactionOfItsOwn() throws Exception {
+        /*
+         * Drives `purgeScheduled` — the method the scheduler calls — rather than the
+         * `purge` underneath it. That distinction is the whole test (FZ-114).
+         *
+         * `purgeScheduled` calls `purge` on `this`, so the proxy that applies
+         * `@Transactional` is bypassed. With the annotation only on `purge`, no
+         * transaction started and the `@Modifying` delete threw
+         * TransactionRequiredException — once a day, in production, while the tests above
+         * passed, because they call `purge` on the injected bean and so do reach the
+         * proxy. A purge that only ever ran in a test is not a retention policy.
+         *
+         * Nothing is asserted about what it deleted: `purgeScheduled` sweeps at `now`, so
+         * a check written a moment ago is inside every retention window. That it returns
+         * at all is the claim being made.
+         */
+        evaluate("payments-api", "production");
+
+        assertThatNoException().isThrownBy(() -> retention.purgeScheduled());
     }
 
     @Test
