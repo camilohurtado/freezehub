@@ -73,9 +73,34 @@ export function SignInPage() {
           </p>
         )}
 
-        <button className={`btn btn-primary btn-block ${styles.button}`} type="submit" disabled={submitting || !email}>
+        <button
+          className={`btn btn-primary btn-block ${styles.button}`}
+          type="submit"
+          disabled={submitting || !email}
+        >
           {submitting ? 'Signing in…' : 'Sign in'}
         </button>
+
+        {/*
+          * Drawn by `1i` and disabled on purpose. The Cognito path is where this screen is
+          * going (`FZ-046`), and showing it greyed says so more honestly than a screen
+          * that presents the development endpoint as the product. It promises nothing —
+          * the sentence below says exactly what this can and cannot do.
+          */}
+        <button
+          className={`btn btn-secondary btn-block ${styles.sso}`}
+          type="button"
+          disabled
+          aria-describedby="signin-note"
+        >
+          Continue with SSO
+        </button>
+
+        <p className={styles.note} id="signin-note">
+          The development endpoint exists only under the backend&apos;s{' '}
+          <span className="mono">local</span> profile, so this screen cannot sign anyone in
+          to a deployed environment.
+        </p>
       </form>
     </main>
   )
