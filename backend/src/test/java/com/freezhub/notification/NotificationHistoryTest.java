@@ -1,7 +1,10 @@
 package com.freezhub.notification;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.is;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.freezhub.ContainersConfig;
@@ -28,6 +31,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.test.context.ActiveProfiles;
@@ -48,6 +52,9 @@ class NotificationHistoryTest {
 
     @Autowired
     private NotificationHistoryService history;
+
+    @Autowired
+    private NotificationRetryService retries;
 
     @Autowired
     private OrganizationRepository organizations;
@@ -205,5 +212,110 @@ class NotificationHistoryTest {
     @Test
     void theEndpointNeedsAuthentication() throws Exception {
         mockMvc.perform(get("/api/notifications")).andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void retryingRequeuesOnlyTheDeliveriesThatFailed() {
+        // Re-sending the whole event would announce a freeze a second time to every
+        // channel that already accepted it — a fix for one person becoming a duplicate
+        // for everyone else (FZ-119).
+        Long slack = channel(IntegrationType.SLACK);
+        Long webhook = channel(IntegrationType.WEBHOOK);
+        Instant at = Instant.now().minus(Duration.ofHours(1));
+        delivery(slack, NotificationEvent.ACTIVATED, NotificationStatus.SENT, 1, null, at);
+        delivery(webhook, NotificationEvent.ACTIVATED, NotificationStatus.FAILED, 6, "502", at);
+
+        int requeued = retries.retry(
+                organizationId, restrictionId, NotificationEvent.ACTIVATED, Instant.now());
+
+        assertThat(requeued).isEqualTo(1);
+        var deliveries = history.history(organizationId, 50).getFirst().deliveries();
+        assertThat(deliveries)
+                .filteredOn(d -> d.integrationId().equals(webhook))
+                .singleElement()
+                .satisfies(d -> assertThat(d.status()).isEqualTo(NotificationStatus.PENDING));
+        assertThat(deliveries)
+                .filteredOn(d -> d.integrationId().equals(slack))
+                .singleElement()
+                .satisfies(d -> assertThat(d.status()).isEqualTo(NotificationStatus.SENT));
+    }
+
+    @Test
+    void retryingResetsTheAttemptCountSoTheDispatcherWillTryAgain() {
+        // RetryPolicy calls a row exhausted at six attempts. Requeuing without resetting
+        // would abandon it again without a single new attempt — the retry would appear to
+        // work and change nothing.
+        Long webhook = channel(IntegrationType.WEBHOOK);
+        delivery(webhook, NotificationEvent.ACTIVATED, NotificationStatus.FAILED, 6, "502",
+                Instant.now().minus(Duration.ofHours(1)));
+
+        retries.retry(organizationId, restrictionId, NotificationEvent.ACTIVATED, Instant.now());
+
+        var delivery = history.history(organizationId, 50).getFirst().deliveries().getFirst();
+        assertThat(delivery.attempts()).isZero();
+        assertThat(RetryPolicy.isExhausted(delivery.attempts())).isFalse();
+    }
+
+    @Test
+    void retryingKeepsWhyItFailedUntilSomethingReplacesIt() {
+        // While it sits queued, the previous error is still the only account of what went
+        // wrong. Clearing it would leave a pending row with no history.
+        delivery(channel(IntegrationType.WEBHOOK), NotificationEvent.ACTIVATED,
+                NotificationStatus.FAILED, 6, "502 Bad Gateway", Instant.now());
+
+        retries.retry(organizationId, restrictionId, NotificationEvent.ACTIVATED, Instant.now());
+
+        assertThat(history.history(organizationId, 50).getFirst().deliveries().getFirst().lastError())
+                .isEqualTo("502 Bad Gateway");
+    }
+
+    @Test
+    void retryingAnEventWithNothingFailedChangesNothing() {
+        delivery(channel(IntegrationType.SLACK), NotificationEvent.ACTIVATED,
+                NotificationStatus.SENT, 1, null, Instant.now());
+
+        assertThat(retries.retry(organizationId, restrictionId, NotificationEvent.ACTIVATED,
+                Instant.now())).isZero();
+        assertThat(history.history(organizationId, 50).getFirst().deliveries().getFirst().status())
+                .isEqualTo(NotificationStatus.SENT);
+    }
+
+    @Test
+    void retryingNeverReachesAnotherOrganizationsDeliveries() {
+        delivery(channel(IntegrationType.WEBHOOK), NotificationEvent.ACTIVATED,
+                NotificationStatus.FAILED, 6, "502", Instant.now());
+        Long other = organizations
+                .saveAndFlush(new Organization("Globex " + System.nanoTime())).getId();
+
+        assertThat(retries.retry(other, restrictionId, NotificationEvent.ACTIVATED, Instant.now()))
+                .isZero();
+        assertThat(history.history(organizationId, 50).getFirst().deliveries().getFirst().status())
+                .isEqualTo(NotificationStatus.FAILED);
+    }
+
+    @Test
+    void onlyAnAdministratorCanRetry() throws Exception {
+        String subject = "member-" + System.nanoTime();
+        users.saveAndFlush(
+                new User(organizationId, subject, subject + "@acme.test", UserRole.MEMBER));
+
+        mockMvc.perform(post("/api/notifications/retry")
+                        .header("Authorization", "Bearer " + TestTokens.forSubject(jwtEncoder, subject))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"restrictionId\":" + restrictionId + ",\"event\":\"ACTIVATED\"}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void theRetryEndpointReportsHowManyItRequeued() throws Exception {
+        delivery(channel(IntegrationType.WEBHOOK), NotificationEvent.ACTIVATED,
+                NotificationStatus.FAILED, 6, "502", Instant.now());
+
+        mockMvc.perform(post("/api/notifications/retry")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"restrictionId\":" + restrictionId + ",\"event\":\"ACTIVATED\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.requeued", is(1)));
     }
 }

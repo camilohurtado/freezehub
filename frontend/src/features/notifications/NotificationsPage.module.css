@@ -143,3 +143,14 @@
     gap: 4px;
   }
 }
+
+/* Pushed to the end of the banner, as `1g` places it. */
+.retry {
+  margin-left: auto;
+}
+
+.retryResult {
+  margin: -20px 0 34px;
+  font-size: 14px;
+  color: var(--color-neutral-800);
+}

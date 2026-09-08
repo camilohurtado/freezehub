@@ -126,6 +126,20 @@ public class Notification {
         this.lastError = reason;
     }
 
+    /**
+     * Puts a given-up-on notification back in front of the dispatcher (FZ-119).
+     *
+     * <p>The attempt count resets, and it has to: {@code RetryPolicy} calls a row
+     * exhausted at six, so a requeue that kept the count would be abandoned again without
+     * a single new attempt. The last error is kept until something replaces it — while
+     * this sits queued, why it failed before is still the only account of it.
+     */
+    public void requeue(Instant now) {
+        this.status = NotificationStatus.PENDING;
+        this.attempts = 0;
+        this.nextAttemptAt = now;
+    }
+
     /** Puts a notification back in the queue after a transient, non-delivery condition. */
     public void deferUntil(String reason, Instant when) {
         this.lastError = reason;

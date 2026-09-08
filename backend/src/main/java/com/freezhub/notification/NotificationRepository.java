@@ -31,6 +31,11 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     long countByOrganizationIdAndRestrictionIdAndStatus(
             Long organizationId, Long restrictionId, NotificationStatus status);
 
+    /** The deliveries of one event in one state — what a retry requeues (FZ-119). */
+    List<Notification> findAllByOrganizationIdAndRestrictionIdAndEventAndStatus(
+            Long organizationId, Long restrictionId, NotificationEvent event,
+            NotificationStatus status);
+
     boolean existsByRestrictionIdAndIntegrationIdAndEvent(
             Long restrictionId, Long integrationId, NotificationEvent event);
 

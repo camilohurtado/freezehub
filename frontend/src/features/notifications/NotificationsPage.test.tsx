@@ -159,4 +159,115 @@ describe('NotificationsPage', () => {
 
     expect(await screen.findByText(/nothing has been announced yet/i)).toBeInTheDocument()
   })
+
+  test('retries the event the banner names, not every event', async () => {
+    // The button sits beside one failure and must send that one. Retrying "everything
+    // failed" would re-announce unrelated freezes (FZ-119).
+    const user = userEvent.setup()
+    const spy = vi.fn((_input: RequestInfo | URL, init?: RequestInit) => {
+      const json = (body: unknown) =>
+        Promise.resolve(
+          new Response(JSON.stringify(body), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        )
+      if (init?.method === 'POST') return json({ requeued: 1 })
+      return json([
+        activated({
+          restrictionId: 8,
+          event: 'CANCELLED',
+          deliveries: [
+            { integrationId: 3, channel: 'WEBHOOK', status: 'FAILED', attempts: 6, lastError: '502', sentAt: null },
+          ],
+        }),
+      ])
+    })
+    vi.stubGlobal('fetch', spy)
+    renderRoute(<NotificationsPage />, { path: '/notifications' })
+
+    await user.click(await screen.findByRole('button', { name: /try again/i }))
+
+    await waitFor(() => {
+      const call = spy.mock.calls.find(([, init]) => init?.method === 'POST')
+      expect(call).toBeDefined()
+      expect(JSON.parse(String(call?.[1]?.body))).toEqual({
+        restrictionId: 8,
+        event: 'CANCELLED',
+      })
+    })
+  })
+
+  test('says the retry is queued, not that it was sent', async () => {
+    // Nothing is delivered on this click — the outbox tries again on its next pass, and
+    // saying "sent" would be a claim the product cannot make yet.
+    const user = userEvent.setup()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((_input: RequestInfo | URL, init?: RequestInit) => {
+        const json = (body: unknown) =>
+          Promise.resolve(
+            new Response(JSON.stringify(body), {
+              status: 200,
+              headers: { 'Content-Type': 'application/json' },
+            }),
+          )
+        if (init?.method === 'POST') return json({ requeued: 2 })
+        return json([
+          activated({
+            deliveries: [
+              { integrationId: 3, channel: 'WEBHOOK', status: 'FAILED', attempts: 6, lastError: '502', sentAt: null },
+            ],
+          }),
+        ])
+      }),
+    )
+    renderRoute(<NotificationsPage />, { path: '/notifications' })
+
+    await user.click(await screen.findByRole('button', { name: /try again/i }))
+
+    const result = await screen.findByText(/2 deliveries queued/i)
+    expect(result).toBeInTheDocument()
+    // Scoped to the result: the page's own description legitimately says "sent".
+    expect(result.textContent).not.toMatch(/sent/i)
+    expect(result.textContent).toMatch(/will try again/i)
+  })
+
+  test('explains a retry that found nothing to do', async () => {
+    // The realistic race: it went through between loading the page and pressing the button.
+    const user = userEvent.setup()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((_input: RequestInfo | URL, init?: RequestInit) => {
+        const json = (body: unknown) =>
+          Promise.resolve(
+            new Response(JSON.stringify(body), {
+              status: 200,
+              headers: { 'Content-Type': 'application/json' },
+            }),
+          )
+        if (init?.method === 'POST') return json({ requeued: 0 })
+        return json([
+          activated({
+            deliveries: [
+              { integrationId: 3, channel: 'WEBHOOK', status: 'FAILED', attempts: 6, lastError: '502', sentAt: null },
+            ],
+          }),
+        ])
+      }),
+    )
+    renderRoute(<NotificationsPage />, { path: '/notifications' })
+
+    await user.click(await screen.findByRole('button', { name: /try again/i }))
+
+    expect(await screen.findByText(/nothing was left to retry/i)).toBeInTheDocument()
+  })
+
+  test('offers no retry when nothing failed', async () => {
+    stubApi([activated()])
+    renderRoute(<NotificationsPage />, { path: '/notifications' })
+
+    await screen.findByRole('list', { name: 'Notifications' })
+    expect(screen.queryByRole('button', { name: /try again/i })).not.toBeInTheDocument()
+  })
 })

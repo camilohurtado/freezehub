@@ -1,5 +1,5 @@
 import { apiRequest } from './client'
-import type { NotificationEventRecord } from '../types/api'
+import type { NotificationEvent, NotificationEventRecord } from '../types/api'
 
 /**
  * What was announced and whether each channel accepted it (`FZ-115`).
@@ -12,4 +12,23 @@ export function listNotifications(
   signal?: AbortSignal,
 ): Promise<NotificationEventRecord[]> {
   return apiRequest<NotificationEventRecord[]>('/api/notifications', { token, signal })
+}
+
+/**
+ * Sends one announcement again (`FZ-119`).
+ *
+ * Requeues only the deliveries that failed — the channels that already accepted it are
+ * left alone, so a fix for the one person who was not told does not become a duplicate
+ * for everyone who was.
+ */
+export function retryNotification(
+  token: string | null,
+  restrictionId: number,
+  event: NotificationEvent,
+): Promise<{ requeued: number }> {
+  return apiRequest<{ requeued: number }>('/api/notifications/retry', {
+    method: 'POST',
+    body: { restrictionId, event },
+    token,
+  })
 }

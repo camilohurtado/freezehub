@@ -1595,7 +1595,7 @@ Consequences worth taking:
 - Only the visible section's data is fetched, because only it is mounted. Four requests on open become one.
 
 ### FZ-119 — Retry a Failed Delivery
-**Status:** TODO · **Needs:** `FZ-115`
+**Status:** DONE
 
 `1g` draws a **Retry** button beside the failure banner. `FZ-115` built the screen without it, because re-sending is a capability rather than a view and the two should not be reviewed as one change.
 

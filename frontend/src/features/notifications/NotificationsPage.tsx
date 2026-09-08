@@ -1,6 +1,6 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useSearchParams } from 'react-router'
-import { listNotifications } from '../../api/notifications'
+import { listNotifications, retryNotification } from '../../api/notifications'
 import { useAuth } from '../auth/authContext'
 import { ApiError } from '../../api/client'
 import { formatShort } from '../../utils/datetime'
@@ -32,9 +32,22 @@ export function NotificationsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const filter = searchParams.get('show') ?? ''
 
+  const queryClient = useQueryClient()
+
   const notifications = useQuery<NotificationEventRecord[]>({
     queryKey: ['notifications'],
     queryFn: ({ signal }) => listNotifications(token, signal),
+  })
+
+  /*
+   * Nothing is sent here. The retry puts the failed deliveries back in front of the
+   * dispatcher, which is why the button says what it does rather than "Resend" — the
+   * announcement goes out on the outbox's next pass, not on this click.
+   */
+  const retry = useMutation({
+    mutationFn: (event: NotificationEventRecord) =>
+      retryNotification(token, event.restrictionId, event.event),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notifications'] }),
   })
 
   function select(value: string) {
@@ -109,7 +122,29 @@ export function NotificationsPage() {
             )}{' '}
             on “{eventTitle(failure.event.event).toLowerCase()}”.
           </span>
+          <button
+            className={`btn btn-primary ${styles.retry}`}
+            type="button"
+            disabled={retry.isPending}
+            onClick={() => retry.mutate(failure.event)}
+          >
+            {retry.isPending ? 'Queueing…' : 'Try again'}
+          </button>
         </div>
+      )}
+
+      {retry.isSuccess && (
+        <p className={styles.retryResult} role="status">
+          {retry.data.requeued === 0
+            ? 'Nothing was left to retry — it may have gone through already.'
+            : `${retry.data.requeued} ${retry.data.requeued === 1 ? 'delivery' : 'deliveries'} queued. The next dispatch will try again.`}
+        </p>
+      )}
+
+      {retry.isError && (
+        <p className={styles.retryResult} role="alert">
+          Could not queue the retry. {retry.error.message}
+        </p>
       )}
 
       <div className={styles.filters}>
