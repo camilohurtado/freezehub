@@ -1553,7 +1553,7 @@ Consequences: `deployment_check` grows without bound, and the per-organization r
 The fix is small. The test that goes with it is the point: it has to drive the **scheduled entry point**, not the method underneath it, or the same bug returns unnoticed.
 
 ### FZ-115 — Notifications
-**Status:** TODO · **Blocked:** there is no notifications endpoint
+**Status:** DONE · **Except:** manual retry, split out as `FZ-119`
 
 `1g` — lifecycle events with per-channel delivery, because *"was Slack actually told?"* is the question that gets asked after a freeze goes wrong.
 
@@ -1593,3 +1593,12 @@ Consequences worth taking:
 - The `IntersectionObserver` goes. Nothing scrolls past anything, so there is nothing to follow — and a whole file of enhancement-that-degrades disappears with it.
 - **The selected section belongs in the URL**, as the checks console's filter already does (`FZ-071`). Settings → API keys should be a link somebody can send, and browser back should step between sections rather than leaving the page.
 - Only the visible section's data is fetched, because only it is mounted. Four requests on open become one.
+
+### FZ-119 — Retry a Failed Delivery
+**Status:** TODO · **Needs:** `FZ-115`
+
+`1g` draws a **Retry** button beside the failure banner. `FZ-115` built the screen without it, because re-sending is a capability rather than a view and the two should not be reviewed as one change.
+
+What it needs: an endpoint that puts an exhausted notification back to `PENDING` with its attempt count reset, so the existing dispatcher picks it up on the next pass. Nothing new has to send anything — the outbox already knows how.
+
+**Decide when starting it:** whether retrying is per delivery or per event. Per event is what the banner implies and is kinder to use; per delivery is what the data models, and re-sending to channels that already accepted would announce a freeze twice to everyone who was told the first time. That argues for per event, retrying only its failed deliveries.

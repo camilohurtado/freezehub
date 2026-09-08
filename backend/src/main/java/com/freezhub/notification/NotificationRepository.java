@@ -21,6 +21,9 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
 
     List<Notification> findAllByRestrictionIdOrderByIdAsc(Long restrictionId);
 
+    /** One organization's announcements, newest first — the history screen's only read. */
+    List<Notification> findAllByOrganizationIdOrderByIdDesc(Long organizationId);
+
     boolean existsByRestrictionIdAndIntegrationIdAndEvent(
             Long restrictionId, Long integrationId, NotificationEvent event);
 

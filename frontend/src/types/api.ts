@@ -220,3 +220,37 @@ export interface DeploymentCheckSummary {
    */
   unregistered: number
 }
+
+export type NotificationEvent =
+  | 'SCHEDULED'
+  | 'STARTING_SOON'
+  | 'ACTIVATED'
+  | 'COMPLETED'
+  | 'CANCELLED'
+
+export type NotificationStatus = 'PENDING' | 'SENT' | 'FAILED'
+
+/** What one channel did with one announcement. */
+export interface NotificationDelivery {
+  integrationId: number
+  channel: IntegrationType | null
+  status: NotificationStatus
+  attempts: number
+  /** Why the last attempt failed, as the destination said it. Null unless it did. */
+  lastError: string | null
+  sentAt: string | null
+}
+
+/**
+ * One lifecycle event and every channel's answer to it (`FZ-115`).
+ *
+ * Grouped by event rather than listed per delivery: the question is "was everybody told?",
+ * and a flat list makes that a counting exercise.
+ */
+export interface NotificationEventRecord {
+  restrictionId: number
+  restrictionName: string
+  event: NotificationEvent
+  occurredAt: string
+  deliveries: NotificationDelivery[]
+}
