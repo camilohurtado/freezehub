@@ -1468,7 +1468,7 @@ Four figures the mockups show and no endpoint produces:
 All read from `deployment_check`, which already records every evaluation (`FZ-070`).
 
 ### FZ-106 — Dashboard
-**Status:** TODO · **Needs:** `FZ-105`
+**Status:** DONE
 
 `1a` with the status line ("Deploys are blocked in production and staging" — a derived sentence naming the blocked environments), the active card with its magenta spine, upcoming cards, and the completed **table** with `CHECKS REFUSED`.
 
