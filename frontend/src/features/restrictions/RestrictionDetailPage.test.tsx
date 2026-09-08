@@ -1,9 +1,9 @@
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { RestrictionDetailPage } from './RestrictionDetailPage'
 import { renderRoute } from '../../test/renderRoute'
-import type { RestrictionDetail, RestrictionStatus } from '../../types/api'
+import type { RestrictionDetail, RestrictionImpact, RestrictionStatus } from '../../types/api'
 
 const entry = (id: number, name: string) => ({
   id,
@@ -31,7 +31,18 @@ function detail(overrides: Partial<RestrictionDetail> = {}): RestrictionDetail {
   }
 }
 
-function stubApi(restriction: RestrictionDetail | { status: number }, cancelStatus = 200) {
+const noImpact: RestrictionImpact = {
+  checksRefused: 0,
+  pipelinesAffected: 0,
+  notificationsSent: 0,
+  notificationsFailed: 0,
+}
+
+function stubApi(
+  restriction: RestrictionDetail | { status: number },
+  cancelStatus = 200,
+  impact: RestrictionImpact = noImpact,
+) {
   const spy = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input)
     const json = (body: unknown, status = 200) =>
@@ -46,6 +57,12 @@ function stubApi(restriction: RestrictionDetail | { status: number }, cancelStat
           ? json(restriction)
           : json({ message: 'Only a SCHEDULED or ACTIVE restriction can be cancelled' }, cancelStatus),
       )
+    }
+    // Checked before the restriction itself: `/api/restrictions/7/impact` matches the
+    // same prefix, and answering it with a restriction is how the figures silently
+    // rendered as dashes.
+    if (url.includes('/impact')) {
+      return Promise.resolve(json(impact))
     }
     if (url.includes('/api/restrictions/')) {
       return 'status' in restriction && !('name' in restriction)
@@ -206,5 +223,72 @@ describe('RestrictionDetailPage', () => {
 
     const tag = await screen.findByText('production')
     expect(tag.className).toContain(expectMagenta ? 'tag-accent-2' : 'tag-neutral')
+  })
+
+  test('says what the restriction actually did', async () => {
+    // The three figures that make a completed freeze more than a row in a list (FZ-112).
+    stubApi(detail({ status: 'COMPLETED' }), 200, {
+      checksRefused: 14,
+      pipelinesAffected: 6,
+      notificationsSent: 3,
+      notificationsFailed: 0,
+    })
+    render()
+
+    const block = await screen.findByRole('region', { name: /what it has done/i })
+    expect(within(block).getByText('14')).toBeInTheDocument()
+    expect(within(block).getByText('6')).toBeInTheDocument()
+    expect(within(block).getByText('3')).toBeInTheDocument()
+  })
+
+  test('refusals and pipelines are different figures', async () => {
+    // Three refusals across two pipelines is the normal case, and reading one as the
+    // other overstates how far a freeze reached.
+    stubApi(detail({ status: 'COMPLETED' }), 200, {
+      checksRefused: 3,
+      pipelinesAffected: 2,
+      notificationsSent: 1,
+      notificationsFailed: 0,
+    })
+    render()
+
+    const block = await screen.findByRole('region', { name: /what it has done/i })
+    expect(within(block).getByText('3')).toBeInTheDocument()
+    expect(within(block).getByText('2')).toBeInTheDocument()
+  })
+
+  test('a scheduled restriction is not reported as having done nothing', async () => {
+    // Three noughts under "what it has done" read as a failure rather than as a freeze
+    // that has not started.
+    stubApi(detail({ status: 'SCHEDULED' }))
+    render()
+
+    await screen.findByRole('heading', { name: 'Black Friday Freeze' })
+    expect(screen.queryByRole('region', { name: /what it has done/i })).not.toBeInTheDocument()
+  })
+
+  test('an advisory says outright that it refused nothing', async () => {
+    // Zero under "checks refused" is the correct answer for an advisory, and without the
+    // caption it reads as a freeze that failed to catch anything.
+    stubApi(detail({ status: 'COMPLETED', level: 'ADVISORY' }))
+    render()
+
+    const block = await screen.findByRole('region', { name: /what it has done/i })
+    expect(within(block).getByText(/an advisory refuses nothing/i)).toBeInTheDocument()
+  })
+
+  test('links a failed announcement to the notifications it came from', async () => {
+    stubApi(detail({ status: 'ACTIVE' }), 200, {
+      checksRefused: 0,
+      pipelinesAffected: 0,
+      notificationsSent: 3,
+      notificationsFailed: 1,
+    })
+    render()
+
+    expect(await screen.findByRole('link', { name: /1 did not arrive/i })).toHaveAttribute(
+      'href',
+      '/notifications?show=failed',
+    )
   })
 })

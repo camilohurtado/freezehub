@@ -203,3 +203,50 @@
     gap: 6px;
   }
 }
+
+/* — what it has done (`1d`, FZ-112) — */
+
+.impact {
+  margin-bottom: 38px;
+}
+
+.figures {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 34px;
+}
+
+.label {
+  composes: fieldLabel from global;
+  margin-bottom: 8px;
+}
+
+.figure,
+.figureAlarming {
+  font: var(--font-heading-weight) 34px/1 var(--font-heading);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Magenta because a refusal is a deployment that was stopped — the same claim the tag
+   and the dashboard rail make, in the same ink. */
+.figureAlarming {
+  color: var(--color-accent-2-700);
+}
+
+.figureCaption {
+  margin: 8px 0 0;
+  font-size: 14px;
+  color: var(--color-neutral-800);
+}
+
+/* A delivery that failed means somebody was not told, so it takes the in-force ink even
+   though it is a link. */
+.failedLink {
+  color: var(--color-accent-2-700);
+}
+
+.impactState {
+  margin: 0;
+  font-size: 14px;
+  color: var(--color-neutral-700);
+}

@@ -254,3 +254,16 @@ export interface NotificationEventRecord {
   occurredAt: string
   deliveries: NotificationDelivery[]
 }
+
+/**
+ * What a restriction actually did (`1d`'s "What it has done", `FZ-112`).
+ *
+ * Counted from the records it produced rather than stored beside it, so the figures
+ * cannot drift from what happened.
+ */
+export interface RestrictionImpact {
+  checksRefused: number
+  pipelinesAffected: number
+  notificationsSent: number
+  notificationsFailed: number
+}
