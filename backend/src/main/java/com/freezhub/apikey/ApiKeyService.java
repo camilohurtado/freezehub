@@ -7,6 +7,8 @@ import com.freezhub.audit.AuditResourceType;
 import com.freezhub.audit.AuditTrail;
 import com.freezhub.subscription.SubscriptionService;
 import com.freezhub.shared.security.ApiKeyPrincipal;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.http.HttpStatus;
@@ -88,12 +90,23 @@ public class ApiKeyService {
      * <p>Every failure is the same empty result — unknown key, revoked key, malformed
      * input — so the caller cannot learn from a rejection whether a key ever existed.
      */
-    @Transactional(readOnly = true)
+    @Transactional
     public Optional<ApiKeyPrincipal> authenticate(String rawKey) {
         return apiKeyRepository.findByTokenHash(ApiKeySecret.hash(rawKey))
                 .filter(apiKey -> !apiKey.isRevoked())
-                .map(apiKey -> new ApiKeyPrincipal(
-                        apiKey.getId(), apiKey.getOrganizationId(), apiKey.getName()));
+                .map(apiKey -> {
+                    /*
+                     * Stamped here because this is the only place every machine request
+                     * passes through, and skipped unless the day has changed (FZ-117).
+                     * A pipeline checking a thousand times today writes once — which is
+                     * what keeps the deployment gate a read path in all but name.
+                     */
+                    if (apiKey.recordUsedOn(LocalDate.now(ZoneOffset.UTC))) {
+                        apiKeyRepository.save(apiKey);
+                    }
+                    return new ApiKeyPrincipal(
+                            apiKey.getId(), apiKey.getOrganizationId(), apiKey.getName());
+                });
     }
 
     /** Another organization's key is indistinguishable from one that never existed. */

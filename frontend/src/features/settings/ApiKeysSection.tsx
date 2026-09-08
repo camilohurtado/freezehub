@@ -111,7 +111,7 @@ export function ApiKeysSection() {
               <div className={styles.rowMain}>
                 <span className={styles.itemName}>{key.name}</span>
                 <span className={styles.summary}>
-                  {key.keyPrefix}… · {key.revoked ? 'revoked' : 'active'}
+                  {key.keyPrefix}… · {key.revoked ? 'revoked' : 'active'} · {lastUse(key)}
                 </span>
               </div>
               <div className={styles.rowActions}>
@@ -164,4 +164,33 @@ export function ApiKeysSection() {
       )}
     </section>
   )
+}
+
+/**
+ * When a key was last used, in the words somebody deciding whether to revoke it needs
+ * (`FZ-117`).
+ *
+ * **"never used" is the answer that matters.** It is the one that makes a key safe to
+ * revoke, so it is said outright rather than left as a blank. A revoked key is not
+ * described as unused: it stopped being able to authenticate, which is a different fact.
+ */
+function lastUse(key: ApiKey): string {
+  if (key.lastUsedOn === null) {
+    return key.revoked ? 'never used before it was revoked' : 'never used'
+  }
+
+  /*
+   * Date to date, not elapsed milliseconds. Measuring the gap from "now" to midnight on
+   * the stored day makes the answer depend on the hour: a key used yesterday evening
+   * reads "2 days ago" once the clock passes midday. Both ends are pinned to UTC
+   * midnight so a day is a day.
+   */
+  const today = new Date().toISOString().slice(0, 10)
+  const days = Math.round(
+    (Date.parse(`${today}T00:00:00Z`) - Date.parse(`${key.lastUsedOn}T00:00:00Z`)) / 86_400_000,
+  )
+  if (days <= 0) return 'used today'
+  if (days === 1) return 'used yesterday'
+  if (days < 30) return `used ${days} days ago`
+  return `last used ${key.lastUsedOn}`
 }

@@ -1,0 +1,16 @@
+databaseChangeLog:
+  - changeSet:
+      id: 021-api-key-last-used
+      author: freezehub
+      comment: >-
+        A date, not a timestamp, and deliberately (FZ-117). The question this answers is
+        "is anything still using this key?", which a day resolves. Storing an instant would
+        invite a write on every policy evaluation — once per deployment, per pipeline —
+        turning the gate's read path into a write path for precision nobody reads.
+      changes:
+        - addColumn:
+            tableName: api_key
+            columns:
+              - column:
+                  name: last_used_on
+                  type: date

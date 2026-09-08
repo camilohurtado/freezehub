@@ -1569,7 +1569,7 @@ Decide when starting it: whether delivery is listed per notification or per rest
 Unlike the other screens in this milestone this is a re-set of a page that already works: `SettingsPage` has its sections, and what changes is how they are laid out and led into.
 
 ### FZ-117 — What a Key and a Channel Are Actually Doing
-**Status:** TODO
+**Status:** DONE
 
 Two columns `1h` draws that `FZ-116` could not fill, because nothing records what they show.
 

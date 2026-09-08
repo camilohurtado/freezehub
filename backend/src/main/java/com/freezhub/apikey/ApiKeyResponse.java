@@ -1,6 +1,7 @@
 package com.freezhub.apikey;
 
 import java.time.Instant;
+import java.time.LocalDate;
 
 /**
  * What a client is allowed to see about an existing key.
@@ -15,6 +16,14 @@ public record ApiKeyResponse(
         String keyPrefix,
         Long createdBy,
         Instant createdAt,
+        /**
+         * The day this key last authenticated something, or null if it never has (FZ-117).
+         *
+         * <p>A date, not an instant: deciding which of four keys is safe to revoke needs
+         * to know whether anything still uses it, and a day answers that. Precision to the
+         * second would cost a write on every deployment check.
+         */
+        LocalDate lastUsedOn,
         Instant revokedAt,
         boolean revoked
 ) {
@@ -26,6 +35,7 @@ public record ApiKeyResponse(
                 apiKey.getKeyPrefix(),
                 apiKey.getCreatedBy(),
                 apiKey.getCreatedAt(),
+                apiKey.getLastUsedOn(),
                 apiKey.getRevokedAt(),
                 apiKey.isRevoked());
     }

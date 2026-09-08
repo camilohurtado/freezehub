@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Link } from 'react-router'
 import { useState, type FormEvent } from 'react'
 import { ApiError } from '../../api/client'
 import {
@@ -135,6 +136,16 @@ export function IntegrationsSection() {
                 <div className={styles.rowMain}>
                   <span className={styles.itemName}>{CONFIG_HELP[integration.type].label}</span>
                   <span className={styles.summary}>{integration.summary}</span>
+                  {/*
+                    * A channel that is enabled and failing looks identical to one that is
+                    * working, unless it says so here — and settings is where somebody
+                    * comes to fix it (FZ-117).
+                    */}
+                  {integration.failedDeliveries > 0 && (
+                    <Link className="tag tag-accent-2" to="/notifications?show=failed">
+                      {integration.failedDeliveries} not delivered
+                    </Link>
+                  )}
                 </div>
                 <div className={styles.rowActions}>
                   <label className={styles.toggle}>

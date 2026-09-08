@@ -39,3 +39,5 @@ databaseChangeLog:
       file: db/changelog/019-demo-request.yaml
   - include:
       file: db/changelog/020-stripe.yaml
+  - include:
+      file: db/changelog/021-api-key-last-used.yaml

@@ -12,6 +12,7 @@ const apiKey = (overrides: Partial<ApiKey> = {}): ApiKey => ({
   name: 'gitlab-ci',
   keyPrefix: 'fzh_exampl',
   createdBy: 1,
+  lastUsedOn: null,
   createdAt: '2026-01-01T00:00:00Z',
   revokedAt: null,
   revoked: false,
@@ -156,5 +157,31 @@ describe('ApiKeysSection', () => {
     await user.click(screen.getByRole('button', { name: /issue key/i }))
 
     expect(await screen.findByText('name must not be blank')).toBeInTheDocument()
+  })
+
+  test('says outright when a key has never been used', async () => {
+    // The answer that makes a key safe to revoke, so it is stated rather than left blank
+    // (FZ-117).
+    stubApi([apiKey({ lastUsedOn: null })])
+    renderRoute(<ApiKeysSection />, { path: '/settings' })
+
+    expect(await screen.findByText(/never used/)).toBeInTheDocument()
+  })
+
+  test('says how recently a key was used', async () => {
+    const twoDaysAgo = new Date(Date.now() - 2 * 86_400_000).toISOString().slice(0, 10)
+    stubApi([apiKey({ lastUsedOn: twoDaysAgo })])
+    renderRoute(<ApiKeysSection />, { path: '/settings' })
+
+    expect(await screen.findByText(/used 2 days ago/)).toBeInTheDocument()
+  })
+
+  test('does not describe a revoked key as merely unused', async () => {
+    // It stopped being able to authenticate, which is a different fact from nothing
+    // having wanted to.
+    stubApi([apiKey({ lastUsedOn: null, revoked: true, revokedAt: '2026-01-01T00:00:00Z' })])
+    renderRoute(<ApiKeysSection />, { path: '/settings' })
+
+    expect(await screen.findByText(/never used before it was revoked/)).toBeInTheDocument()
   })
 })

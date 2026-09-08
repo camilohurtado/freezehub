@@ -1,5 +1,7 @@
 package com.freezhub.integration;
 
+import com.freezhub.notification.NotificationRepository;
+import com.freezhub.notification.NotificationStatus;
 import com.freezhub.shared.security.AuthenticatedUser;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -29,16 +31,35 @@ import org.springframework.web.bind.annotation.RestController;
 public class IntegrationController {
 
     private final IntegrationService integrationService;
+    private final NotificationRepository notifications;
 
-    public IntegrationController(IntegrationService integrationService) {
+    public IntegrationController(IntegrationService integrationService,
+                                 NotificationRepository notifications) {
         this.integrationService = integrationService;
+        this.notifications = notifications;
     }
 
     @GetMapping
     public List<IntegrationResponse> list(@AuthenticationPrincipal AuthenticatedUser caller) {
         return integrationService.list(caller.organizationId()).stream()
-                .map(IntegrationResponse::from)
+                .map(integration -> IntegrationResponse.from(integration, failedFor(integration)))
                 .toList();
+    }
+
+    /**
+     * Announcements to this channel that were given up on (FZ-117).
+     *
+     * <p>Read from the outbox rather than kept on the channel, so it cannot say a channel
+     * is healthy after the record says otherwise — and it clears itself when a retry
+     * succeeds ({@code FZ-119}) without anything having to remember to reset a flag.
+     */
+    private IntegrationResponse withFailures(Integration integration) {
+        return IntegrationResponse.from(integration, failedFor(integration));
+    }
+
+    private long failedFor(Integration integration) {
+        return notifications.countByOrganizationIdAndIntegrationIdAndStatus(
+                integration.getOrganizationId(), integration.getId(), NotificationStatus.FAILED);
     }
 
     /**
@@ -65,7 +86,7 @@ public class IntegrationController {
     public IntegrationResponse setEnabled(@AuthenticationPrincipal AuthenticatedUser caller,
                                           @PathVariable Long integrationId,
                                           @Valid @RequestBody EnabledRequest request) {
-        return IntegrationResponse.from(
+        return withFailures(
                 integrationService.setEnabled(caller.organizationId(), integrationId, request.enabled()));
     }
 
@@ -74,7 +95,7 @@ public class IntegrationController {
     public IntegrationResponse replaceConfig(@AuthenticationPrincipal AuthenticatedUser caller,
                                              @PathVariable Long integrationId,
                                              @Valid @RequestBody ConfigRequest request) {
-        return IntegrationResponse.from(
+        return withFailures(
                 integrationService.replaceConfig(caller.organizationId(), integrationId, request.config()));
     }
 

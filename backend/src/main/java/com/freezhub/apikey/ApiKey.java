@@ -8,6 +8,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.time.LocalDate;
 
 /**
  * An organization-owned machine credential used by CI/CD clients (FZ-052).
@@ -45,6 +46,16 @@ public class ApiKey {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
+    /**
+     * The day this key last authenticated something (FZ-117).
+     *
+     * <p>A date rather than an instant, so the policy check stays a read path except at
+     * most once a day per key. "Is anything still using this?" is the question a person
+     * asks before revoking, and a day answers it.
+     */
+    @Column(name = "last_used_on")
+    private LocalDate lastUsedOn;
+
     @Column(name = "revoked_at")
     private Instant revokedAt;
 
@@ -66,6 +77,25 @@ public class ApiKey {
 
     public boolean isRevoked() {
         return revokedAt != null;
+    }
+
+    public LocalDate getLastUsedOn() {
+        return lastUsedOn;
+    }
+
+    /**
+     * Records that this key authenticated something today (FZ-117).
+     *
+     * <p><strong>Returns whether anything changed</strong>, so the caller can skip the
+     * write. That is the whole design: the policy check is on the deployment path and runs
+     * once per pipeline run, and a key used a thousand times today is written once.
+     */
+    boolean recordUsedOn(LocalDate today) {
+        if (today.equals(lastUsedOn)) {
+            return false;
+        }
+        this.lastUsedOn = today;
+        return true;
     }
 
     /**
