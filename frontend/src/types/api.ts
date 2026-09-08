@@ -97,6 +97,8 @@ export interface Integration {
   type: IntegrationType
   enabled: boolean
   summary: string
+  /** Announcements to this channel that were given up on and never arrived (`FZ-117`). */
+  failedDeliveries: number
   createdAt: string
   updatedAt: string
 }
@@ -108,6 +110,13 @@ export interface ApiKey {
   keyPrefix: string
   createdBy: number
   createdAt: string
+  /**
+   * The day this key last authenticated something, or null if it never has.
+   *
+   * A date, not an instant: the question is whether anything still uses it, and a day
+   * answers that without making the deployment gate a write path (`FZ-117`).
+   */
+  lastUsedOn: string | null
   revokedAt: string | null
   revoked: boolean
 }
