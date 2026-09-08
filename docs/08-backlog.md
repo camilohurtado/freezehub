@@ -1456,7 +1456,7 @@ The only cost is three catalog requests per detail view, which is not worth an A
 **What `1d` actually needs is layout, not data** — the two-column definition grid, hairline rules instead of boxes, letterspaced labels, scope values as tags, and GMT times. That is `FZ-107`.
 
 ### FZ-105 — Deployment Check Aggregates
-**Status:** TODO
+**Status:** DONE
 
 Four figures the mockups show and no endpoint produces:
 

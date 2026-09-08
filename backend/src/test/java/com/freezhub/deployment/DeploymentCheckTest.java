@@ -1,6 +1,7 @@
 package com.freezhub.deployment;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.nullValue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -104,11 +105,15 @@ class DeploymentCheckTest {
     }
 
     private void givenAFreezeInForce() {
+        givenAFreezeInForceReturningId();
+    }
+
+    private Long givenAFreezeInForceReturningId() {
         Instant now = Instant.now();
-        changeRestrictionRepository.saveAndFlush(new ChangeRestriction(
+        return changeRestrictionRepository.saveAndFlush(new ChangeRestriction(
                 organizationId, "Black Friday Freeze", null, "Revenue-critical period",
                 RestrictionLevel.HARD_FREEZE, now.minus(Duration.ofHours(1)),
-                now.plus(Duration.ofHours(1)), userId, Set.of(), Set.of(), Set.of(environmentId)));
+                now.plus(Duration.ofHours(1)), userId, Set.of(), Set.of(), Set.of(environmentId))).getId();
     }
 
     private void evaluate(String body) throws Exception {
@@ -307,4 +312,58 @@ class DeploymentCheckTest {
                 .andExpect(jsonPath("$[0].matchedRestrictions", is(nullValue())));
     }
 
+
+    @Test
+    void theSummaryNeedsAuthenticationLikeEverythingElse() throws Exception {
+        mockMvc.perform(get("/api/deployment-checks/summary"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void theSummaryCountsChecksTheGateActuallyAnswered() throws Exception {
+        // End to end on purpose (FZ-105). The refusals-per-restriction figure is read out
+        // of the denormalised JSON with a native query, so the only verification worth
+        // having is one where PolicyService wrote that JSON — a fixture hand-rolled in a
+        // test would prove the query parses a shape nothing produces.
+        // Allowed while nothing is in force, refused once the freeze exists. An
+        // unrecognised environment is itself a refusal, so both checks name a real one.
+        evaluate("payments-api", "production");
+        Long restrictionId = givenAFreezeInForceReturningId();
+        evaluate("payments-api", "production");
+
+        mockMvc.perform(get("/api/deployment-checks/summary")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.today.allowed", is(1)))
+                .andExpect(jsonPath("$.today.refused", is(1)))
+                .andExpect(jsonPath("$.today.total", is(2)))
+                // One name has asked, of one in the catalog.
+                .andExpect(jsonPath("$.applications.seen", is(1)))
+                .andExpect(jsonPath("$.applications.total", is(1)))
+                .andExpect(jsonPath("$.daily", hasSize(14)))
+                .andExpect(jsonPath("$.refusalsByRestriction", hasSize(1)))
+                .andExpect(jsonPath("$.refusalsByRestriction[0].restrictionId",
+                        is(restrictionId.intValue())))
+                .andExpect(jsonPath("$.refusalsByRestriction[0].refused", is(1)));
+    }
+
+    @Test
+    void theSummaryNeverCountsAnotherOrganizationsChecks() throws Exception {
+        givenAFreezeInForce();
+        evaluate("payments-api", "production");
+
+        // A second organization, with its own administrator and nothing else.
+        Organization other = organizationRepository
+                .saveAndFlush(new Organization("Globex " + System.nanoTime()));
+        String subject = "subject-" + System.nanoTime();
+        userRepository.saveAndFlush(new User(other.getId(), subject,
+                subject + "@globex.test", UserRole.ADMINISTRATOR));
+
+        mockMvc.perform(get("/api/deployment-checks/summary")
+                        .header("Authorization", "Bearer " + TestTokens.forSubject(jwtEncoder, subject)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.today.total", is(0)))
+                .andExpect(jsonPath("$.applications.seen", is(0)))
+                .andExpect(jsonPath("$.refusalsByRestriction", hasSize(0)));
+    }
 }
