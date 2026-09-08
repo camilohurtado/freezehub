@@ -1421,7 +1421,7 @@ Acceptance:
 **Everything else is taken as drawn:** `1d` detail, `1e` create, `1f` checks, `1g` notifications, `1h` settings, `1i` sign-in, `1j` landing, `1k` mobile.
 
 ### FZ-103 — The Colour Rule, Density and Furniture
-**Status:** TODO · **Closes:** `OI-18`
+**Status:** DONE · **Partly addresses:** `OI-18`
 
 The brief states one rule and `FZ-101` broke it:
 
