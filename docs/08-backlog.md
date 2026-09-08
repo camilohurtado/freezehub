@@ -1497,7 +1497,7 @@ Plus `1b`'s four metrics, and `1c`'s **"Then what"** — a forward list of trans
 One figure needs backend work: **refused as unregistered** is a count of `blocked_reason = UNREGISTERED` over the window, and nothing aggregates it. Small, and strictly required by the screen.
 
 ### FZ-110 — Sign-in and Mobile
-**Status:** TODO
+**Status:** DONE · **Except:** `1k`'s "Can I deploy?" control, split out as `FZ-120`
 
 `1i` and `1k`. `1k` is the dashboard at 390px, so it is responsive work on `FZ-106` rather than a separate screen.
 
@@ -1602,3 +1602,14 @@ Consequences worth taking:
 What it needs: an endpoint that puts an exhausted notification back to `PENDING` with its attempt count reset, so the existing dispatcher picks it up on the next pass. Nothing new has to send anything — the outbox already knows how.
 
 **Decide when starting it:** whether retrying is per delivery or per event. Per event is what the banner implies and is kinder to use; per delivery is what the data models, and re-sending to channels that already accepted would announce a freeze twice to everyone who was told the first time. That argues for per event, retrying only its failed deliveries.
+
+### FZ-120 — Check a Deployment From the Product
+**Status:** TODO
+
+`1k` puts a **"Can I deploy?"** field and an Evaluate button on the phone, and `1c` draws the same thing on the desktop. Neither is buildable today, for a reason worth stating plainly: **policy evaluation is a machine endpoint.** `POST /api/policy/evaluate` sits behind the API-key filter chain, and a signed-in person has a JWT, not a key. There is no way for the product to ask its own question.
+
+What it needs is a human-authenticated evaluation that answers from the same code as the machine one — not a second implementation of the matching rules, which would be a second source of truth for the one thing this product exists to decide.
+
+**Decide when starting it:** whether a person's check is recorded as a `deployment_check` alongside the pipeline's. It is a real question rather than a detail — the console says *"every time a pipeline asked"*, and quietly filling it with people trying the form would make that sentence false and the refusal counts wrong.
+
+Worth having. It answers "is the freeze on for me?" without reading a restriction and working out whether its scope covers you — which is exactly the sum this product exists to do for people.

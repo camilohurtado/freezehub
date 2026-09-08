@@ -46,3 +46,32 @@
 .signOut {
   margin-left: var(--space-2);
 }
+
+/*
+ * Mobile (`1k`, FZ-110).
+ *
+ * The nav was a single non-wrapping row, so at 390px it ran off the side of the screen
+ * and took the whole page's horizontal scroll with it — every screen, not just this one.
+ * Wrapping is the fix rather than a menu: seven destinations fit in two lines, and a
+ * menu is a control to build, explain and keep accessible in exchange for a row of space.
+ */
+@media (max-width: 48rem) {
+  .header {
+    flex-wrap: wrap;
+    gap: var(--space-2) var(--space-3);
+    padding: var(--space-3);
+  }
+
+  .nav {
+    order: 3;
+    flex-basis: 100%;
+    flex-wrap: wrap;
+    gap: var(--space-2) var(--space-3);
+  }
+
+  .link,
+  .linkActive {
+    /* A comfortable target on a phone without making the row look like buttons. */
+    padding: 4px 0;
+  }
+}

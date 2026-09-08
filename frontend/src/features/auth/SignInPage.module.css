@@ -6,8 +6,8 @@
   padding: var(--space-6);
 }
 
-/* Frame and marks come from <Blueprint>; the extra inset is so the corner marks are not
-   crowded by the viewport edge on a small screen. */
+/* The sign-in card is the page, so it carries the padding rather than a frame — the
+   Industry-era Blueprint this comment used to describe no longer exists. */
 .card {
   display: flex;
   flex-direction: column;
@@ -17,8 +17,10 @@
 }
 
 .title {
-  margin: 0 0 var(--space-1);
-  letter-spacing: 0.02em;
+  /* 30px, as 1i sets it: the wordmark on this screen is a mark, not a page heading. */
+  margin: 0 0 6px;
+  font-size: 30px;
+  letter-spacing: -0.01em;
 }
 
 .hint {
@@ -48,4 +50,33 @@
 
 .button {
   margin-top: var(--space-4);
+}
+
+/*
+ * The Cognito path, drawn as `1i` draws it (FZ-110): present, disabled, and explained.
+ * Disabled controls drop to 45% opacity from the system, so it reads as unavailable
+ * rather than as a second thing to try.
+ */
+.sso {
+  margin-top: 14px;
+}
+
+.note {
+  margin: 32px 0 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--color-neutral-800);
+}
+
+/* On a phone the card is the page — a centred box with margins wastes the width. */
+@media (max-width: 30rem) {
+  .page {
+    align-items: flex-start;
+    padding: var(--space-6) var(--space-4);
+  }
+
+  .card {
+    width: 100%;
+    max-width: none;
+  }
 }
