@@ -61,6 +61,17 @@
   font-variant-numeric: tabular-nums;
 }
 
+/*
+ * The present beside the future (FZ-113). 1.25fr / 1fr, the proportion 1c sets for the
+ * same pairing — the cards carry more per row than a list of dates does.
+ */
+.columns {
+  display: grid;
+  grid-template-columns: 1.25fr 1fr;
+  gap: var(--space-8);
+  align-items: start;
+}
+
 /* — groups — */
 
 .group {
@@ -94,8 +105,10 @@
 
 .list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
-  gap: 32px;
+  /* One card per row inside the left column: the cards now share the width with the
+     forward list, and at a half-column a two-up grid wraps the title onto three lines. */
+  grid-template-columns: repeat(auto-fill, minmax(min(20rem, 100%), 1fr));
+  gap: var(--space-4);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -199,6 +212,13 @@
 
 .retry {
   margin-top: var(--space-2);
+}
+
+@media (max-width: 60rem) {
+  .columns {
+    grid-template-columns: 1fr;
+    gap: var(--space-6);
+  }
 }
 
 @media (max-width: 48rem) {

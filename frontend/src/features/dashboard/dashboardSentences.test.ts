@@ -1,9 +1,11 @@
 import { describe, expect, test } from 'vitest'
 import {
   blockedEnvironments,
+  checkTotals,
+  coverageCaption,
   countsSentence,
   describeEnvironments,
-  nextStart,
+  sentenceOf,
   statusLine,
   thenWhat,
 } from './dashboardSentences'
@@ -129,8 +131,8 @@ describe('thenWhat', () => {
     const active = [summary({ endsAt: '2026-12-02T09:00:00Z' })]
     const list = thenWhat(active, [], NOW)
 
-    expect(list[0].sentence).toBe('Black Friday Freeze completes. Deploys reopen.')
-    expect(list[list.length - 1].sentence).toBe('Clear from here.')
+    expect(sentenceOf(list[0])).toBe('Black Friday Freeze completes. Deploys reopen.')
+    expect(sentenceOf(list[list.length - 1])).toBe('Clear from here.')
   })
 
   test('does not promise a reopening in the middle of an overlapping freeze', () => {
@@ -148,13 +150,13 @@ describe('thenWhat', () => {
     ]
 
     const list = thenWhat(active, upcoming, NOW)
-    const firstCompletion = list.find((t) => t.sentence.startsWith('Black Friday Freeze completes'))
+    const firstCompletion = list.find((t) => sentenceOf(t).startsWith('Black Friday Freeze completes'))
 
-    expect(firstCompletion?.sentence).toBe('Black Friday Freeze completes.')
-    expect(firstCompletion?.sentence).not.toContain('Deploys reopen')
+    expect(firstCompletion && sentenceOf(firstCompletion)).toBe('Black Friday Freeze completes.')
+    expect(firstCompletion && sentenceOf(firstCompletion)).not.toContain('Deploys reopen')
     // The later one does reopen them.
     expect(
-      list.find((t) => t.sentence.startsWith('Core banking migration completes'))?.sentence,
+      sentenceOf(list.find((t) => sentenceOf(t).startsWith('Core banking migration completes'))!),
     ).toBe('Core banking migration completes. Deploys reopen.')
   })
 
@@ -170,7 +172,7 @@ describe('thenWhat', () => {
       }),
     ]
     const list = thenWhat([], upcoming, NOW)
-    expect(list[0].sentence).toBe('Year-end change window starts. Advisory only.')
+    expect(sentenceOf(list[0])).toBe('Year-end change window starts. Advisory only.')
   })
 
   test('a hard freeze says how long it lasts', () => {
@@ -183,7 +185,7 @@ describe('thenWhat', () => {
         endsAt: '2026-12-12T06:00:00Z',
       }),
     ]
-    expect(thenWhat([], upcoming, NOW)[0].sentence).toBe(
+    expect(sentenceOf(thenWhat([], upcoming, NOW)[0])).toBe(
       'Core banking migration starts. 8 hours, hard freeze.',
     )
   })
@@ -206,21 +208,6 @@ describe('thenWhat', () => {
   })
 })
 
-describe('nextStart', () => {
-  test('counts days for anything further out than two', () => {
-    const upcoming = [summary({ status: 'SCHEDULED', startsAt: '2026-12-11T14:32:00Z' })]
-    expect(nextStart(upcoming, NOW)).toBe('next starts in 17 days')
-  })
-
-  test('counts hours when it is close', () => {
-    const upcoming = [summary({ status: 'SCHEDULED', startsAt: '2026-11-25T02:32:00Z' })]
-    expect(nextStart(upcoming, NOW)).toBe('next starts in 12 hours')
-  })
-
-  test('is null when nothing is scheduled', () => {
-    expect(nextStart([], NOW)).toBeNull()
-  })
-})
 
 describe('countsSentence', () => {
   test.each([
@@ -229,5 +216,46 @@ describe('countsSentence', () => {
     [2, 1, '2 active restrictions. 1 scheduled.'],
   ])('(%i active, %i scheduled) reads as "%s"', (active, scheduled, expected) => {
     expect(countsSentence(active, scheduled)).toBe(expected)
+  })
+})
+
+describe('checkTotals', () => {
+  const day = (allowed: number, refused: number) => ({ allowed, refused })
+
+  test('sums the fortnight rather than reporting one day', () => {
+    // A one-day window reads 0 on any quiet morning, which makes a working gate look
+    // like a dead one — the reason FZ-113 widened these tiles.
+    const totals = checkTotals([day(10, 2), day(0, 0), day(5, 3)])
+
+    expect(totals.checks).toBe(20)
+    expect(totals.refused).toBe(5)
+    expect(totals.refusedShare).toBe(25)
+  })
+
+  test('has no share to report when nothing was asked', () => {
+    // 0/0 is not 0% — it is a question nobody asked, and a "0% refused" caption on an
+    // unused gate would read as reassurance.
+    const totals = checkTotals([day(0, 0), day(0, 0)])
+
+    expect(totals.checks).toBe(0)
+    expect(totals.refusedShare).toBeNull()
+  })
+
+  test('an empty series is zero, not an error', () => {
+    expect(checkTotals([])).toEqual({ checks: 0, refused: 0, refusedShare: null })
+  })
+})
+
+describe('coverageCaption', () => {
+  test('names the gap rather than leaving it to be subtracted', () => {
+    expect(coverageCaption(11, 14)).toBe('of 14 · 3 never asked')
+  })
+
+  test('says so outright when there is no gap', () => {
+    expect(coverageCaption(4, 4)).toBe('of 4 · none unprotected')
+  })
+
+  test('does not divide an empty catalogue into a coverage claim', () => {
+    expect(coverageCaption(0, 0)).toBe('no applications catalogued')
   })
 })

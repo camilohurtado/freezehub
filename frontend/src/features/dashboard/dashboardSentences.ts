@@ -87,17 +87,27 @@ export function statusLine(
 export interface Transition {
   /** ISO-8601 instant the change happens. */
   at: string
-  sentence: string
+  /** The restriction this is about, so the page can link it. Null on the closing line. */
+  restrictionId: number | null
+  name: string | null
+  /** What happens, without the name: "completes. Deploys reopen." */
+  detail: string
   /** True once nothing further is known to happen — the last line. */
   clear: boolean
+}
+
+/** The whole line, for reading and for tests. */
+export function sentenceOf(transition: Transition): string {
+  return transition.name ? `${transition.name} ${transition.detail}` : transition.detail
 }
 
 /**
  * "Then what" — the forward list of changes, as date plus plain sentence (`1c`).
  *
- * A list of what *exists* is the group of cards above this. The value here is that it
- * says what *happens*, in the order it happens, so the answer to "when can I deploy
- * again?" is read rather than worked out.
+ * Since `FZ-113` this is the dashboard's only forward-looking list: the Upcoming cards it
+ * replaced said the same thing in a second form, so a scheduled freeze appeared three
+ * times on one page. The value here is that it says what *happens*, in the order it
+ * happens, so "when can I deploy again?" is read rather than worked out.
  */
 export function thenWhat(
   active: RestrictionSummary[],
@@ -107,28 +117,30 @@ export function thenWhat(
   const nowIso = now.toISOString()
   const transitions: Transition[] = []
 
+  const completion = (restriction: RestrictionSummary): Transition => ({
+    at: restriction.endsAt,
+    restrictionId: restriction.id,
+    name: restriction.name,
+    detail: 'completes.',
+    clear: false,
+  })
+
   for (const restriction of active) {
-    transitions.push({
-      at: restriction.endsAt,
-      sentence: `${restriction.name} completes.`,
-      clear: false,
-    })
+    transitions.push(completion(restriction))
   }
 
   for (const restriction of upcoming) {
     if (restriction.endsAt <= nowIso) continue
     transitions.push({
       at: restriction.startsAt,
-      sentence: `${restriction.name} starts. ${
+      restrictionId: restriction.id,
+      name: restriction.name,
+      detail: `starts. ${
         restriction.level === 'HARD_FREEZE' ? describeDuration(restriction) : 'Advisory only.'
       }`,
       clear: false,
     })
-    transitions.push({
-      at: restriction.endsAt,
-      sentence: `${restriction.name} completes.`,
-      clear: false,
-    })
+    transitions.push(completion(restriction))
   }
 
   transitions.sort((a, b) => a.at.localeCompare(b.at))
@@ -143,20 +155,24 @@ export function thenWhat(
     (restriction) => restriction.level === 'HARD_FREEZE',
   )
   const annotated = transitions.map((transition) => {
-    if (!transition.sentence.endsWith('completes.')) return transition
+    if (transition.detail !== 'completes.') return transition
     const stillBlocked = freezes.some(
       (freeze) => freeze.startsAt <= transition.at && freeze.endsAt > transition.at,
     )
-    return stillBlocked
-      ? transition
-      : { ...transition, sentence: `${transition.sentence} Deploys reopen.` }
+    return stillBlocked ? transition : { ...transition, detail: 'completes. Deploys reopen.' }
   })
 
   if (annotated.length === 0) return []
 
   return [
     ...annotated,
-    { at: annotated[annotated.length - 1].at, sentence: 'Clear from here.', clear: true },
+    {
+      at: annotated[annotated.length - 1].at,
+      restrictionId: null,
+      name: null,
+      detail: 'Clear from here.',
+      clear: true,
+    },
   ]
 }
 
@@ -170,18 +186,43 @@ function describeDuration(restriction: RestrictionSummary): string {
   return `${days} ${days === 1 ? 'day' : 'days'}, hard freeze.`
 }
 
-/** "next starts in 17 days" — the Scheduled metric's caption. */
-export function nextStart(upcoming: RestrictionSummary[], now: Date = new Date()): string | null {
-  const next = upcoming
-    .map((restriction) => restriction.startsAt)
-    .filter((startsAt) => new Date(startsAt) > now)
-    .sort()[0]
-  if (!next) return null
+export interface CheckTotals {
+  checks: number
+  refused: number
+  /** Whole-percent share of checks that were refused; null when nothing was asked. */
+  refusedShare: number | null
+}
 
-  const hours = Math.round((new Date(next).getTime() - now.getTime()) / 3_600_000)
-  if (hours < 1) return 'next starts within the hour'
-  if (hours < 48) return `next starts in ${hours} ${hours === 1 ? 'hour' : 'hours'}`
-  return `next starts in ${Math.round(hours / 24)} days`
+/**
+ * The fortnight the metrics report (`FZ-113`).
+ *
+ * A fortnight rather than a day because a one-day window reads `0` on any quiet morning,
+ * which makes a working gate look like a dead one. The series already covers a fixed 14
+ * days including the empty ones (`D-27`), so this is a sum and not a second question.
+ */
+export function checkTotals(daily: { allowed: number; refused: number }[]): CheckTotals {
+  const checks = daily.reduce((sum, day) => sum + day.allowed + day.refused, 0)
+  const refused = daily.reduce((sum, day) => sum + day.refused, 0)
+  return {
+    checks,
+    refused,
+    refusedShare: checks === 0 ? null : Math.round((refused / checks) * 100),
+  }
+}
+
+/**
+ * "of 14 · 3 never asked" — the coverage caption.
+ *
+ * The gap is the point of the tile, so it is named rather than left to be subtracted.
+ * When there is no gap the caption says so outright: "none unprotected" is a stronger
+ * statement than a number that happens to match.
+ */
+export function coverageCaption(seen: number, total: number): string {
+  if (total === 0) return 'no applications catalogued'
+  const missing = total - seen
+  return missing === 0
+    ? `of ${total} · none unprotected`
+    : `of ${total} · ${missing} never asked`
 }
 
 /** "One active restriction. Two scheduled." — the sentence under the page title. */

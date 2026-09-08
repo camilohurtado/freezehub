@@ -159,7 +159,9 @@ describe('DashboardPage', () => {
     expect(screen.queryByText(/deploys are blocked in/i)).not.toBeInTheDocument()
   })
 
-  test('separates active from upcoming restrictions', async () => {
+  test('a scheduled restriction is in the forward list, not repeated as a card', async () => {
+    // Upcoming showed every scheduled freeze as a card beside its own start and
+    // completion lines — the same freeze three times on one page (FZ-113).
     stubWorld({
       live: [
         restriction({ id: 1, name: 'Running now', status: 'ACTIVE', level: 'ADVISORY' }),
@@ -170,30 +172,51 @@ describe('DashboardPage', () => {
     renderRoute(<DashboardPage />)
 
     const active = await screen.findByRole('region', { name: /active now/i })
-    const upcoming = screen.getByRole('region', { name: /upcoming/i })
-
     expect(within(active).getByText('Running now')).toBeInTheDocument()
-    expect(within(upcoming).getByText('Starts later')).toBeInTheDocument()
     expect(within(active).queryByText('Starts later')).not.toBeInTheDocument()
+
+    expect(screen.queryByRole('region', { name: /^upcoming$/i })).not.toBeInTheDocument()
+
+    const forward = screen.getByRole('region', { name: /then what/i })
+    expect(within(forward).getAllByRole('link', { name: 'Starts later' }).length).toBeGreaterThan(0)
   })
 
-  test('links each restriction to its detail route', async () => {
-    stubWorld({ live: [restriction({ id: 42, name: 'Linked' })] })
+  test('links an active restriction to its detail route', async () => {
+    const active = activeFreeze({ id: 42, name: 'Linked' })
+    stubWorld({ live: [active], details: { 42: detailFor(active, [1]) } })
     renderRoute(<DashboardPage />)
 
-    expect(await screen.findByRole('link', { name: 'Linked' })).toHaveAttribute(
+    const cards = await screen.findByRole('region', { name: /active now/i })
+    expect(within(cards).getByRole('link', { name: 'Linked' })).toHaveAttribute(
       'href',
       '/restrictions/42',
     )
   })
 
-  test('draws the four metrics from the check summary', async () => {
+  test('the forward list links the restriction it names', async () => {
+    // Dropping the Upcoming cards removed the only route from here to a scheduled
+    // restriction, so the name in each line carries it instead.
+    stubWorld({ live: [restriction({ id: 9, name: 'Year-end close', status: 'SCHEDULED' })] })
+    renderRoute(<DashboardPage />)
+
+    const forward = await screen.findByRole('region', { name: /then what/i })
+    expect(within(forward).getAllByRole('link', { name: 'Year-end close' })[0]).toHaveAttribute(
+      'href',
+      '/restrictions/9',
+    )
+  })
+
+  test('draws three metrics over the fortnight, not four over today', async () => {
     stubWorld({
       live: [restriction({ id: 2, name: 'Later', status: 'SCHEDULED' })],
       summary: {
-        today: { total: 86, allowed: 77, refused: 9 },
+        today: { total: 12, allowed: 10, refused: 2 },
         applications: { seen: 11, total: 14 },
-        daily: [],
+        daily: [
+          { date: '2026-09-01', allowed: 60, refused: 6 },
+          { date: '2026-09-02', allowed: 0, refused: 0 },
+          { date: '2026-09-03', allowed: 17, refused: 3 },
+        ],
         refusalsByRestriction: [],
       },
     })
@@ -201,10 +224,17 @@ describe('DashboardPage', () => {
     renderRoute(<DashboardPage />)
 
     const metrics = await screen.findByRole('region', { name: /at a glance/i })
+    // 60+6+17+3 asked, 9 of them refused.
     expect(within(metrics).getByText('86')).toBeInTheDocument()
-    expect(within(metrics).getByText('9 refused, 77 allowed')).toBeInTheDocument()
+    expect(within(metrics).getByText('12 today')).toBeInTheDocument()
+    expect(within(metrics).getByText('9')).toBeInTheDocument()
+    expect(within(metrics).getByText('10% of checks')).toBeInTheDocument()
     expect(within(metrics).getByText('11')).toBeInTheDocument()
-    expect(within(metrics).getByText('of 14 applications')).toBeInTheDocument()
+    expect(within(metrics).getByText('of 14 · 3 never asked')).toBeInTheDocument()
+
+    // The two that only restated the rail and the forward list are gone.
+    expect(within(metrics).queryByText('Active')).not.toBeInTheDocument()
+    expect(within(metrics).queryByText('Scheduled')).not.toBeInTheDocument()
   })
 
   test('the completed table shows what each restriction refused', async () => {
@@ -257,11 +287,24 @@ describe('DashboardPage', () => {
 
     renderRoute(<DashboardPage />)
 
-    const thenWhat = await screen.findByRole('region', { name: /then what/i })
+    const forward = await screen.findByRole('region', { name: /then what/i })
+    // The name is a link now, so the line is split across elements — read the whole row.
+    const lines = within(forward)
+      .getAllByRole('listitem')
+      .map((line) => line.textContent ?? '')
+
     expect(
-      within(thenWhat).getByText('Black Friday Freeze completes. Deploys reopen.'),
-    ).toBeInTheDocument()
-    expect(within(thenWhat).getByText('Clear from here.')).toBeInTheDocument()
+      lines.some((line) => line.includes('Black Friday Freeze completes. Deploys reopen.')),
+    ).toBe(true)
+    expect(lines.at(-1)).toContain('Clear from here.')
+  })
+
+  test('says so plainly when there is nothing ahead', async () => {
+    stubWorld()
+    renderRoute(<DashboardPage />)
+
+    const forward = await screen.findByRole('region', { name: /then what/i })
+    expect(within(forward).getByText(/clear from here/i)).toBeInTheDocument()
   })
 
   test('sends the bearer token with its requests', async () => {

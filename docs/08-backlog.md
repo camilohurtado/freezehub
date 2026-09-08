@@ -1518,3 +1518,21 @@ Worth doing as one story because all three are the same question — *what did t
 **Decide when starting it:** whether this is `GET /api/restrictions/{id}/impact`, or extra fields on the restriction detail response. The endpoint is probably right — the detail response is a domain object, and these are counts about it — but that is a real choice and not a foregone one.
 
 The three figures are also the reason a restriction is worth reviewing after the fact, so this is the story that makes a completed freeze more than a row in a list.
+
+### FZ-113 — One Forward List, and Metrics That Are Not Restatements
+**Status:** DONE · **Refines:** `FZ-106`
+
+Operator feedback on the shipped dashboard: **Upcoming and "Then what" say the same thing twice.** Every scheduled restriction appears three times on one page — once as an Upcoming card, then again as its start and its completion in "Then what".
+
+- **Drop Upcoming; keep "Then what"**, and put it beside `Active now` rather than under it. Left is what is true, right is what happens — the present and the future, read together.
+- Because the Upcoming cards were the only route from the dashboard to a scheduled restriction, **the restriction name in each transition becomes a link**. `1c` draws the line as plain text; without the cards, plain text would be a dead end.
+
+**Metrics.** Two of the four were restatements once the layout changed: `Active` repeated the status rail directly above it, and `Scheduled` repeated the forward list. Replaced with three, and deliberately not a fourth:
+
+| Tile | From | Why |
+|---|---|---|
+| **Checks · 14 days** | `daily` | Adoption. A one-day window read `0` on a quiet morning and made the gate look dead |
+| **Refused** | `daily` | Effect — what the gate actually stopped, as a share of what it was asked |
+| **Pipelines integrated** | `applications` | Coverage. The gap is the risk: services whose pipelines sail through a freeze |
+
+No fourth tile invented to fill the row. "Clear runway" was considered and rejected: "Then what" already answers it in words, and saying it twice in two forms is what this story exists to remove.
