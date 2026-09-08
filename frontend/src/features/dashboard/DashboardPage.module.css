@@ -1,16 +1,188 @@
+/*
+ * Dashboard — `1a` with `1b`'s metrics and `1c`'s "Then what" (FZ-106).
+ *
+ * The rail, the label caps and the tabular figures are the deck's own values, not
+ * approximations of them: 4px over 1px in full-strength ink, labels at 600 11px with
+ * 0.14em tracking.
+ */
+
 .page {
   width: 100%;
-  max-width: 64rem;
+  max-width: 68rem;
   margin: 0 auto;
-  padding: var(--space-6);
+  padding: var(--space-4) var(--space-8) var(--space-8);
+}
+
+.masthead {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-6);
+  margin-bottom: var(--space-4);
 }
 
 .title {
-  margin: 0 0 var(--space-6);
+  margin: 0 0 8px;
 }
 
-/* Empty and error states are drawn, not filled: a dashed hairline rectangle reads as an
-   un-drawn cell on the board rather than a grey box. */
+.counts {
+  margin: 0;
+  font-size: 15px;
+  color: var(--color-neutral-800);
+}
+
+/* — the status line — */
+
+.rail {
+  composes: statusRule from global;
+  margin-bottom: 26px;
+}
+
+.railLabel {
+  composes: fieldLabel from global;
+}
+
+/* Magenta is the claim that deployments are being stopped. Nothing else on this page
+   takes it except a hard-freeze tag, which is the same claim about one restriction. */
+.railBlocking {
+  font: 600 17px var(--font-heading);
+  color: var(--color-accent-2-700);
+}
+
+.railClear {
+  font: 600 17px var(--font-heading);
+  color: var(--color-text);
+}
+
+.railUntil {
+  margin-left: auto;
+  font-size: 14px;
+  color: var(--color-neutral-700);
+  font-variant-numeric: tabular-nums;
+}
+
+/* — groups — */
+
+.group {
+  margin-bottom: 44px;
+}
+
+.groupHeading {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0 0 6px;
+}
+
+.count {
+  font: 400 14px var(--font-body);
+  color: var(--color-neutral-700);
+  font-variant-numeric: tabular-nums;
+}
+
+.note {
+  margin: 0 0 20px;
+  font-size: 14.5px;
+  color: var(--color-neutral-700);
+}
+
+.groupEmpty {
+  margin: 0;
+  font-size: 14.5px;
+  color: var(--color-neutral-700);
+}
+
+.list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+  gap: 32px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* — metrics (1b) — */
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+  gap: 34px;
+  margin-top: var(--space-4);
+}
+
+.metricLabel {
+  composes: fieldLabel from global;
+  margin-bottom: 8px;
+}
+
+.metricValue,
+.metricValueAlarming {
+  font: 600 40px/1 var(--font-heading);
+  font-variant-numeric: tabular-nums;
+}
+
+.metricValueAlarming {
+  color: var(--color-accent-2-700);
+}
+
+.metricCaption {
+  margin: 8px 0 0;
+  font-size: 14px;
+  color: var(--color-neutral-800);
+}
+
+/* — then what (1c) — */
+
+.transitions {
+  display: flex;
+  flex-direction: column;
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  list-style: none;
+  max-width: 42rem;
+}
+
+.transition {
+  display: grid;
+  grid-template-columns: 112px 1fr;
+  gap: 16px;
+  padding: 14px 0;
+  border-top: 1px solid var(--color-divider);
+  font-size: 15px;
+}
+
+.transition:last-child {
+  border-bottom: 1px solid var(--color-divider);
+}
+
+.transitionAt {
+  font-size: 14px;
+  color: var(--color-neutral-700);
+  font-variant-numeric: tabular-nums;
+}
+
+.transitionClear {
+  color: var(--color-neutral-700);
+}
+
+/* — completed table — */
+
+.scroller {
+  overflow-x: auto;
+}
+
+.ran,
+.refused {
+  font-variant-numeric: tabular-nums;
+}
+
+.ran {
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+/* — states — */
+
 .state {
   margin: 0;
   padding: var(--space-4);
@@ -29,51 +201,23 @@
   margin-top: var(--space-2);
 }
 
-.group {
-  margin-bottom: var(--space-8);
-}
+@media (max-width: 48rem) {
+  .page {
+    padding: var(--space-4);
+  }
 
-/* The heading rule runs to the edge of the column — the system's visible horizontal
-   rhythm, and it makes the group boundary legible without a container. */
-.groupHeading {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  margin: 0 0 var(--space-3);
-  font-family: var(--font-heading);
-  font-size: 17px;
-  font-weight: var(--font-heading-weight);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
+  .masthead {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-3);
+  }
 
-.groupHeading::after {
-  content: "";
-  flex: 1;
-  height: 1px;
-  background: var(--fh-border);
-}
+  .railUntil {
+    margin-left: 0;
+  }
 
-.count {
-  font-family: ui-monospace, "SFMono-Regular", Menlo, monospace;
-  font-size: 12px;
-  font-weight: 400;
-  letter-spacing: 0;
-  color: var(--fh-text-muted);
-}
-
-.groupEmpty {
-  margin: 0;
-  color: var(--fh-text-muted);
-  font-size: 13px;
-}
-
-/* Equal cells, per the system's modular grid. One column below 720px. */
-.list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr));
-  gap: var(--space-6);
-  margin: 0;
-  padding: 0;
-  list-style: none;
+  .transition {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
 }

@@ -72,3 +72,35 @@ export function daysUntil(iso: string, now: Date = new Date()): number {
   if (Number.isNaN(target.getTime())) return 0
   return Math.round((target.getTime() - now.getTime()) / 86_400_000)
 }
+
+/**
+ * The short form the dashboard sets dates in: `02 Dec, 09:00`.
+ *
+ * No year and no zone, because it appears in the status line and the completed table,
+ * where the year is almost always the current one and the zone is stated once for the
+ * whole page. `formatInstant` remains the form to use anywhere a date stands alone.
+ */
+export function formatShort(iso: string): string {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return iso
+
+  return new Intl.DateTimeFormat(undefined, {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).format(date)
+}
+
+/**
+ * The viewer's own zone, named — `GMT`, `GMT-5`, `CET`.
+ *
+ * The dashboard says "all times {zone}" once, so every date under it can drop the suffix.
+ * The mockups say GMT because that is where they were drawn; what belongs on the page is
+ * whichever zone the reader is actually in.
+ */
+export function localZoneName(date: Date = new Date()): string {
+  const parts = new Intl.DateTimeFormat(undefined, { timeZoneName: 'short' }).formatToParts(date)
+  return parts.find((part) => part.type === 'timeZoneName')?.value ?? 'UTC'
+}

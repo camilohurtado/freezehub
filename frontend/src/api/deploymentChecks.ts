@@ -1,5 +1,5 @@
 import { apiRequest } from './client'
-import type { DeploymentCheck } from '../types/api'
+import type { DeploymentCheck, DeploymentCheckSummary } from '../types/api'
 
 export interface DeploymentCheckFilters {
   decision?: 'ALLOW' | 'BLOCK'
@@ -31,4 +31,17 @@ export function listDeploymentChecks(
     `/api/deployment-checks${query ? `?${query}` : ''}`,
     { token, signal },
   )
+}
+
+/**
+ * The figures the dashboard and the checks console draw (`FZ-105`).
+ *
+ * One request rather than four because they are read together — four round trips to paint
+ * one row is four chances for it to paint inconsistently.
+ */
+export function getDeploymentCheckSummary(
+  token: string | null,
+  signal?: AbortSignal,
+): Promise<DeploymentCheckSummary> {
+  return apiRequest<DeploymentCheckSummary>('/api/deployment-checks/summary', { token, signal })
 }

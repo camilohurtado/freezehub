@@ -204,7 +204,7 @@ samp {
  * "read this first".
  */
 .statusRule {
-  border-top: 3px solid var(--color-text);
+  border-top: 4px solid var(--color-text);
   border-bottom: 1px solid var(--color-text);
   padding: var(--space-2) 0;
   display: flex;
@@ -215,10 +215,10 @@ samp {
 
 /* Small letterspaced labels name every field and section. */
 .fieldLabel {
-  font-size: 12px;
-  letter-spacing: 0.08em;
+  font: var(--font-heading-weight) 11px var(--font-heading);
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--fh-text-muted);
+  color: var(--color-neutral-700);
 }
 
 /* Times and counts are set in tabular figures so columns align down the page. */

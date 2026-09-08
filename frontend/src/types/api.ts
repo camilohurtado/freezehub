@@ -200,3 +200,18 @@ export interface Subscription {
   currentPeriodEndsAt: string | null
   usage: PlanUsage[]
 }
+
+/**
+ * What the deployment checks add up to (`FZ-105`) — `GET /api/deployment-checks/summary`.
+ *
+ * Days are UTC, and the series covers a fixed fortnight including days on which nothing
+ * happened, so a chart drawn from it does not compress time (`D-27`).
+ */
+export interface DeploymentCheckSummary {
+  today: { total: number; allowed: number; refused: number }
+  /** `seen` counts catalogued applications that have ever asked, so it never exceeds `total`. */
+  applications: { seen: number; total: number }
+  daily: { date: string; allowed: number; refused: number }[]
+  /** All-time, per restriction. Only hard freezes are credited with a refusal. */
+  refusalsByRestriction: { restrictionId: number; refused: number }[]
+}

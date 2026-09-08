@@ -2,24 +2,11 @@ import { screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 import { DashboardPage } from './DashboardPage'
 import { renderRoute } from '../../test/renderRoute'
-import type { RestrictionSummary } from '../../types/api'
-
-/** Network is stubbed at the fetch boundary, so no backend is required. */
-function stubFetch(handler: (url: string) => { status?: number; body?: unknown }) {
-  vi.stubGlobal(
-    'fetch',
-    vi.fn((input: RequestInfo | URL) => {
-      const url = String(input)
-      const { status = 200, body = [] } = handler(url)
-      return Promise.resolve(
-        new Response(JSON.stringify(body), {
-          status,
-          headers: { 'Content-Type': 'application/json' },
-        }),
-      )
-    }),
-  )
-}
+import type {
+  DeploymentCheckSummary,
+  RestrictionDetail,
+  RestrictionSummary,
+} from '../../types/api'
 
 function restriction(overrides: Partial<RestrictionSummary> = {}): RestrictionSummary {
   return {
@@ -38,39 +25,97 @@ function restriction(overrides: Partial<RestrictionSummary> = {}): RestrictionSu
   }
 }
 
-/** The dashboard asks for ACTIVE+SCHEDULED in one request and COMPLETED in another. */
-function isLiveQuery(url: string): boolean {
-  return url.includes('status=ACTIVE')
+const emptySummary: DeploymentCheckSummary = {
+  today: { total: 0, allowed: 0, refused: 0 },
+  applications: { seen: 0, total: 0 },
+  daily: [],
+  refusalsByRestriction: [],
+}
+
+interface World {
+  live?: RestrictionSummary[]
+  completed?: RestrictionSummary[]
+  details?: Record<number, RestrictionDetail>
+  environments?: { id: number; name: string }[]
+  summary?: DeploymentCheckSummary
+  /** Force a status on the restriction list requests. */
+  status?: number
+}
+
+/**
+ * Network is stubbed at the fetch boundary, so no backend is required. Routed by URL
+ * rather than by call order, because the page now issues five different requests and
+ * some of them depend on the answer to an earlier one.
+ */
+function stubWorld(world: World = {}) {
+  const spy = vi.fn((input: RequestInfo | URL) => {
+    const url = String(input)
+    const json = (body: unknown, status = 200) =>
+      Promise.resolve(
+        new Response(JSON.stringify(body), {
+          status,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      )
+
+    if (url.includes('/api/deployment-checks/summary')) {
+      return json(world.summary ?? emptySummary)
+    }
+    if (url.includes('/api/environments')) {
+      return json(
+        (world.environments ?? [{ id: 1, name: 'production' }, { id: 2, name: 'staging' }]).map(
+          (entry) => ({ ...entry, createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z' }),
+        ),
+      )
+    }
+    // A single restriction by id — the scope lookup behind the status line.
+    const byId = url.match(/\/api\/restrictions\/(\d+)/)
+    if (byId) {
+      const detail = world.details?.[Number(byId[1])]
+      return detail ? json(detail) : json({ message: 'Not found' }, 404)
+    }
+    if (url.includes('/api/restrictions')) {
+      if (world.status && world.status !== 200) return json({ message: 'Boom' }, world.status)
+      return json(url.includes('status=ACTIVE') ? (world.live ?? []) : (world.completed ?? []))
+    }
+    return json([])
+  })
+  vi.stubGlobal('fetch', spy)
+  return spy
+}
+
+function activeFreeze(over: Partial<RestrictionSummary> = {}) {
+  return restriction({
+    id: 1,
+    name: 'Black Friday Freeze',
+    status: 'ACTIVE',
+    level: 'HARD_FREEZE',
+    startsAt: '2020-01-01T00:00:00Z',
+    endsAt: '2099-12-02T09:00:00Z',
+    ...over,
+  })
+}
+
+function detailFor(summary: RestrictionSummary, environmentIds: number[]): RestrictionDetail {
+  return {
+    ...summary,
+    description: null,
+    scope: { teamIds: [], applicationIds: [], environmentIds },
+  }
 }
 
 describe('DashboardPage', () => {
-  beforeEach(() => {
-    sessionStorage.clear()
-  })
-
-  afterEach(() => {
-    vi.unstubAllGlobals()
-  })
+  beforeEach(() => sessionStorage.clear())
+  afterEach(() => vi.unstubAllGlobals())
 
   test('shows a loading state while restrictions are being fetched', () => {
-    stubFetch(() => ({ body: [] }))
-
+    stubWorld()
     renderRoute(<DashboardPage />)
-
     expect(screen.getByRole('status')).toHaveTextContent(/loading/i)
   })
 
-  test('tells the user nothing is blocking deploys when there is nothing at all', async () => {
-    stubFetch(() => ({ body: [] }))
-
-    renderRoute(<DashboardPage />)
-
-    expect(await screen.findByText(/no deployment restrictions yet/i)).toBeInTheDocument()
-  })
-
   test('surfaces an error with a way to retry', async () => {
-    stubFetch(() => ({ status: 500, body: { message: 'Boom' } }))
-
+    stubWorld({ status: 500 })
     renderRoute(<DashboardPage />)
 
     const alert = await screen.findByRole('alert')
@@ -78,17 +123,49 @@ describe('DashboardPage', () => {
     expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument()
   })
 
+  test('names the environments a freeze in force is blocking', async () => {
+    // The status line is the one sentence the page asserts rather than displays, and it
+    // has to name what it claims — which means resolving scope ids to catalog names.
+    const active = activeFreeze()
+    stubWorld({ live: [active], details: { 1: detailFor(active, [1, 2]) } })
+
+    renderRoute(<DashboardPage />)
+
+    expect(
+      await screen.findByText('Deploys are blocked in production and staging'),
+    ).toBeInTheDocument()
+    expect(screen.getByText(/^In force now$/i)).toBeInTheDocument()
+  })
+
+  test('an empty environment scope is reported as every environment, not as none', async () => {
+    // FZ-020's wildcard rule, in the sentence people read first.
+    const active = activeFreeze()
+    stubWorld({ live: [active], details: { 1: detailFor(active, []) } })
+
+    renderRoute(<DashboardPage />)
+
+    expect(await screen.findByText('Deploys are blocked in every environment')).toBeInTheDocument()
+  })
+
+  test('an advisory in force does not claim deploys are blocked', async () => {
+    // An advisory is reported, not enforced. Saying otherwise on the headline would be
+    // the most consequential thing this page could get wrong.
+    const advisory = activeFreeze({ level: 'ADVISORY' })
+    stubWorld({ live: [advisory] })
+
+    renderRoute(<DashboardPage />)
+
+    expect(await screen.findByText('No restriction is blocking deploys.')).toBeInTheDocument()
+    expect(screen.queryByText(/deploys are blocked in/i)).not.toBeInTheDocument()
+  })
+
   test('separates active from upcoming restrictions', async () => {
-    stubFetch((url) =>
-      isLiveQuery(url)
-        ? {
-            body: [
-              restriction({ id: 1, name: 'Running now', status: 'ACTIVE' }),
-              restriction({ id: 2, name: 'Starts later', status: 'SCHEDULED' }),
-            ],
-          }
-        : { body: [] },
-    )
+    stubWorld({
+      live: [
+        restriction({ id: 1, name: 'Running now', status: 'ACTIVE', level: 'ADVISORY' }),
+        restriction({ id: 2, name: 'Starts later', status: 'SCHEDULED' }),
+      ],
+    })
 
     renderRoute(<DashboardPage />)
 
@@ -97,40 +174,62 @@ describe('DashboardPage', () => {
 
     expect(within(active).getByText('Running now')).toBeInTheDocument()
     expect(within(upcoming).getByText('Starts later')).toBeInTheDocument()
-    // Not merely present somewhere — in the *right* group.
     expect(within(active).queryByText('Starts later')).not.toBeInTheDocument()
   })
 
-  test('distinguishes a blocking freeze from an advisory one', async () => {
-    // The single most consequential thing an engineer reads off this page.
-    stubFetch((url) =>
-      isLiveQuery(url)
-        ? {
-            body: [
-              restriction({ id: 1, name: 'Hard', level: 'HARD_FREEZE', status: 'ACTIVE' }),
-              restriction({ id: 2, name: 'Soft', level: 'ADVISORY', status: 'ACTIVE' }),
-            ],
-          }
-        : { body: [] },
-    )
-
+  test('links each restriction to its detail route', async () => {
+    stubWorld({ live: [restriction({ id: 42, name: 'Linked' })] })
     renderRoute(<DashboardPage />)
 
-    // Exact strings, not regexes: a substring regex also matches the enclosing element,
-    // which makes the query ambiguous rather than precise.
-    expect(await screen.findByText('Blocks deploys')).toBeInTheDocument()
-    expect(screen.getByText('Advisory')).toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: 'Linked' })).toHaveAttribute(
+      'href',
+      '/restrictions/42',
+    )
   })
 
-  test('links each restriction to its detail route', async () => {
-    stubFetch((url) =>
-      isLiveQuery(url) ? { body: [restriction({ id: 42, name: 'Linked' })] } : { body: [] },
-    )
+  test('draws the four metrics from the check summary', async () => {
+    stubWorld({
+      live: [restriction({ id: 2, name: 'Later', status: 'SCHEDULED' })],
+      summary: {
+        today: { total: 86, allowed: 77, refused: 9 },
+        applications: { seen: 11, total: 14 },
+        daily: [],
+        refusalsByRestriction: [],
+      },
+    })
 
     renderRoute(<DashboardPage />)
 
-    const link = await screen.findByRole('link', { name: 'Linked' })
-    expect(link).toHaveAttribute('href', '/restrictions/42')
+    const metrics = await screen.findByRole('region', { name: /at a glance/i })
+    expect(within(metrics).getByText('86')).toBeInTheDocument()
+    expect(within(metrics).getByText('9 refused, 77 allowed')).toBeInTheDocument()
+    expect(within(metrics).getByText('11')).toBeInTheDocument()
+    expect(within(metrics).getByText('of 14 applications')).toBeInTheDocument()
+  })
+
+  test('the completed table shows what each restriction refused', async () => {
+    const done = restriction({ id: 7, name: 'Peak trading rehearsal', status: 'COMPLETED' })
+    stubWorld({
+      completed: [done],
+      summary: { ...emptySummary, refusalsByRestriction: [{ restrictionId: 7, refused: 14 }] },
+    })
+
+    renderRoute(<DashboardPage />)
+
+    const group = await screen.findByRole('region', { name: /recently completed/i })
+    const row = within(group).getByRole('row', { name: /peak trading rehearsal/i })
+    expect(within(row).getByText('14')).toBeInTheDocument()
+  })
+
+  test('a completed restriction that refused nothing shows zero, not blank', async () => {
+    const done = restriction({ id: 7, name: 'Payments incident', status: 'COMPLETED' })
+    stubWorld({ completed: [done], summary: emptySummary })
+
+    renderRoute(<DashboardPage />)
+
+    const group = await screen.findByRole('region', { name: /recently completed/i })
+    const row = within(group).getByRole('row', { name: /payments incident/i })
+    expect(within(row).getByText('0')).toBeInTheDocument()
   })
 
   test('caps recently completed restrictions and shows the newest first', async () => {
@@ -139,28 +238,38 @@ describe('DashboardPage', () => {
     const completed = Array.from({ length: 8 }, (_, index) =>
       restriction({ id: 100 + index, name: `Done ${index}`, status: 'COMPLETED' }),
     )
-    stubFetch((url) => (isLiveQuery(url) ? { body: [] } : { body: completed }))
+    stubWorld({ completed })
 
     renderRoute(<DashboardPage />)
 
     const group = await screen.findByRole('region', { name: /recently completed/i })
     await waitFor(() => {
-      expect(within(group).getAllByRole('listitem')).toHaveLength(5)
+      // One row per restriction, plus the header row.
+      expect(within(group).getAllByRole('row')).toHaveLength(6)
     })
     expect(within(group).getByText('Done 7')).toBeInTheDocument()
     expect(within(group).queryByText('Done 2')).not.toBeInTheDocument()
   })
 
-  test('sends the bearer token with its requests', async () => {
-    stubFetch(() => ({ body: [] }))
+  test('says what happens next, ending with "Clear from here."', async () => {
+    const active = activeFreeze()
+    stubWorld({ live: [active], details: { 1: detailFor(active, [1]) } })
 
+    renderRoute(<DashboardPage />)
+
+    const thenWhat = await screen.findByRole('region', { name: /then what/i })
+    expect(
+      within(thenWhat).getByText('Black Friday Freeze completes. Deploys reopen.'),
+    ).toBeInTheDocument()
+    expect(within(thenWhat).getByText('Clear from here.')).toBeInTheDocument()
+  })
+
+  test('sends the bearer token with its requests', async () => {
+    stubWorld()
     renderRoute(<DashboardPage />, { token: 'a-real-token' })
 
-    await waitFor(() => {
-      expect(fetch).toHaveBeenCalled()
-    })
+    await waitFor(() => expect(fetch).toHaveBeenCalled())
     const [, init] = vi.mocked(fetch).mock.calls[0]
-    expect(init).toBeDefined()
     const headers = (init as RequestInit).headers as Record<string, string>
     expect(headers.Authorization).toBe('Bearer a-real-token')
   })
