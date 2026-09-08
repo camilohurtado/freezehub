@@ -1562,8 +1562,21 @@ The data exists: `notification` rows carry `restrictionId`, an integration, a st
 Decide when starting it: whether delivery is listed per notification or per restriction, and whether a failed delivery can be retried by hand from the screen. The second is a new capability, not a view.
 
 ### FZ-116 — Settings
-**Status:** TODO
+**Status:** DONE · **Except:** two columns `1h` draws that have no data — see `FZ-117`
 
 `1h` — organization, integrations and API keys on one page, with the section rail the settings page already implies.
 
 Unlike the other screens in this milestone this is a re-set of a page that already works: `SettingsPage` has its sections, and what changes is how they are laid out and led into.
+
+### FZ-117 — What a Key and a Channel Are Actually Doing
+**Status:** TODO
+
+Two columns `1h` draws that `FZ-116` could not fill, because nothing records what they show.
+
+**"Last used" on an API key.** `api_key` has `created_at` and `revoked_at` and nothing else. Deciding which of four keys is safe to revoke is exactly the question this column answers, and without it the answer is a guess.
+
+It is not free: the policy check is a read path, and stamping a key on every evaluation makes it a write path — once per deployment, per pipeline. **Decide before building:** a coarse `last_used_on` date updated at most once a day per key is probably enough to answer "is anything still using this?", and costs one write per key per day instead of one per check.
+
+**"Failing" on an integration.** `1h` draws a channel whose deliveries are failing in magenta. `integration` carries only `enabled`; whether its last deliveries succeeded lives in `notification` rows. Overlaps with `FZ-115`, which needs the same aggregate for `1g` — do them together or make `FZ-115` first.
+
+Until both exist the settings page shows what it can prove: a key's prefix and whether it is revoked, and a channel's enabled state.
