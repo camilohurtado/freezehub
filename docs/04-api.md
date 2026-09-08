@@ -122,6 +122,7 @@ Authenticated with a JWT; all tenant-scoped.
 | `POST` | `/api/restrictions/{id}/cancel` | `SCHEDULED` or `ACTIVE` only |
 | `GET` | `/api/deployment-checks` | any member; every check and its answer, newest first, `?decision=BLOCK` for refusals, `?beforeId=` cursor |
 | `GET` | `/api/deployment-checks/summary` | any member; what the checks add up to — today by decision, applications seen vs catalogued, a 14-day series, and refusals per restriction. Days are **UTC** |
+| `GET` | `/api/notifications` | **ADMINISTRATOR only**; lifecycle events grouped with each channel's delivery, newest first, `?limit=` capped at 200 |
 | `GET` | `/api/audit` | **ADMINISTRATOR only**; newest first, `?resourceType=` filter, `?beforeId=` cursor, `?limit=` capped at 200 |
 | `GET` | `/api/audit/resource` | **ADMINISTRATOR only**; everything that happened to one `resourceType`/`resourceId` |
 | `GET POST PATCH DELETE` | `/api/integrations` | **ADMINISTRATOR only**; stored credentials are never returned. Creating a `WEBHOOK` returns its `signingSecret` once |

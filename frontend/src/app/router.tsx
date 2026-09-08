@@ -8,6 +8,7 @@ import { RestrictionsPage } from '../features/restrictions/RestrictionsPage'
 import { AuditPage } from '../features/audit/AuditPage'
 import { CatalogPage } from '../features/catalog/CatalogPage'
 import { DeploymentChecksPage } from '../features/deployments/DeploymentChecksPage'
+import { NotificationsPage } from '../features/notifications/NotificationsPage'
 import { SettingsPage } from '../features/settings/SettingsPage'
 import { CreateRestrictionPage } from '../features/restrictions/CreateRestrictionPage'
 import { RestrictionDetailPage } from '../features/restrictions/RestrictionDetailPage'
@@ -35,6 +36,7 @@ export const routes = [
       { path: 'restrictions/:restrictionId/edit', element: <EditRestrictionPage /> },
       { path: 'deployment-checks', element: <DeploymentChecksPage /> },
       { path: 'catalog', element: <CatalogPage /> },
+      { path: 'notifications', element: <NotificationsPage /> },
       { path: 'audit', element: <AuditPage /> },
       { path: 'settings', element: <SettingsPage /> },
     ],
