@@ -111,11 +111,23 @@ Recorded rather than silently removed, because taking away something an applicat
 ### OI-18 — Module spacing does not use the design system's scale
 **Severity:** Gap · **Owner:** needs a story · **Found in:** `FZ-101`
 
-120 `padding` / `gap` / `margin` declarations across the CSS Modules use rem literals; 21 use `var(--space-*)`. The modules were written before either design system and never converted.
+The consequence is that a system's density is unreachable by changing tokens. Broadsheet specifies a 1.25× airier scale, and the application receives it mostly through the type scale — the layout keeps the spacing each screen was written with, whatever the tokens say.
 
-The consequence is that a system's density is unreachable by changing tokens. Broadsheet specifies a 1.25× airier scale, and the application receives it only through the type scale — the layout keeps the spacing it has always had, whatever the tokens say.
+**Re-counted 2026-09-08**, because the original figures were stale and the shape of the problem has changed. `padding` / `gap` / `margin` declarations across the CSS Modules:
 
-Not urgent and not visible as a defect; it is why the app will keep looking approximately-themed rather than exactly-themed. Converting is mechanical but touches every screen at once, which is precisely the change most likely to break layout in ways tests asserting on text and roles cannot catch.
+| | Then (`FZ-101`) | Now |
+|---|---|---|
+| `var(--space-*)` | 21 | **76** |
+| rem literals | 120 | **47** |
+| px literals | — | **111** |
+
+`FZ-103` was recorded as closing this. **It did not** — it addressed the colour rule, the type scale and the furniture, and the token count roughly quadrupled as screens were rewritten, but two thirds of spacing is still literal.
+
+The px column is new and needs a judgement rather than a conversion. Much of it is deliberate: the Broadsheet deck specifies its furniture in px — a 4px rule over a 1px one, 12px between chart columns, 8px between chips — and those are the design, not drift. The rem literals are the ones that are simply old.
+
+So this is not the mechanical sweep it was first written as. Whoever takes it has to separate *"this px is what the mockup says"* from *"this rem is what the file happened to have"*, and only convert the second. Converting all of it would overwrite the system with itself.
+
+Still not visible as a defect, and still the reason the app looks approximately-themed rather than exactly-themed.
 
 ## Resolved
 
