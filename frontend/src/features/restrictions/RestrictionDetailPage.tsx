@@ -10,32 +10,51 @@ import { formatInstant } from '../../utils/datetime'
 import type { RestrictionDetail } from '../../types/api'
 import styles from './RestrictionDetailPage.module.css'
 
-/** Scope comes back as ids; ids tell a reader nothing, so they are resolved to names. */
+/**
+ * Scope comes back as ids; ids tell a reader nothing, so they are resolved to names against
+ * the catalogs this page loads anyway (`FZ-104` established that a lookup is not a domain
+ * rule, so doing it here puts the frontend in charge of nothing).
+ *
+ * Values are tags rather than a comma-joined sentence, because a scope is a set and a list
+ * of names separated by commas reads as prose about one thing.
+ */
 function ScopeDimension({
   label,
   ids,
   namesById,
   loading,
+  inForce,
 }: {
   label: string
   ids: number[]
   namesById: Map<number, string>
   loading: boolean
+  inForce: boolean
 }) {
   return (
     <div className={styles.dimension}>
-      <dt className={styles.dimensionLabel}>{label}</dt>
+      <dt className={styles.label}>{label}</dt>
       <dd className={styles.dimensionValue}>
         {ids.length === 0 ? (
           <span className={styles.any}>Any</span>
         ) : (
-          <span>
-            {ids
-              .map((id) => namesById.get(id) ?? (loading ? '…' : `#${id}`))
-              .join(', ')}
-          </span>
+          ids.map((id) => (
+            <span key={id} className={`tag ${inForce ? 'tag-accent-2' : 'tag-neutral'}`}>
+              {namesById.get(id) ?? (loading ? '…' : `#${id}`)}
+            </span>
+          ))
         )}
       </dd>
+    </div>
+  )
+}
+
+/** One fact of the definition grid. */
+function Fact({ label, value }: { label: string; value: string }) {
+  return (
+    <div className={styles.fact}>
+      <dt className={styles.label}>{label}</dt>
+      <dd className={styles.factValue}>{value}</dd>
     </div>
   )
 }
@@ -107,6 +126,15 @@ export function RestrictionDetailPage() {
   const editable = detail.status === 'SCHEDULED'
   const cancellable = detail.status === 'SCHEDULED' || detail.status === 'ACTIVE'
 
+  /*
+   * The one rule for colour, applied rather than copied. The mockup draws scope values in
+   * magenta because it draws an ACTIVE hard freeze, and magenta claims "a deployment is
+   * being stopped here". A scheduled, advisory, completed or cancelled restriction is
+   * stopping nothing, so its scope takes neutral tags — magenta on all four would empty
+   * the colour of the meaning the system gives it.
+   */
+  const inForce = detail.status === 'ACTIVE' && detail.level === 'HARD_FREEZE'
+
   const names = (entries: { id: number; name: string }[] | undefined) =>
     new Map((entries ?? []).map((entry) => [entry.id, entry.name]))
 
@@ -128,17 +156,13 @@ export function RestrictionDetailPage() {
       {detail.description && <p className={styles.description}>{detail.description}</p>}
 
       <dl className={styles.facts}>
-        <dt className={styles.factLabel}>Starts</dt>
-        <dd className={styles.factValue}>{formatInstant(detail.startsAt)}</dd>
-        <dt className={styles.factLabel}>Ends</dt>
-        <dd className={styles.factValue}>{formatInstant(detail.endsAt)}</dd>
-        <dt className={styles.factLabel}>Created</dt>
-        <dd className={styles.factValue}>{formatInstant(detail.createdAt)}</dd>
-        <dt className={styles.factLabel}>Last updated</dt>
-        <dd className={styles.factValue}>{formatInstant(detail.updatedAt)}</dd>
+        <Fact label="Starts" value={formatInstant(detail.startsAt)} />
+        <Fact label="Ends" value={formatInstant(detail.endsAt)} />
+        <Fact label="Created" value={formatInstant(detail.createdAt)} />
+        <Fact label="Last updated" value={formatInstant(detail.updatedAt)} />
       </dl>
 
-      <section className={styles.scopeBlock} aria-labelledby="scope-heading">
+      <section aria-labelledby="scope-heading">
         <h2 className={styles.sectionHeading} id="scope-heading">
           Scope
         </h2>
@@ -152,18 +176,21 @@ export function RestrictionDetailPage() {
             ids={detail.scope.teamIds}
             namesById={names(teams.data)}
             loading={teams.isPending}
+            inForce={inForce}
           />
           <ScopeDimension
             label="Applications"
             ids={detail.scope.applicationIds}
             namesById={names(applications.data)}
             loading={applications.isPending}
+            inForce={inForce}
           />
           <ScopeDimension
             label="Environments"
             ids={detail.scope.environmentIds}
             namesById={names(environments.data)}
             loading={environments.isPending}
+            inForce={inForce}
           />
         </dl>
       </section>
@@ -175,27 +202,36 @@ export function RestrictionDetailPage() {
       )}
 
       <div className={styles.actions}>
-        {/* Affordances follow the backend's rules rather than being offered and refused. */}
-        {editable && (
+        {/*
+          * Affordances follow the backend's rules (`FZ-023`, `FZ-024`), but the control
+          * stays on the page when the rule forbids it — disabled, with the reason beside
+          * it. Removing it answers "where is Edit?" with silence.
+          */}
+        {editable ? (
           <Link className={styles.secondary} to={`/restrictions/${id}/edit`}>
             Edit
           </Link>
-        )}
-        {cancellable && (
-          <button
-            className={styles.danger}
-            type="button"
-            onClick={requestCancel}
-            disabled={cancel.isPending}
-          >
-            {cancel.isPending ? 'Cancelling…' : 'Cancel restriction'}
+        ) : (
+          <button className={styles.secondary} type="button" disabled aria-describedby="action-rule">
+            Edit
           </button>
         )}
-        {!editable && !cancellable && (
-          <p className={styles.finalState}>
-            This restriction is {detail.status.toLowerCase()} and can no longer be changed.
-          </p>
-        )}
+
+        <button
+          className={styles.danger}
+          type="button"
+          onClick={requestCancel}
+          disabled={!cancellable || cancel.isPending}
+          aria-describedby={cancellable ? undefined : 'action-rule'}
+        >
+          {cancel.isPending ? 'Cancelling…' : 'Cancel restriction'}
+        </button>
+
+        <p className={styles.rule} id="action-rule">
+          {cancellable
+            ? 'Editing is closed once a restriction is active. Cancelling ends it now and notifies every channel.'
+            : `This restriction is ${detail.status.toLowerCase()} and can no longer be changed.`}
+        </p>
       </div>
     </main>
   )

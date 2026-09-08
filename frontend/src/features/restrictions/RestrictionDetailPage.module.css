@@ -1,134 +1,142 @@
+/*
+ * Restriction detail, `1d` as drawn (FZ-107).
+ *
+ * The Broadsheet rewrite of a page that was three bordered boxes. Structure now comes from
+ * rules and negative space: a thick rule opens each block, hairlines separate its rows, and
+ * nothing is enclosed. The definition grid runs two columns because the four facts are two
+ * pairs — a window, and a history — and reading them side by side is what makes that legible.
+ */
+
 .page {
   width: 100%;
-  max-width: 44rem;
+  max-width: 52rem;
   margin: 0 auto;
-  padding: 1.5rem;
+  padding: var(--space-6);
 }
 
 .breadcrumb {
-  margin: 0 0 1rem;
-  font-size: 0.8125rem;
+  margin: 0 0 var(--space-4);
+  font-size: 14.5px;
 }
 
 .header {
   display: flex;
-  align-items: baseline;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 1rem;
-  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin-bottom: var(--space-3);
 }
 
+/* Measured, not arbitrary: a headline past this stops reading as a headline. */
 .title {
-  margin: 0;
+  max-width: 24ch;
 }
 
 .badges {
   display: flex;
-  gap: 0.5rem;
+  gap: 8px;
+  flex: none;
+  padding-top: 8px;
 }
 
+/* The reason is the sentence that justifies the freeze, so it is set above body size. */
 .reason {
-  margin: 0.75rem 0 0;
-  font-size: 1rem;
+  margin: 0 0 8px;
+  font-size: 19px;
+  line-height: 1.35;
 }
 
 .description {
-  margin: 0.5rem 0 0;
-  color: var(--fh-text-muted);
-  font-size: 0.9375rem;
+  margin: 0 0 var(--space-6);
+  max-width: 64ch;
+  color: var(--color-neutral-800);
+  font-size: 15px;
+  line-height: 1.65;
   white-space: pre-wrap;
 }
 
-.state {
-  margin: 0;
-  padding: 1.25rem;
-  border: 1px dashed var(--fh-border);
-  border-radius: var(--radius-md);
-  color: var(--fh-text-muted);
-}
+/* — the definition grid — */
 
 .facts {
   display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 0.375rem 1rem;
-  margin: 1.5rem 0 0;
-  padding: 1rem;
-  border: 1px solid var(--fh-border);
-  border-radius: var(--radius-md);
-  font-size: 0.875rem;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0 var(--space-8);
+  margin: 0 0 38px;
+  /* The one heavy rule opens the block; every row below it is a hairline. */
+  border-top: 1px solid var(--fh-text);
 }
 
-.factLabel {
-  color: var(--fh-text-muted);
-  white-space: nowrap;
+.fact {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--fh-border);
+  font-size: 15px;
 }
 
 .factValue {
   margin: 0;
+  font-variant-numeric: tabular-nums;
 }
 
-.scopeBlock {
-  margin-top: 1.5rem;
-  padding: 1rem;
-  border: 1px solid var(--fh-border);
-  border-radius: var(--radius-md);
-}
+/* — scope — */
 
 .sectionHeading {
-  margin: 0;
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--fh-text-muted);
+  margin: 0 0 10px;
 }
 
 .scopeHint {
-  margin: 0.5rem 0 1rem;
-  color: var(--fh-text-muted);
-  font-size: 0.8125rem;
+  margin: 0 0 var(--space-4);
+  max-width: 64ch;
+  color: var(--color-neutral-800);
+  font-size: 15px;
+  line-height: 1.6;
 }
 
 .dimensions {
-  display: grid;
-  gap: 0.5rem;
-  margin: 0;
+  margin: 0 0 38px;
+  border-top: 1px solid var(--fh-text);
 }
 
 .dimension {
   display: grid;
-  grid-template-columns: 8rem 1fr;
-  gap: 1rem;
-  font-size: 0.875rem;
+  grid-template-columns: 150px 1fr;
+  gap: 14px;
+  align-items: center;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--fh-border);
 }
 
-.dimensionLabel {
-  color: var(--fh-text-muted);
+.label {
+  composes: fieldLabel from global;
 }
 
 .dimensionValue {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   margin: 0;
 }
 
+/*
+ * "Any" is not a value, it is the absence of a constraint — so it is set as prose rather
+ * than as a tag. A tag here would read as a named dimension called "Any".
+ */
 .any {
-  color: var(--fh-text-muted);
-  font-style: italic;
+  color: var(--color-neutral-700);
+  font-size: 15px;
 }
 
-.actionError {
-  margin: 1.25rem 0 0;
-  padding: 0.625rem 0.75rem;
-  border: 1px solid var(--fh-danger);
-  border-radius: var(--radius-md);
-  color: var(--fh-danger);
-  font-size: 0.875rem;
-}
+/* — actions — */
 
 .actions {
   display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
   align-items: center;
-  gap: 0.75rem;
-  margin-top: 1.75rem;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--fh-text);
 }
 
 .secondary,
@@ -139,22 +147,59 @@
   background: transparent;
   color: inherit;
   font: inherit;
-  font-size: 0.875rem;
+  font-size: 14px;
   text-decoration: none;
   cursor: pointer;
 }
 
 .danger {
   color: var(--fh-danger);
+  border-color: var(--fh-danger);
 }
 
+.secondary:disabled,
 .danger:disabled {
-  opacity: 0.55;
+  border-color: var(--fh-border);
+  color: var(--color-neutral-600);
   cursor: not-allowed;
 }
 
-.finalState {
+/*
+ * The rule, in words, beside the controls it explains. The mockup keeps a disabled Edit on
+ * the page rather than removing it, and a disabled control with no reason beside it is a
+ * dead end — this sentence is what makes showing it better than hiding it.
+ */
+.rule {
+  max-width: 44ch;
   margin: 0;
+  color: var(--color-neutral-800);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.actionError {
+  margin: var(--space-4) 0 0;
+  color: var(--fh-danger);
+  font-size: 14px;
+}
+
+/* Empty and error states are drawn, not filled — matching the dashboard. */
+.state {
+  margin: 0;
+  padding: var(--space-4);
+  border: 1px dashed var(--fh-border);
   color: var(--fh-text-muted);
-  font-size: 0.875rem;
+  font-size: 13px;
+}
+
+@media (max-width: 40rem) {
+  .facts {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .dimension {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
 }

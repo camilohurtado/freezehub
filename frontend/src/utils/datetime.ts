@@ -24,6 +24,9 @@ export function formatInstant(iso: string): string {
     day: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
+    // 24-hour, as the mockups set every time. A deployment window read as "03:29 AM"
+    // invites the one misreading that matters here; the design shows "18:00".
+    hour12: false,
     timeZoneName: 'short',
   }).format(date)
 }
