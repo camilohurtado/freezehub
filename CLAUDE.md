@@ -446,6 +446,31 @@ The pull request body carries what a reviewer needs to disagree with the work: w
 
 Still requiring explicit instruction each time: deleting branches, rewriting history, force pushing, and committing work that is not a completed story.
 
+#### Screenshots — every change a person can see
+
+**Standing instruction, granted 2026-09-08.** If a story changes a page or a component, its pull request shows **before and after**. A diff of a stylesheet does not tell a reviewer what the screen now looks like, and "verified live" is a claim the reviewer has to take on trust.
+
+**Capture the "before" first.** It is the state on `master`, so it has to be photographed *before* the work starts, or recovered afterwards by stashing and checking `master` out again — which is slower and easy to forget. Take it in the same browser, at the same window size, signed in as the same account, showing the same data. Two screenshots that differ in three ways at once prove nothing.
+
+Commit them to the repository:
+
+```text
+docs/ui/<story-id>/before.jpg
+docs/ui/<story-id>/after.jpg
+```
+
+More than one pair is fine when a change has more than one state worth seeing — `before-empty` / `after-empty` for an empty organization, `after-mobile` for a narrow viewport. Name what the frame shows.
+
+Embed them in the pull request body with `raw.githubusercontent.com` URLs **pinned to the commit SHA**, never to the branch name:
+
+```markdown
+![before](https://raw.githubusercontent.com/<owner>/<repo>/<sha>/docs/ui/FZ-113/before.jpg)
+```
+
+A branch-name URL breaks the moment the branch is deleted; a SHA URL is permanent, so the pull request still shows what it showed on the day it was reviewed.
+
+This applies to any visible change, including one made in passing. It does not apply to backend-only stories, documentation, or scripts — there, say plainly that there was nothing to see.
+
 ### Story Completion
 
 A backlog item is considered ready for human review when:
