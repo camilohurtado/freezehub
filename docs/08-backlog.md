@@ -1480,7 +1480,7 @@ Plus `1b`'s four metrics, and `1c`'s **"Then what"** — a forward list of trans
 `1d`, taken as drawn: the two-column definition grid, scope resolved to names, and the scope explanation — *"A deployment is affected when it matches **every** dimension below. 'Any' means the dimension places no constraint."* That sentence documents the AND-across-dimensions rule (`FZ-020`) where somebody will actually read it.
 
 ### FZ-108 — Create Restriction
-**Status:** TODO
+**Status:** DONE
 
 `1e`. Two things beyond a restyle:
 
