@@ -1,15 +1,19 @@
 package com.freezhub.deployment;
 
 import com.freezhub.policy.PolicyDecision;
+import com.freezhub.policy.PolicyPreviewResponse;
+import com.freezhub.policy.PolicyService;
 import com.freezhub.shared.security.AuthenticatedUser;
 import java.time.Instant;
 import java.util.List;
 import org.springframework.data.domain.Limit;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 /**
  * What has been asked of the deployment gate, and what it answered (FZ-070).
@@ -28,11 +32,14 @@ public class DeploymentCheckController {
 
     private final DeploymentCheckRepository deploymentCheckRepository;
     private final DeploymentCheckSummaryService summaries;
+    private final PolicyService policyService;
 
     public DeploymentCheckController(DeploymentCheckRepository deploymentCheckRepository,
-                                     DeploymentCheckSummaryService summaries) {
+                                     DeploymentCheckSummaryService summaries,
+                                     PolicyService policyService) {
         this.deploymentCheckRepository = deploymentCheckRepository;
         this.summaries = summaries;
+        this.policyService = policyService;
     }
 
     /**
@@ -48,6 +55,33 @@ public class DeploymentCheckController {
     @GetMapping("/summary")
     public DeploymentCheckSummary summary(@AuthenticationPrincipal AuthenticatedUser caller) {
         return summaries.summarise(caller.organizationId(), Instant.now());
+    }
+
+    /**
+     * "Can I deploy?", asked by a person (FZ-120).
+     *
+     * <p>Here rather than under {@code /api/policy}, which is bound to the API-key chain
+     * and accepts no human credential at all (FZ-052) — a signed-in person cannot reach it,
+     * and widening that chain to let them would put the deployment gate behind two kinds
+     * of credential.
+     *
+     * <p><strong>A GET, unlike the machine endpoint's POST.</strong> The POST is a POST
+     * because a cached ALLOW served during a freeze is the failure that endpoint exists to
+     * prevent. Nothing enforces anything on this answer, and a GET cannot record — which
+     * is exactly the property this story claims: asking here leaves no trace in the checks
+     * console, so "every time a pipeline asked" stays true of it.
+     */
+    @GetMapping("/preview")
+    public PolicyPreviewResponse preview(@AuthenticationPrincipal AuthenticatedUser caller,
+                                         @RequestParam String application,
+                                         @RequestParam String environment) {
+        if (application.isBlank() || environment.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Both application and environment are required.");
+        }
+
+        return policyService.preview(caller.organizationId(), application, environment,
+                Instant.now());
     }
 
     /**

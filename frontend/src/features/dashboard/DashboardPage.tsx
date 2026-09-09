@@ -1,5 +1,6 @@
 import { Link } from 'react-router'
 import type { RestrictionSummary } from '../../types/api'
+import { DeployCheck } from './DeployCheck'
 import { RestrictionCard } from './RestrictionCard'
 import { useDashboardRestrictions, useDeploymentCheckSummary } from './useDashboard'
 import { useEnvironments } from '../catalog/useCatalog'
@@ -144,6 +145,13 @@ export function DashboardPage() {
           )}
         </section>
       </div>
+
+      {/*
+        * `1c` puts the check under the status block, above everything counted or listed:
+        * "am I blocked right now?" is the question somebody arrives with, and the answer
+        * to it is one they have to ask for rather than one the page can already know.
+        */}
+      <DeployCheck />
 
       <section className={styles.group} aria-labelledby="metrics-heading">
         <h2 className={styles.groupHeading} id="metrics-heading">

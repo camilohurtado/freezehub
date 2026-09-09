@@ -1604,15 +1604,20 @@ What it needs: an endpoint that puts an exhausted notification back to `PENDING`
 **Decide when starting it:** whether retrying is per delivery or per event. Per event is what the banner implies and is kinder to use; per delivery is what the data models, and re-sending to channels that already accepted would announce a freeze twice to everyone who was told the first time. That argues for per event, retrying only its failed deliveries.
 
 ### FZ-120 — Check a Deployment From the Product
-**Status:** TODO
+**Status:** DONE
 
 `1k` puts a **"Can I deploy?"** field and an Evaluate button on the phone, and `1c` draws the same thing on the desktop. Neither is buildable today, for a reason worth stating plainly: **policy evaluation is a machine endpoint.** `POST /api/policy/evaluate` sits behind the API-key filter chain, and a signed-in person has a JWT, not a key. There is no way for the product to ask its own question.
 
 What it needs is a human-authenticated evaluation that answers from the same code as the machine one — not a second implementation of the matching rules, which would be a second source of truth for the one thing this product exists to decide.
 
-**Decide when starting it:** whether a person's check is recorded as a `deployment_check` alongside the pipeline's. It is a real question rather than a detail — the console says *"every time a pipeline asked"*, and quietly filling it with people trying the form would make that sentence false and the refusal counts wrong.
+**Decided:** a person's check is **not** recorded (`D-29`). The console says *"every time a pipeline asked"*, and filling it with people trying the form would make that sentence false and inflate every refusal figure drawn from those rows — the dashboard's *Refused*, and a restriction's *checks refused* and *pipelines affected*.
+
+Built as `GET /api/deployment-checks/preview?application=&environment=`, beside the console that shows the history rather than under `/api/policy`, which accepts an API key and nothing else. A `GET` because nothing is enforced on the answer and a GET cannot record.
+
+`PolicyService.decide` was extracted from `evaluate` and now carries the matching rules and the sentence describing them; both callers derive their answer from it, so the product cannot disagree with the gate. `DeploymentCheckPreviewTest` asks both paths the same three questions and compares the answers field by field, and asserts that a preview leaves no check row and no audit entry.
 
 Worth having. It answers "is the freeze on for me?" without reading a restriction and working out whether its scope covers you — which is exactly the sum this product exists to do for people.
+
 
 ## Milestone 13 — Running It
 

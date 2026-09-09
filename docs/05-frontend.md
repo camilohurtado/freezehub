@@ -52,6 +52,8 @@ Sourced from `GET /api/restrictions?status=…`; the list endpoint already suppo
 
 Each entry links to its detail route. No scope is shown here: the list endpoint returns summaries without scope by design (`FZ-021`).
 
+**"Can I deploy?"** (`FZ-120`) sits between the forward list and the metrics: an application, an environment, and the answer the deployment gate would give, from `GET /api/deployment-checks/preview`. The decision, the sentence and the matched restrictions are all rendered as the backend sent them — nothing here decides anything, because a product that could disagree with the gate would not be worth asking. Asked with a mutation rather than a query, deliberately: a cached answer is a stale one, and it is a question somebody puts rather than something the page fetches on open.
+
 ### Restriction list (`FZ-032`)
 
 Browsing and filtering by status. Filter state belongs in the URL query string so a filtered view is linkable and survives reload. Ordering is the backend's (soonest start first) and is not re-sorted client-side.

@@ -1,5 +1,9 @@
 import { apiRequest } from './client'
-import type { DeploymentCheck, DeploymentCheckSummary } from '../types/api'
+import type {
+  DeploymentCheck,
+  DeploymentCheckPreview,
+  DeploymentCheckSummary,
+} from '../types/api'
 
 export interface DeploymentCheckFilters {
   decision?: 'ALLOW' | 'BLOCK'
@@ -44,4 +48,23 @@ export function getDeploymentCheckSummary(
   signal?: AbortSignal,
 ): Promise<DeploymentCheckSummary> {
   return apiRequest<DeploymentCheckSummary>('/api/deployment-checks/summary', { token, signal })
+}
+
+/**
+ * What a deployment would be told right now (`FZ-120`).
+ *
+ * A GET, unlike the pipeline's POST: nothing is enforced on this answer and nothing is
+ * recorded by it.
+ */
+export function previewDeploymentCheck(
+  token: string | null,
+  application: string,
+  environment: string,
+  signal?: AbortSignal,
+): Promise<DeploymentCheckPreview> {
+  const params = new URLSearchParams({ application, environment })
+  return apiRequest<DeploymentCheckPreview>(
+    `/api/deployment-checks/preview?${params.toString()}`,
+    { token, signal },
+  )
 }
