@@ -63,6 +63,18 @@ export class ApiError extends Error {
   get isPlanLimit(): boolean {
     return this.status === 402
   }
+
+  /**
+   * No answer at all, rather than an answer that says no (`FZ-124`).
+   *
+   * Status `0` because there was no response to take one from — the request was abandoned
+   * before the server said anything. It is what the retry policy branches on: a timeout
+   * has already cost its whole deadline before it is reported, so it does not get the
+   * same number of further attempts as a failure that came back quickly.
+   */
+  get isTimeout(): boolean {
+    return this.status === 0
+  }
 }
 
 interface ProblemDetail {
@@ -164,26 +176,76 @@ async function toApiError(response: Response): Promise<ApiError> {
   }
 }
 
+/**
+ * How long any one request may take before it is abandoned (`FZ-124`).
+ *
+ * Generous, because this is a backstop and not a performance budget: it exists so a
+ * connection that is accepted and then never answered ends in an error somebody can act on
+ * rather than a spinner that never resolves. The realistic cause is a load balancer holding
+ * the socket to a task that has wedged — an unreachable API already fails in milliseconds.
+ */
+const REQUEST_TIMEOUT_MS = 20_000
+
 export interface RequestOptions {
   method?: string
   body?: unknown
   token?: string | null
   signal?: AbortSignal
+  /** Overridable per call, for the rare request that has earned more time. */
+  timeoutMs?: number
 }
 
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { method = 'GET', body, token, signal } = options
+  const { method = 'GET', body, token, signal, timeoutMs = REQUEST_TIMEOUT_MS } = options
 
   const headers: Record<string, string> = {}
   if (body !== undefined) headers['Content-Type'] = 'application/json'
   if (token) headers.Authorization = `Bearer ${token}`
 
-  const response = await fetch(`${BASE_URL}${path}`, {
-    method,
-    headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
-    signal,
-  })
+  /*
+   * Built by hand rather than with `AbortSignal.any` + `AbortSignal.timeout`, which say
+   * this in two lines. Two reasons: the composed signal cannot tell us *which* input
+   * fired, and that distinction is the whole story — TanStack Query aborts on unmount and
+   * on refetch, and rendering those as failures would flash an error every time somebody
+   * navigates away. Doing it manually also keeps the wrapper on APIs every browser and the
+   * test environment have had for years.
+   */
+  const controller = new AbortController()
+  let timedOut = false
+  const timer = setTimeout(() => {
+    timedOut = true
+    controller.abort()
+  }, timeoutMs)
+  const abortWithCaller = () => controller.abort()
+  signal?.addEventListener('abort', abortWithCaller)
+  if (signal?.aborted) abortWithCaller()
+
+  let response: Response
+  try {
+    response = await fetch(`${BASE_URL}${path}`, {
+      method,
+      headers,
+      body: body === undefined ? undefined : JSON.stringify(body),
+      signal: controller.signal,
+    })
+  } catch (failure) {
+    if (timedOut) {
+      // Deliberately an ApiError: every screen already renders `error.message`, so this
+      // reaches the person without a single page being changed.
+      throw new ApiError(
+        0,
+        `The server did not answer within ${Math.round(timeoutMs / 1000)} seconds. ` +
+          'It may be overloaded or restarting — try again in a moment.',
+      )
+    }
+    // The caller's own abort, or a genuine network failure. Rethrown as it came: a
+    // cancellation must stay a cancellation, or TanStack Query reports navigating away
+    // as an error.
+    throw failure
+  } finally {
+    clearTimeout(timer)
+    signal?.removeEventListener('abort', abortWithCaller)
+  }
 
   if (!response.ok) {
     throw await toApiError(response)

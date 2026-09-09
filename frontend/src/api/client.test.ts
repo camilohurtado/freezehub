@@ -149,3 +149,115 @@ describe('plan limits', () => {
     expect(error.message).toBe('Payment required')
   })
 })
+
+/**
+ * A request that is accepted and never answered (`FZ-124`).
+ *
+ * Fake timers throughout: the point is what happens after twenty seconds, and a test that
+ * actually waits twenty seconds is a test nobody runs.
+ */
+describe('a server that does not answer', () => {
+  /** Accepts the request and never settles — the wedged-task case, not the unreachable one. */
+  function neverAnswers() {
+    const spy = vi.fn(
+      (_input: RequestInfo | URL, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () =>
+            // What fetch does when its signal fires, and the only thing the wrapper sees.
+            reject(new DOMException('The operation was aborted.', 'AbortError')),
+          )
+        }),
+    )
+    vi.stubGlobal('fetch', spy)
+    return spy
+  }
+
+  test('gives up and says so, rather than waiting for ever', async () => {
+    vi.useFakeTimers()
+    neverAnswers()
+    try {
+      const pending = apiRequest('/api/restrictions').catch((error: unknown) => error)
+
+      await vi.advanceTimersByTimeAsync(19_000)
+      // Still waiting at nineteen seconds: the backstop must not fire on a merely slow API.
+      expect(await Promise.race([pending, Promise.resolve('still pending')])).toBe('still pending')
+
+      await vi.advanceTimersByTimeAsync(2_000)
+
+      const error = (await pending) as ApiError
+      expect(error).toBeInstanceOf(ApiError)
+      expect(error.isTimeout).toBe(true)
+      expect(error.message).toMatch(/did not answer within 20 seconds/i)
+    } finally {
+      vi.useRealTimers()
+      vi.unstubAllGlobals()
+    }
+  })
+
+  test('a cancelled request stays a cancellation, not a failure', async () => {
+    /*
+     * The distinction the story turned on. TanStack Query aborts on unmount and on
+     * refetch; both arrive as the same AbortError as a timeout. Reporting those as errors
+     * would flash a failure banner every time somebody navigates away, so the caller's
+     * abort has to come back untouched.
+     */
+    vi.useFakeTimers()
+    neverAnswers()
+    try {
+      const controller = new AbortController()
+      const pending = apiRequest('/api/restrictions', { signal: controller.signal }).catch(
+        (error: unknown) => error,
+      )
+
+      controller.abort()
+
+      const error = await pending
+      expect(error).not.toBeInstanceOf(ApiError)
+      expect((error as DOMException).name).toBe('AbortError')
+    } finally {
+      vi.useRealTimers()
+      vi.unstubAllGlobals()
+    }
+  })
+
+  test('honours a longer deadline when a caller asks for one', async () => {
+    vi.useFakeTimers()
+    neverAnswers()
+    try {
+      const pending = apiRequest('/api/restrictions', { timeoutMs: 60_000 }).catch(
+        (error: unknown) => error,
+      )
+
+      await vi.advanceTimersByTimeAsync(21_000)
+      expect(await Promise.race([pending, Promise.resolve('still pending')])).toBe('still pending')
+
+      await vi.advanceTimersByTimeAsync(40_000)
+      expect(((await pending) as ApiError).isTimeout).toBe(true)
+      expect(((await pending) as ApiError).message).toMatch(/within 60 seconds/i)
+    } finally {
+      vi.useRealTimers()
+      vi.unstubAllGlobals()
+    }
+  })
+
+  test('an answer that arrives in time is not touched', async () => {
+    // The timer must not leave the request hanging, or every successful call would sit
+    // waiting for a timeout that has already been cleared.
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(JSON.stringify([{ id: 1, name: 'Payments' }]), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+        ),
+      ),
+    )
+    try {
+      await expect(apiRequest('/api/teams')).resolves.toEqual([{ id: 1, name: 'Payments' }])
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+})

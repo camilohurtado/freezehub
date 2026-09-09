@@ -30,6 +30,17 @@ export function QueryProvider({ children }: { children: ReactNode }) {
               if (error instanceof ApiError && error.status >= 400 && error.status < 500) {
                 return false
               }
+              /*
+               * A timeout is worth one more go — a task restarting behind the load
+               * balancer is exactly the case that recovers — but not two (`FZ-124`).
+               * A timeout costs its full deadline before it is even reported, so the
+               * default here would have meant sixty seconds of spinner before the
+               * person saw a word. Forty is still long; twenty was judged too eager to
+               * give up on a deploy in progress.
+               */
+              if (error instanceof ApiError && error.isTimeout) {
+                return failureCount < 1
+              }
               return failureCount < 2
             },
             refetchOnWindowFocus: false,

@@ -150,7 +150,7 @@ Becomes urgent at the first EU deal with a security questionnaire, not before.
 The real fix is `management.server.port` on a port the load balancer does not publish, so nothing outside the VPC can reach anything but `/actuator/health`. That is a Terraform change — a second container port, a security-group rule, and the health check pointed at it — which is why it belongs to the story that applies the deployment rather than to the review that found it.
 
 ### OI-22 — The frontend has no request timeout, so a hung API leaves a spinner for ever
-**Severity:** Gap · **Owner:** needs a story · **Raised:** 2026-09-09
+**Severity:** Gap · **Owner:** `FZ-124` · **Raised:** 2026-09-09
 
 `apiRequest` passes the caller's `AbortSignal` through and adds nothing of its own. A request that is accepted and never answered — a load balancer holding a connection to a wedged task is the realistic case — leaves every screen in its loading state indefinitely, with no error and no retry: the same class of defect `FZ-065` fixed on the backend's outbound calls, on the other side of the wire.
 
