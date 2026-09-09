@@ -120,6 +120,33 @@ class ObservabilityTest {
     }
 
     @Test
+    void keepsMetricsFromOrdinaryMembers() throws Exception {
+        /*
+         * The sentence above this test was true of the intent and false of the code
+         * (`FZ-065`): authentication was the only bar, so any member of any organization
+         * could read how many deployment checks every customer makes, and the JVM's
+         * internals besides. An administrator is not the right bar either — these figures
+         * are not tenant-scoped at all — but it is the one that costs nothing here. The
+         * answer is a management port nothing outside can reach (`OI-21`).
+         */
+        Organization organization =
+                organizationRepository.saveAndFlush(new Organization("Contoso " + System.nanoTime()));
+        String subject = "member-" + System.nanoTime();
+        userRepository.saveAndFlush(
+                new User(organization.getId(), subject, subject + "@contoso.test", UserRole.MEMBER));
+        String memberToken = TestTokens.forSubject(jwtEncoder, subject);
+
+        mockMvc.perform(get("/actuator/metrics").header("Authorization", "Bearer " + memberToken))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get("/actuator/metrics/jvm.memory.used")
+                        .header("Authorization", "Bearer " + memberToken))
+                .andExpect(status().isForbidden());
+
+        // The load balancer still gets its answer without a credential at all.
+        mockMvc.perform(get("/actuator/health/readiness")).andExpect(status().isOk());
+    }
+
+    @Test
     void countsWhatTheDeploymentGateDecided() throws Exception {
         // Registered as soon as the application starts, so a dashboard has a series to
         // draw before the first deployment rather than a gap.

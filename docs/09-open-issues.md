@@ -141,6 +141,21 @@ The seam is in good shape, which is why this is a decision rather than a gap: th
 
 Becomes urgent at the first EU deal with a security questionnaire, not before.
 
+
+### OI-21 — Actuator is on the application's own port, reachable by any administrator of any tenant
+**Severity:** Gap · **Owner:** `FZ-123` · **Raised:** 2026-09-09
+
+`/actuator/metrics` and `/actuator/info` are aggregate across every organization — `freezehub.policy.evaluations` counts every customer's deployment checks, and `jvm.*` describes the process. `FZ-065` narrowed them from "any authenticated member" (verified live: a member of one tenant could read them) to ADMINISTRATOR, which shrinks the audience but does not change what they are: figures no customer should see at all.
+
+The real fix is `management.server.port` on a port the load balancer does not publish, so nothing outside the VPC can reach anything but `/actuator/health`. That is a Terraform change — a second container port, a security-group rule, and the health check pointed at it — which is why it belongs to the story that applies the deployment rather than to the review that found it.
+
+### OI-22 — The frontend has no request timeout, so a hung API leaves a spinner for ever
+**Severity:** Gap · **Owner:** needs a story · **Raised:** 2026-09-09
+
+`apiRequest` passes the caller's `AbortSignal` through and adds nothing of its own. A request that is accepted and never answered — a load balancer holding a connection to a wedged task is the realistic case — leaves every screen in its loading state indefinitely, with no error and no retry: the same class of defect `FZ-065` fixed on the backend's outbound calls, on the other side of the wire.
+
+Left out of `FZ-065` deliberately. The fix is `AbortSignal.any([caller, AbortSignal.timeout(n)])` in the one wrapper, but it changes the failure mode of every request in the application, and `AbortSignal.any` needs checking against the jsdom the test suite runs on. That is a change worth its own story and its own tests, not a line added at the end of a review.
+
 ## Resolved
 
 | Issue | Found in | Resolved by |

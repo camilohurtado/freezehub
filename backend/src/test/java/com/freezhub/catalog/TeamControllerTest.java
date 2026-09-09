@@ -137,6 +137,20 @@ class TeamControllerTest {
 
         mockMvc.perform(delete("/api/teams/" + teamId).header("Authorization", "Bearer " + tokenB))
                 .andExpect(status().isNotFound());
+
+        // Rename was the one verb this had never checked (`FZ-065`). It is also the one
+        // with teeth: because an unrecognised name blocks (`D-14`), renaming another
+        // organization's application would turn every pipeline still sending the old name
+        // into a refusal — a denial of service written as an edit.
+        mockMvc.perform(patch("/api/teams/" + teamId)
+                        .header("Authorization", "Bearer " + tokenB)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new TeamRequest("Renamed"))))
+                .andExpect(status().isNotFound());
+
+        mockMvc.perform(get("/api/teams/" + teamId).header("Authorization", "Bearer " + tokenA))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name", is("Identity")));
     }
 
 }

@@ -90,12 +90,21 @@ public interface ChangeRestrictionRepository extends JpaRepository<ChangeRestric
      * <p>Half-open window: a restriction ending at 09:30 does not block a deployment at
      * 09:30, matching the lifecycle reconciler's own predicates.
      */
+    /*
+     * Ordered, like the listing query above and for the same reason (`FZ-065`). Without an
+     * ORDER BY the database may return two freezes that are both in force in either order,
+     * so the same evaluation could name them "A, B" in one build log and "B, A" in the
+     * next, and record the matched set differently each time. The answer was never wrong;
+     * it simply was not reproducible, which is the property a deployment gate is supposed
+     * to have.
+     */
     @Query("""
             select r from ChangeRestriction r
              where r.organizationId = :organizationId
                and r.startsAt <= :now
                and r.endsAt > :now
                and r.status <> :cancelled
+             order by r.startsAt asc, r.id asc
             """)
     List<ChangeRestriction> findInForce(@Param("organizationId") Long organizationId,
                                         @Param("now") Instant now,

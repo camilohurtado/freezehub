@@ -99,7 +99,11 @@ MVP does not implement advanced RBAC (`00-product.md`, Out of Scope). Role check
 - configure a notification destination (`FZ-045`) — it decides who hears about a freeze, and its configuration can hold a credential;
 - issue or revoke an API key (`FZ-052`) — a key authenticates as the whole organization.
 
+- read anything under `/actuator` except health (`FZ-065`) — the counters there are aggregate across every tenant, so they are not an organization's data at all. An administrator is not the right bar either, merely a cheaper one than the fix: see `OI-21`.
+
 Every other authenticated action is available to any user within their own organization.
+
+`/actuator/health` and its probes stay unauthenticated, because the load balancer reads them.
 
 ## Tenant Isolation Enforcement
 
