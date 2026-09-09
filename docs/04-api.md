@@ -1,4 +1,3 @@
-| `GET` | `/api/deployment-checks/summary` | any member; what the checks add up to — today by decision, applications seen vs catalogued, a 14-day series, refusals per restriction, and how many were refused as unregistered over the window. Days are **UTC** |
 # FreezeHub — API Contract
 
 ## Purpose
@@ -122,7 +121,8 @@ Authenticated with a JWT; all tenant-scoped.
 | `POST` | `/api/restrictions/{id}/cancel` | `SCHEDULED` or `ACTIVE` only |
 | `GET` | `/api/restrictions/{id}/impact` | what one restriction did: checks refused, distinct pipelines behind them, announcements sent and failed. 404 for another organization's |
 | `GET` | `/api/deployment-checks` | any member; every check and its answer, newest first, `?decision=BLOCK` for refusals, `?beforeId=` cursor |
-| `GET` | `/api/deployment-checks/summary` | any member; what the checks add up to — today by decision, applications seen vs catalogued, a 14-day series, and refusals per restriction. Days are **UTC** |
+| `GET` | `/api/deployment-checks/summary` | any member; what the checks add up to — today by decision, applications seen vs catalogued, a 14-day series, refusals per restriction, and how many were refused as unregistered over the window. Days are **UTC** |
+| `GET` | `/api/deployment-checks/preview` | any member; **"can I deploy?" asked by a person** — `?application=` and `?environment=`, both required. The Policy API's answer, decided by the same code, and **recorded nowhere** (`D-29`) |
 | `GET` | `/api/notifications` | **ADMINISTRATOR only**; lifecycle events grouped with each channel's delivery, newest first, `?limit=` capped at 200 |
 | `POST` | `/api/notifications/retry` | **ADMINISTRATOR only**; requeues one event's failed deliveries, leaving the ones that arrived alone. Answers with how many |
 | `GET` | `/api/audit` | **ADMINISTRATOR only**; newest first, `?resourceType=` filter, `?beforeId=` cursor, `?limit=` capped at 200 |
@@ -288,6 +288,24 @@ Three properties of that response are deliberate:
 **Accepted cost: FreezeHub becomes a gate on catalog completeness.** An application nobody has registered cannot deploy at all, including when no freeze exists anywhere. That is the deliberate trade — the alternative leaves a bypass open to anyone who can misspell a string. Registering applications and environments is therefore part of onboarding, not an optional tidiness step.
 
 Still open: whether these evaluations should be **recorded**, so a repeated bypass attempt is visible after the fact rather than only refused in the moment. That belongs to `FZ-060`.
+
+### The same question, asked by a person
+
+`GET /api/deployment-checks/preview?application=&environment=` (`FZ-120`) answers this for
+a signed-in person, because `/api/policy/**` accepts an API key and nothing else — the
+product had no way to ask its own gate.
+
+- **The same decision.** Both endpoints derive their answer from one implementation of the
+  matching rules, so a preview cannot say a freeze does not apply while the gate refuses
+  the pipeline. Decision, message, `unregistered` and `restrictions` are identical; only
+  `action` is absent, because a person supplies none.
+- **Recorded nowhere** (`D-29`). No `deployment_check`, no audit entry, no metric — the
+  checks console means "every time a pipeline asked", and the refusal counts drawn from it
+  would otherwise include people trying the form.
+- **A `GET`,** where the machine endpoint is a `POST`. The POST exists so no proxy can
+  cache an `ALLOW` through a freeze; nothing is enforced on a preview, and a GET cannot
+  record — the method carries the guarantee.
+- Both parameters are required, and blank is rejected with `400`.
 
 ## Client guidance
 

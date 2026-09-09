@@ -612,6 +612,7 @@ This is the daily-grain sibling of `D-25`, which normalises instants to the prec
 database stores. Both exist because a timestamp read back is not automatically the
 timestamp written.
 
+
 ## D-28 — Stay on the Terraform we have, at 0.5 vCPU and 1 GB, without a NAT
 
 `FZ-122`
@@ -694,3 +695,43 @@ real invoice against them, which is the only number that settles it.
 Measurements were taken on x86_64, because that is the machine they were taken on. CI builds
 `linux/arm64` and the task runs ARM64; the memory shape should carry across, and the startup
 timings should not be read as predictions of Graviton.
+
+
+## D-29 — A person's check is not a deployment check
+
+**Story:** `FZ-120` · **Status:** accepted
+
+The product can now ask its own gate: `GET /api/deployment-checks/preview` answers "can I
+deploy?" for a signed-in person. The open question was whether that answer joins the
+pipeline's in `deployment_check`.
+
+**It does not.** The checks console says it lists every time a pipeline asked, and three
+figures are read from those same rows: the dashboard's *Checks · 14 days* and *Refused*,
+and a restriction's *checks refused* and *pipelines affected*. Somebody trying the form
+four times to understand a freeze would add four refusals that no deployment ever
+suffered, and the sentence describing the console would stop being true. Nothing is
+enforced on a preview either — no pipeline stops because of it — so recording it would
+count an event that did not happen.
+
+The endpoint is a `GET` for the same reason: a GET that wrote would be a defect, so the
+method itself carries the guarantee.
+
+### Why not under `/api/policy`
+
+`/api/policy/**` is bound to the API-key filter chain and accepts no human credential
+(`FZ-052`). Widening it would put the deployment gate behind two kinds of credential to
+save one path, so the human question lives beside the console that shows its history.
+
+### What is shared
+
+`PolicyService.decide` — the matching rules and the sentence that describes them. Both
+callers derive their answer from it, so the product cannot tell somebody a freeze does not
+apply while the gate refuses their pipeline. `DeploymentCheckPreviewTest` asks both paths
+the same three questions and compares the answers field by field.
+
+### Consequence
+
+Adoption metrics stay honest: *Pipelines integrated* still counts applications whose
+pipelines have actually asked, and a team that only ever checks by hand does not appear
+integrated. The cost is that FreezeHub has no record of people asking — if that question
+is ever worth answering, it needs its own table, not this one.

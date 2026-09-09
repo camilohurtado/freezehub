@@ -1,0 +1,130 @@
+/*
+ * "Can I deploy?" — `1c`'s check panel (FZ-120).
+ *
+ * The deck draws the answer as a plain filled block, not a card: it is one answer to one
+ * question, and boxing it would make it a fourth object competing with the restriction
+ * cards beside it.
+ */
+
+.section {
+  margin-bottom: 44px;
+}
+
+.heading {
+  margin: 0 0 6px;
+}
+
+.note {
+  margin: 0 0 var(--space-4);
+  font-size: 14.5px;
+  color: var(--color-neutral-700);
+}
+
+.form {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  max-width: 46rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.label {
+  composes: fieldLabel from global;
+}
+
+/* — the answer — */
+
+.answer {
+  margin-top: var(--space-4);
+  padding: 16px 18px;
+  background: var(--color-accent-100);
+  max-width: 46rem;
+}
+
+.verdictLine {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+/*
+ * 20px caps, the deck's own value for this block. Magenta is reserved for BLOCK — the
+ * colour is the claim that a deployment is being stopped.
+ */
+.verdictAllow,
+.verdictBlock {
+  font: 600 20px var(--font-heading);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.verdictAllow {
+  color: var(--color-accent-800);
+}
+
+.verdictBlock {
+  color: var(--color-accent-2-700);
+}
+
+.evaluatedAt {
+  font-size: 13px;
+  color: var(--color-neutral-800);
+  font-variant-numeric: tabular-nums;
+}
+
+.message {
+  margin: 0;
+  font-size: 14.5px;
+  line-height: 1.6;
+}
+
+.matched {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.match {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 14px;
+}
+
+.matchWindow {
+  color: var(--color-neutral-700);
+  font-variant-numeric: tabular-nums;
+}
+
+.error {
+  margin: var(--space-4) 0 0;
+  color: var(--fh-danger);
+  font-size: 14.5px;
+}
+
+.footnote {
+  margin: 12px 0 0;
+  font-size: 13px;
+  color: var(--color-neutral-700);
+  max-width: 46rem;
+}
+
+@media (max-width: 48rem) {
+  /* The phone draws this as a stacked field and a full-width button (`1k`). */
+  .form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

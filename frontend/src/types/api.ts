@@ -276,3 +276,32 @@ export interface RestrictionImpact {
   notificationsSent: number
   notificationsFailed: number
 }
+
+/**
+ * The answer to "can I deploy?", asked by a person (`FZ-120`).
+ *
+ * Deliberately the same answer a pipeline gets from `POST /api/policy/evaluate`, minus
+ * the action — the backend derives both from one decision, so the product cannot disagree
+ * with the gate about whether a freeze applies.
+ *
+ * Asking leaves no trace: a preview is not recorded as a `DeploymentCheck`, so the checks
+ * console keeps meaning "every time a pipeline asked".
+ */
+export interface DeploymentCheckPreview {
+  decision: 'ALLOW' | 'BLOCK'
+  application: string
+  environment: string
+  evaluatedAt: string
+  /** The whole answer in one sentence, written by the backend. */
+  message: string
+  /** Which names were not recognised. Empty is the normal case. */
+  unregistered: ('APPLICATION' | 'ENVIRONMENT')[]
+  restrictions: {
+    id: number
+    name: string
+    reason: string
+    level: RestrictionLevel
+    startsAt: string
+    endsAt: string
+  }[]
+}

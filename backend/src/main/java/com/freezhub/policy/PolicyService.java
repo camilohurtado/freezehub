@@ -74,19 +74,28 @@ public class PolicyService {
     }
 
     /**
-     * Not {@code readOnly}: a refusal caused by an unregistered name writes an audit
-     * entry (FZ-060), and it has to commit with the decision that produced it.
+     * The rules, and nothing else (`FZ-120`).
+     *
+     * <p>Read-only and side-effect free: no audit entry, no metric, no recorded check. Both
+     * the machine endpoint and the person-facing preview call this, so there is one
+     * implementation of what "blocked" means rather than two that drift.
+     *
+     * <p>{@code readOnly} applies when a controller calls this through the proxy. Called
+     * from {@link #evaluate} it is a self-invocation, so that transaction's settings
+     * stand — which is what the machine path needs, since it goes on to write. Do not
+     * "fix" that by routing it through an injected self-reference: it would make the
+     * audit entry and the recorded check unwritable.
      */
-    @Transactional
-    public PolicyEvaluationResponse evaluate(Long organizationId, ApiKeyPrincipal caller,
-                                             PolicyEvaluationRequest request, Instant now) {
+    @Transactional(readOnly = true)
+    public PolicyOutcome decide(Long organizationId, String applicationName,
+                                String environmentName, Instant now) {
         // Exact names. A near miss is a miss: the catalog's uniqueness is case-sensitive,
-        // so treating "Prod" as "prod" here would make this endpoint disagree with the
-        // registry it is reading from.
+        // so treating "Prod" as "prod" here would make this disagree with the registry it
+        // is reading from.
         Optional<Application> application =
-                applicationRepository.findByOrganizationIdAndName(organizationId, request.application());
+                applicationRepository.findByOrganizationIdAndName(organizationId, applicationName);
         Optional<Environment> environment =
-                environmentRepository.findByOrganizationIdAndName(organizationId, request.environment());
+                environmentRepository.findByOrganizationIdAndName(organizationId, environmentName);
 
         List<ScopeDimension> unregistered = new ArrayList<>();
         if (application.isEmpty()) {
@@ -95,20 +104,8 @@ public class PolicyService {
         if (environment.isEmpty()) {
             unregistered.add(ScopeDimension.ENVIRONMENT);
         }
-
         if (!unregistered.isEmpty()) {
-            auditTrail.record(organizationId, AuditActor.of(caller),
-                    AuditAction.POLICY_BLOCKED_UNREGISTERED, AuditResourceType.POLICY, null,
-                    AuditDetails.builder()
-                            .with("application", request.application())
-                            .with("environment", request.environment())
-                            .with("unregistered", unregistered.toString())
-                            .toJson());
-
-            metrics.blockedUnregistered();
-            deploymentChecks.record(caller, request.application(), request.environment(),
-                    PolicyDecision.BLOCK, BlockedReason.UNREGISTERED, List.of(), metadataOf(request));
-            return blockUnregistered(request, now, unregistered);
+            return new PolicyOutcome(unregistered, List.of());
         }
 
         Set<Long> applicationTeamIds = teamApplicationRepository
@@ -116,11 +113,38 @@ public class PolicyService {
                 .map(TeamApplication::getTeamId)
                 .collect(Collectors.toSet());
 
-        List<ChangeRestriction> matched = matching(
-                organizationId, now, application.get().getId(), environment.get().getId(), applicationTeamIds);
+        return new PolicyOutcome(List.of(), matching(
+                organizationId, now, application.get().getId(), environment.get().getId(),
+                applicationTeamIds));
+    }
 
-        boolean blocked = matched.stream()
-                .anyMatch(restriction -> restriction.getLevel() == RestrictionLevel.HARD_FREEZE);
+    /**
+     * Not {@code readOnly}: a refusal caused by an unregistered name writes an audit
+     * entry (FZ-060), and it has to commit with the decision that produced it.
+     */
+    @Transactional
+    public PolicyEvaluationResponse evaluate(Long organizationId, ApiKeyPrincipal caller,
+                                             PolicyEvaluationRequest request, Instant now) {
+        PolicyOutcome outcome =
+                decide(organizationId, request.application(), request.environment(), now);
+
+        if (outcome.isUnregistered()) {
+            auditTrail.record(organizationId, AuditActor.of(caller),
+                    AuditAction.POLICY_BLOCKED_UNREGISTERED, AuditResourceType.POLICY, null,
+                    AuditDetails.builder()
+                            .with("application", request.application())
+                            .with("environment", request.environment())
+                            .with("unregistered", outcome.unregistered().toString())
+                            .toJson());
+
+            metrics.blockedUnregistered();
+            deploymentChecks.record(caller, request.application(), request.environment(),
+                    PolicyDecision.BLOCK, BlockedReason.UNREGISTERED, List.of(), metadataOf(request));
+            return blockUnregistered(request, now, outcome);
+        }
+
+        List<ChangeRestriction> matched = outcome.matched();
+        boolean blocked = outcome.blocked();
 
         if (blocked) {
             metrics.blockedByRestriction();
@@ -148,9 +172,37 @@ public class PolicyService {
                 request.application(),
                 request.environment(),
                 now,
-                describe(blocked, matched),
+                explain(outcome, request.application(), request.environment()),
                 List.of(),
                 matched.stream().map(MatchedRestriction::from).toList());
+    }
+
+    /**
+     * The same question, asked by a person from inside the product (`FZ-120`).
+     *
+     * <p><strong>Records nothing.</strong> No {@code deployment_check}, no audit entry, no
+     * metric. The checks console says it lists every time a pipeline asked, and the
+     * per-restriction refusal counts on the dashboard and on a restriction's page are read
+     * from those same rows — filling them with people trying the form would make that
+     * sentence false and every one of those figures wrong. Somebody asking is not a
+     * deployment.
+     *
+     * <p>The decision comes from {@link #decide}, which is also where the machine
+     * endpoint's comes from: one implementation of the matching rules, not two that drift.
+     */
+    @Transactional(readOnly = true)
+    public PolicyPreviewResponse preview(Long organizationId, String applicationName,
+                                         String environmentName, Instant now) {
+        PolicyOutcome outcome = decide(organizationId, applicationName, environmentName, now);
+
+        return new PolicyPreviewResponse(
+                outcome.blocked() ? PolicyDecision.BLOCK : PolicyDecision.ALLOW,
+                applicationName,
+                environmentName,
+                now,
+                explain(outcome, applicationName, environmentName),
+                outcome.unregistered(),
+                outcome.matched().stream().map(MatchedRestriction::from).toList());
     }
 
     /** Blank is the same as absent: an unset CI variable arrives as an empty string. */
@@ -199,31 +251,44 @@ public class PolicyService {
      * A decision cannot be configured away.
      */
     private PolicyEvaluationResponse blockUnregistered(PolicyEvaluationRequest request, Instant now,
-                                                       List<ScopeDimension> unregistered) {
-        String detail = unregistered.stream()
-                .map(dimension -> dimension == ScopeDimension.APPLICATION
-                        ? "application '" + request.application() + "'"
-                        : "environment '" + request.environment() + "'")
-                .collect(Collectors.joining(" and "));
-
+                                                       PolicyOutcome outcome) {
         return new PolicyEvaluationResponse(
                 PolicyDecision.BLOCK,
                 request.action(),
                 request.application(),
                 request.environment(),
                 now,
-                "Blocked: no " + detail + " is registered in this organization, so this deployment "
-                        + "cannot be evaluated against the restrictions that may apply to it.",
-                unregistered,
+                explain(outcome, request.application(), request.environment()),
+                outcome.unregistered(),
                 List.of());
     }
 
-    private String describe(boolean blocked, List<ChangeRestriction> matched) {
+    /**
+     * The line worth printing in a build log — and the line the product shows a person.
+     *
+     * <p>One implementation, for the same reason the decision has one: a preview that
+     * agreed with the pipeline on ALLOW or BLOCK but described it differently would still
+     * be two answers to the same question.
+     */
+    private String explain(PolicyOutcome outcome, String applicationName, String environmentName) {
+        if (outcome.isUnregistered()) {
+            String detail = outcome.unregistered().stream()
+                    .map(dimension -> dimension == ScopeDimension.APPLICATION
+                            ? "application '" + applicationName + "'"
+                            : "environment '" + environmentName + "'")
+                    .collect(Collectors.joining(" and "));
+
+            return "Blocked: no " + detail + " is registered in this organization, so this deployment "
+                    + "cannot be evaluated against the restrictions that may apply to it.";
+        }
+
+        List<ChangeRestriction> matched = outcome.matched();
+
         if (matched.isEmpty()) {
             return "Allowed: no restriction is in force for this deployment.";
         }
 
-        if (blocked) {
+        if (outcome.blocked()) {
             String names = matched.stream()
                     .filter(restriction -> restriction.getLevel() == RestrictionLevel.HARD_FREEZE)
                     .map(ChangeRestriction::getName)

@@ -53,6 +53,10 @@ function stubApi(pages: DeploymentCheck[][], summary: DeploymentCheckSummary = e
       )
 
     if (url.includes('/api/deployment-checks/summary')) return json(summary)
+    // The catalog behind the check panel's suggestions. Routed explicitly for the same
+    // reason the summary is: falling through would hand it a page of checks *and* advance
+    // the paging cursor, so a test about "load more" would be reading someone else's call.
+    if (url.includes('/api/applications') || url.includes('/api/environments')) return json([])
 
     const page = pages[Math.min(call, pages.length - 1)]
     call += 1
