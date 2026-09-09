@@ -9,6 +9,19 @@ spring:
     change-log: classpath:db/changelog/db.changelog-master.yaml
   jpa:
     open-in-view: false
+  # Declared before email is ever switched on, because JavaMail's own defaults are *no*
+  # timeout at all (FZ-065). Delivery runs inside a transaction on the one dispatcher every
+  # organization shares, so an SMTP server that accepts the connection and then stops
+  # answering would hold that transaction — and everyone else's announcements — open
+  # indefinitely. Same reasoning as the outbound HTTP timeouts in OutboundHttpConfig; this
+  # is the half of it that has no builder to customise. Milliseconds, as JavaMail wants.
+  mail:
+    properties:
+      mail:
+        smtp:
+          connectiontimeout: 5000
+          timeout: 10000
+          writetimeout: 10000
 
 # Deployed behind an Application Load Balancer (FZ-063), which terminates the client
 # connection and appends the real address to X-Forwarded-For. Without this every request
@@ -63,9 +76,11 @@ management:
   endpoints:
     web:
       exposure:
-        # health is public (the load balancer reads it); the rest require authentication,
-        # since aggregate counters are not tenant-scoped. Moving actuator to an internal
-        # port is the next step once there is real traffic — see FZ-062 in the backlog.
+        # health is public (the load balancer reads it); the rest are ADMINISTRATOR-only,
+        # because the counters are aggregate across every tenant (FZ-065 — until then
+        # authentication alone was the bar, which any member of any organization clears).
+        # A separate management port the internet cannot reach is the real answer, and it
+        # is deployment work: OI-21.
         include: health,info,metrics
   endpoint:
     health:

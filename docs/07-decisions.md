@@ -735,3 +735,26 @@ Adoption metrics stay honest: *Pipelines integrated* still counts applications w
 pipelines have actually asked, and a team that only ever checks by hand does not appear
 integrated. The cost is that FreezeHub has no record of people asking — if that question
 is ever worth answering, it needs its own table, not this one.
+
+
+## D-30 — Every outbound call has a timeout, and it is set centrally
+
+`FZ-065`
+
+FreezeHub calls out to three kinds of place a customer controls: Slack, an arbitrary webhook endpoint, and (once configured) an SMTP server. None of those calls had a timeout, because neither Spring's `RestClient.Builder` nor JavaMail sets one by default. A receiver that accepts the connection and never answers therefore blocked the caller indefinitely.
+
+### Why it mattered more than it looks
+
+The hang is not confined to the tenant whose endpoint is broken. Delivery runs inside a transaction, on one dispatcher every organization shares, so a single wedged receiver held a database connection open and stopped every other customer's announcements behind it. One customer's misconfiguration was an outage for the rest.
+
+Verified rather than reasoned: a socket that accepts and never replies held `WebhookNotificationSender.send` in `SocketDispatcher.read0` until the test killed the thread. `WebhookTimeoutTest` is that experiment, kept.
+
+### The rule
+
+Connect and read timeouts are configured **once**, on the injected builder (`OutboundHttpConfig`) and in `spring.mail.properties`, not at each call site. A sender added later inherits them without anyone remembering to, which is the only version of this rule that survives contact with a new integration type.
+
+Defaults are 5s to connect and 10s to read — deliberately generous. A slow receiver should be retried by `RetryPolicy`, not called a failure on its first slow day, and the retry ladder already exists to absorb that.
+
+### What this does not cover
+
+The frontend's `fetch` wrapper has the same gap in the other direction and is **not** fixed here (`OI-22`): changing the failure mode of every request in the application is its own story. Stripe is unaffected — its SDK ships bounded defaults of its own.

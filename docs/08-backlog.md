@@ -834,7 +834,7 @@ Build/test/deploy automation for backend and frontend.
 Every entry states a **cost**. That is the part worth keeping: a decision recorded without what it gave up reads as a justification rather than a decision, and is no help to whoever revisits it.
 
 ### FZ-065 — Beta Hardening
-**Status:** TODO
+**Status:** DONE
 
 Perform focused review of:
 
@@ -845,6 +845,28 @@ Perform focused review of:
 - notification reliability;
 - policy determinism;
 - critical UI paths.
+
+**Reviewed by running things, not by reading them.** A review whose output is an opinion decays the day after it is written; each area below was checked with something that can be re-run, and what it found is a test that fails without the fix.
+
+| Area | How it was checked | Outcome |
+|---|---|---|
+| Tenant isolation | Every controller inventoried for where `organizationId` comes from; every id-addressed endpoint checked against its cross-tenant test | **Clean.** No endpoint takes an organization identifier from a client; the four `findById` calls in the codebase are the caller's own organization or an internal sweep. One gap in *coverage*: renaming another organization's catalog entry had no test, though the service was always scoped |
+| API key security | Read the credential path end to end against `06-security.md` | **Clean.** Revocation is checked before the key is usable and before it is stamped; failures are indistinguishable; the audit records the prefix, never the key. The filter is constructed rather than a `@Component`, which is what stops Boot registering it for *every* request — the comment in `ApiKeySecurityConfig` names that trap |
+| Date/time | Whole suite re-run under `TZ=Asia/Tokyo` (`D-27`'s detector); every `now()` call audited | **Clean.** 453 tests pass in a non-UTC zone. No `LocalDate.now()`/`LocalDateTime.now()` anywhere — every clock read is an `Instant` — and exactly one query buckets by day, with `at time zone 'UTC'` spelled out |
+| Restriction lifecycle | Traced `CANCELLED` through activation, completion, starting-soon and the policy query | **Clean.** Terminal in all four |
+| Notification reliability | Pointed a webhook at a socket that accepts and never answers | **Defect.** See below |
+| Policy determinism | Read the in-force query for a total order | **Defect.** See below |
+| Critical UI paths | Frontend suite; read the fetch wrapper for the failure mode found on the backend | 221 tests pass. The wrapper has no request timeout — same defect, other direction, recorded as `OI-22` rather than fixed here |
+
+**Three defects, all fixed here.**
+
+1. **No timeout on any outbound call** (`D-30`). A customer's webhook that accepts the connection and never replies held `WebhookNotificationSender.send` in `SocketDispatcher.read0` indefinitely — and delivery runs inside a transaction on one dispatcher shared by every organization, so one wedged receiver held a database connection and stopped *every other tenant's* announcements. Fixed centrally on the injected builder, plus `spring.mail.*` for the SMTP path that has no builder. `WebhookTimeoutTest` is the experiment, kept.
+
+2. **Actuator was open to any authenticated member** (`OI-21`). `/actuator/metrics` is aggregate across tenants — a member of one organization could read how many deployment checks every customer makes, and the JVM's internals. Verified live with two real accounts. Now ADMINISTRATOR-only; the real answer is a management port, which is deployment work. The existing test's own comment said these were "not for every member of every organization to browse" — the rule was in the comment and not in the code.
+
+3. **`findInForce` had no `ORDER BY`.** Two freezes both in force came back in whatever order the database chose, so one evaluation could name them "A, B" and the next "B, A", recording a different matched set each time. Never a wrong answer — just not a reproducible one, which is the property a deployment gate exists to have. Its sibling listing query had carried a total order, and the documented reason, since `FZ-021`.
+
+Each fix was mutation-checked: reverted, and the new test fails.
 
 ## Deferred
 

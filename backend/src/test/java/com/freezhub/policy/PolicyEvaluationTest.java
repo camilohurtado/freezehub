@@ -208,6 +208,34 @@ class PolicyEvaluationTest {
     }
 
     @Test
+    void namesMatchedRestrictionsInAStableOrder() throws Exception {
+        /*
+         * Determinism, not presentation (`FZ-065`). The query behind this had no ORDER BY,
+         * so two freezes both in force came back in whatever order the database chose —
+         * the same evaluation could name them "A, B" in one build log and "B, A" in the
+         * next, and record a different matched set each time. The answer was never wrong;
+         * it simply was not reproducible, which is the one property a gate must have.
+         *
+         * Soonest-first, tie-broken by id, matching the listing query.
+         */
+        Instant now = Instant.now();
+        ChangeRestriction later = givenRestriction(RestrictionLevel.HARD_FREEZE,
+                now.minus(Duration.ofHours(1)), now.plus(Duration.ofHours(2)),
+                Set.of(), Set.of(), Set.of(production.getId()));
+        ChangeRestriction earlier = givenRestriction(RestrictionLevel.HARD_FREEZE,
+                now.minus(Duration.ofHours(6)), now.plus(Duration.ofHours(2)),
+                Set.of(), Set.of(), Set.of(production.getId()));
+
+        for (int attempt = 0; attempt < 3; attempt++) {
+            evaluate("payments-api", "production")
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.restrictions", hasSize(2)))
+                    .andExpect(jsonPath("$.restrictions[0].id", is(earlier.getId().intValue())))
+                    .andExpect(jsonPath("$.restrictions[1].id", is(later.getId().intValue())));
+        }
+    }
+
+    @Test
     void decidesFromTheTimestampsRatherThanTheStatusColumn() throws Exception {
         // The whole point of `FZ-050`'s contract. This restriction's window has opened but
         // the lifecycle reconciler has not run, so its stored status is still SCHEDULED.

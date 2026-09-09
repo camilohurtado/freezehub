@@ -40,6 +40,14 @@ public class SecurityConfig {
                         // reads /actuator/health/readiness, and an exact match on
                         // /actuator/health would answer it with a 401 (FZ-062).
                         .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
+                        // Everything else under /actuator is administrator-only (`FZ-065`).
+                        // `metrics` and `info` are aggregate across every tenant — a member
+                        // of one organization could read how many deployment checks all of
+                        // them make. Authentication alone was never the right bar for that.
+                        // The real fix is a separate management port the internet cannot
+                        // reach at all, which is deployment work (`OI-21`); this is the part
+                        // that costs nothing and shrinks the audience today.
+                        .requestMatchers("/actuator/**").hasRole("ADMINISTRATOR")
                         // "Book a demo" (FZ-083). Unauthenticated by necessity — the
                         // person filling it in has no account yet, which is the point.
                         //
