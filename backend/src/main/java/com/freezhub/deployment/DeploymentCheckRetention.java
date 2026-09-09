@@ -2,6 +2,7 @@ package com.freezhub.deployment;
 
 import com.freezhub.organization.Organization;
 import com.freezhub.organization.OrganizationRepository;
+import com.freezhub.shared.scheduling.SchedulerLock;
 import java.time.Duration;
 import java.time.Instant;
 import org.slf4j.Logger;
@@ -32,13 +33,18 @@ public class DeploymentCheckRetention {
 
     private static final Logger log = LoggerFactory.getLogger(DeploymentCheckRetention.class);
 
+    private static final Duration LEASE = Duration.ofMinutes(30);
+
     private final DeploymentCheckRepository deploymentCheckRepository;
     private final OrganizationRepository organizationRepository;
+    private final SchedulerLock lock;
 
     public DeploymentCheckRetention(DeploymentCheckRepository deploymentCheckRepository,
-                                    OrganizationRepository organizationRepository) {
+                                    OrganizationRepository organizationRepository,
+                                    SchedulerLock lock) {
         this.deploymentCheckRepository = deploymentCheckRepository;
         this.organizationRepository = organizationRepository;
+        this.lock = lock;
     }
 
     /**
@@ -58,7 +64,9 @@ public class DeploymentCheckRetention {
             initialDelayString = "PT5M")
     @Transactional
     public void purgeScheduled() {
-        purge(Instant.now());
+        // Harmless to duplicate — a delete is idempotent — but locked with the rest so
+        // there is one answer to "is this job coordinated?" rather than five (FZ-121).
+        lock.runIfAcquired("deployment-check-retention", LEASE, () -> purge(Instant.now()));
     }
 
     /** @return how many records were removed */

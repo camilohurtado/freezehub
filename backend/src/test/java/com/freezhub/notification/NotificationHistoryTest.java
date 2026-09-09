@@ -1,6 +1,9 @@
 package com.freezhub.notification;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
 import static org.hamcrest.Matchers.is;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -24,7 +27,12 @@ import com.freezhub.restriction.RestrictionLevel;
 import com.freezhub.shared.security.TestTokens;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -55,6 +63,12 @@ class NotificationHistoryTest {
 
     @Autowired
     private NotificationRetryService retries;
+
+    @Autowired
+    private NotificationDispatcher dispatcher;
+
+    @Autowired
+    private com.freezhub.shared.scheduling.SchedulerLock schedulerLock;
 
     @Autowired
     private OrganizationRepository organizations;
@@ -317,5 +331,59 @@ class NotificationHistoryTest {
                         .content("{\"restrictionId\":" + restrictionId + ",\"event\":\"ACTIVATED\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.requeued", is(1)));
+    }
+
+    @Test
+    void twoDispatchersAgainstOnePendingRowDeliverItOnce() throws Exception {
+        /*
+         * The criterion FZ-121 exists for, in the exact shape the risk takes:
+         * `backend_desired_count` defaults to 2, both instances poll every thirty seconds,
+         * and without the lock both select the same PENDING row and both send it.
+         *
+         * Asserted on the attempt count rather than on a mock, because the attempt is what
+         * the recipient would have seen twice.
+         */
+        Long slack = channel(IntegrationType.SLACK);
+        delivery(slack, NotificationEvent.ACTIVATED, NotificationStatus.PENDING, 0, null,
+                Instant.now().minus(Duration.ofMinutes(1)));
+
+        /*
+         * Built by hand rather than autowired: the test profile switches the schedulers
+         * off so the suite never races a background job, and turning this one on would
+         * reintroduce exactly that. The constructor is the same one Spring calls.
+         */
+        NotificationDispatcher work = spy(dispatcher);
+        var instanceA = new NotificationDispatchScheduler(work, schedulerLock);
+        var instanceB = new NotificationDispatchScheduler(work, schedulerLock);
+
+        CyclicBarrier bothAtOnce = new CyclicBarrier(2);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            List<Callable<Void>> instances = List.of(
+                    () -> {
+                        bothAtOnce.await();
+                        instanceA.dispatch();
+                        return null;
+                    },
+                    () -> {
+                        bothAtOnce.await();
+                        instanceB.dispatch();
+                        return null;
+                    });
+
+            for (var future : pool.invokeAll(instances)) {
+                future.get();
+            }
+        } finally {
+            pool.shutdownNow();
+        }
+
+        /*
+         * Counted at the dispatcher, not on the row. The attempt counter is a bad witness
+         * here: two concurrent transactions each read 0 and each write 1, so a lost update
+         * hides the duplication behind a plausible number. This test passed against a
+         * deliberately disabled lock until it counted the work instead.
+         */
+        verify(work, times(1)).dispatchPending();
     }
 }

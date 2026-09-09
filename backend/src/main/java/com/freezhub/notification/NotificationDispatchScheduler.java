@@ -1,6 +1,8 @@
 package com.freezhub.notification;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import com.freezhub.shared.scheduling.SchedulerLock;
+import java.time.Duration;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -15,15 +17,22 @@ import org.springframework.stereotype.Component;
 @ConditionalOnProperty(name = "freezehub.notifications.enabled", havingValue = "true", matchIfMissing = true)
 public class NotificationDispatchScheduler {
 
-    private final NotificationDispatcher notificationDispatcher;
+    /** Comfortably longer than a dispatch sweep, which is bounded by the retry policy. */
+    private static final Duration LEASE = Duration.ofMinutes(5);
 
-    public NotificationDispatchScheduler(NotificationDispatcher notificationDispatcher) {
+    private final NotificationDispatcher notificationDispatcher;
+    private final SchedulerLock lock;
+
+    public NotificationDispatchScheduler(NotificationDispatcher notificationDispatcher,
+                                         SchedulerLock lock) {
         this.notificationDispatcher = notificationDispatcher;
+        this.lock = lock;
     }
 
     @Scheduled(fixedDelayString = "${freezehub.notifications.interval:PT30S}")
     public void dispatch() {
-        notificationDispatcher.dispatchPending();
+        // Without the lock every pending row is delivered once per instance (FZ-121).
+        lock.runIfAcquired("notification-dispatch", LEASE, notificationDispatcher::dispatchPending);
     }
 
 }

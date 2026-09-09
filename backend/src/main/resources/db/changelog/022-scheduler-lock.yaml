@@ -1,0 +1,32 @@
+databaseChangeLog:
+  - changeSet:
+      id: 022-scheduler-lock
+      author: freezehub
+      comment: >-
+        One row per scheduled job (FZ-121). Five jobs run on every instance and nothing
+        coordinates them, so at the default desired count of two the notification
+        dispatcher delivers every pending row twice and the lifecycle reconciler records
+        two activations of one restriction.
+
+        The token exists so a holder that overran its lease cannot release the lock a
+        second instance has since taken.
+      changes:
+        - createTable:
+            tableName: scheduler_lock
+            columns:
+              - column:
+                  name: name
+                  type: varchar(100)
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: locked_until
+                  type: timestamptz
+                  constraints:
+                    nullable: false
+              - column:
+                  name: token
+                  type: varchar(64)
+                  constraints:
+                    nullable: false

@@ -4,6 +4,8 @@ import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import com.freezhub.shared.scheduling.SchedulerLock;
+import java.time.Duration;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -33,20 +35,25 @@ public class TrialExpiryScheduler {
 
     private static final Logger log = LoggerFactory.getLogger(TrialExpiryScheduler.class);
 
-    private final SubscriptionService subscriptions;
+    private static final Duration LEASE = Duration.ofMinutes(10);
 
-    public TrialExpiryScheduler(SubscriptionService subscriptions) {
+    private final SubscriptionService subscriptions;
+    private final SchedulerLock lock;
+
+    public TrialExpiryScheduler(SubscriptionService subscriptions, SchedulerLock lock) {
         this.subscriptions = subscriptions;
+        this.lock = lock;
     }
 
     @EventListener(ApplicationReadyEvent.class)
     public void sweepOnStartup() {
-        sweep();
+        // Two instances booting together is precisely when this collides (FZ-121).
+        lock.runIfAcquired("trial-expiry", LEASE, this::sweep);
     }
 
     @Scheduled(fixedDelayString = "${freezehub.subscriptions.interval:PT1H}")
     public void sweepPeriodically() {
-        sweep();
+        lock.runIfAcquired("trial-expiry", LEASE, this::sweep);
     }
 
     private void sweep() {
