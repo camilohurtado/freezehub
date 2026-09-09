@@ -611,3 +611,86 @@ noon cannot tell the two implementations apart.
 This is the daily-grain sibling of `D-25`, which normalises instants to the precision the
 database stores. Both exist because a timestamp read back is not automatically the
 timestamp written.
+
+## D-28 — Stay on the Terraform we have, at 0.5 vCPU and 1 GB, without a NAT
+
+`FZ-122`
+
+A spike to answer two questions: how big the container has to be, and which platform runs it.
+Both answers came out differently from the way the story framed them.
+
+### App Runner is not a choice any more
+
+**AWS has closed App Runner to new customers.** Existing customers may continue; nobody
+new can start. The migration guide recommends Amazon ECS Express Mode, which provisions
+"an ECS service on Fargate, an Application Load Balancer, auto scaling, and networking"
+from one API call.
+
+That settles it without needing the two questions the story raised — whether App Runner
+runs ARM64, and whether its `VPC` egress mode would drag every outbound call through a NAT.
+Neither matters now.
+
+**So: keep the Terraform `FZ-063` already wrote.** Express Mode would provision roughly what
+that Terraform provisions, from an API call instead of from a file — trading a definition we
+control and can read for a managed abstraction, to arrive at the same ECS service on Fargate
+behind the same load balancer. There is nothing to gain by moving, and a reviewable
+description of the infrastructure to lose.
+
+### The container is already the right size, for a reason nobody had established
+
+Measured against the real image, a real database and 600 policy evaluations:
+
+| | 1 GiB container, default 25% | 512 MiB container, 60% |
+|---|---|---|
+| Startup, 26 migrations on an empty database | — | **320 MiB** |
+| Idle, settled | **315 MiB** | 325 MiB |
+| Peak under 600 evaluations, 20 concurrent | **353 MiB** | **353 MiB** |
+| Heap ceiling the JVM chose | 256 MiB | 308 MiB |
+
+The Dockerfile's comment is confirmed: at the default `MaxRAMPercentage` of 25%, a 1 GiB
+container caps the heap at exactly 256 MiB. And the working set is the same at either size —
+**353 MiB both times** — so on memory alone 512 MiB would do, with about 30% headroom.
+
+**It cannot be bought.** Fargate sells CPU and memory as a fixed table: `0.25 vCPU` allows
+512 MiB, and `0.5 vCPU` starts at 1 GB. Dropping to 512 MiB means dropping to a quarter vCPU,
+and that was measured too:
+
+| On 0.25 vCPU | |
+|---|---|
+| Startup to first healthy response | **132 seconds**, against ~10 with more CPU |
+| 300 policy evaluations, 10 concurrent | **39 seconds** — about 7.7 a second |
+
+A two-minute start is longer than most health-check grace periods and makes every deployment
+a two-minute window; 7.7 evaluations a second is thin for the endpoint a deploy waits on.
+
+So `backend_cpu = 512` and `backend_memory = 1024` stay — **not because the JVM needs a
+gigabyte, but because Fargate will not sell half a vCPU with less.** The 670 MiB the process
+never touches is not waste; it is the floor. That is worth writing down, because the obvious
+next optimisation is to halve the memory and it is a dead end.
+
+**Raise `MaxRAMPercentage` anyway.** The RAM is bought either way, so leaving the heap capped
+at a quarter of it buys nothing. Non-heap is the larger half of the footprint today — 139 MiB
+against 62 MiB of live heap — so this is headroom for a spike rather than a fix for a problem.
+
+### The NAT gateway can go
+
+The design puts tasks in private subnets with `assign_public_ip = false` and routes egress
+through a NAT gateway, which the milestone identifies as the single largest line item.
+
+AWS documents the alternative plainly: a Fargate task **in a public subnet with a public IP**
+reaches the internet through the internet gateway and needs no NAT; only a task in a *private*
+subnet requires one. The database stays private and is reached over the VPC regardless, and
+the task's port stays closed to everything but the load balancer's security group.
+
+The cost of that is a public IP on the task, mitigated by the security group rather than by
+the subnet. For a pre-customer beta that is the right trade; it is worth revisiting when
+there is something to protect.
+
+### What this does not answer
+
+The dollar figures in `OI-15` are still list-price arithmetic. `FZ-123` records the first
+real invoice against them, which is the only number that settles it.
+
+Measurements were taken on x86_64, because that is the machine they were taken on. CI builds
+`linux/arm64` and the task runs ARM64; the memory shape should carry across, and the startup
+timings should not be read as predictions of Graviton.
