@@ -1700,7 +1700,7 @@ Acceptance:
   entry point passed for as long as the only path that runs in production never worked.
 
 ### FZ-122 — Measure the Container, and Decide the Platform
-**Status:** TODO
+**Status:** DONE · **Decided in:** `D-28`
 
 A spike. Its output is two numbers and one decision, not code that is kept.
 
