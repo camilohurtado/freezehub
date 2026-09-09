@@ -1613,3 +1613,163 @@ What it needs is a human-authenticated evaluation that answers from the same cod
 **Decide when starting it:** whether a person's check is recorded as a `deployment_check` alongside the pipeline's. It is a real question rather than a detail — the console says *"every time a pipeline asked"*, and quietly filling it with people trying the form would make that sentence false and the refusal counts wrong.
 
 Worth having. It answers "is the freeze on for me?" without reading a restriction and working out whether its scope covers you — which is exactly the sum this product exists to do for people.
+
+## Milestone 13 — Running It
+
+The first milestone about the deployment rather than the product. `FZ-063` designed a
+production-shaped AWS environment and it has never been applied; `OI-15` records that
+applying it as written costs about $96 a month with no customers, and that two questions
+block closing it. This milestone answers both, and fixes the defect found while asking.
+
+**Order.** `FZ-121` first and independently — it is a defect in shipped code, it gates the
+second instance wherever that instance runs, and nothing about it depends on a platform
+decision.
+
+```text
+FZ-121 ──┐
+         ├── FZ-123
+FZ-122 ──┘
+```
+
+### FZ-121 — Scheduler Locking
+**Status:** DONE · **Owns:** `OI-19`
+
+Five `@Scheduled` jobs and no distributed locking anywhere in the codebase — no advisory
+lock, no `FOR UPDATE SKIP LOCKED`, no version column. Every one of them runs on every
+instance.
+
+`backend_desired_count` defaults to **2**, justified in `variables.tf` as *"so a deployment
+or an AZ failure does not mean an outage."* Applied against today's application code that
+default is not a redundancy setting, it is a duplication setting.
+
+| Scheduler | Every | On two instances |
+|---|---|---|
+| `RestrictionLifecycleScheduler` | 1m | Duplicate notifications **enqueued** and duplicate audit rows |
+| `NotificationDispatchScheduler` | 30s | Every pending row **delivered twice** |
+| `DemoRequestNotificationScheduler` | 30s | Duplicate lead alerts |
+| `TrialExpiryScheduler` | 1h | Duplicate `SUBSCRIPTION_SUSPENDED` audit rows |
+| `DeploymentCheckRetention` | 24h | Harmless — a delete is idempotent |
+
+**The audit duplication is the worse half.** `RestrictionLifecycleService.reconcile()` bulk-updates
+status — idempotent, because the `WHERE` clause saves it — and then loops calling
+`notificationOutbox.enqueue()` and `auditTrail.record()` per transition. Neither is guarded.
+Combined with the dispatcher, one freeze is announced four times; and the trail that
+`11-commercial.md` §1 argues is *what makes this a purchase rather than a Slack channel*
+reports two activations of one restriction. A record that cannot be trusted to say how many
+times something happened is not evidence of anything.
+
+**Decided: a hand-rolled `scheduler_lock` table, not ShedLock.** Roughly forty lines and one
+changeset, against two dependencies. It follows the precedent this repository has already
+set twice — `FZ-087` hand-rolled per-IP rate limiting rather than adding a limiter library,
+and `FZ-083` wrote a four-column outbox rather than bending the notification module to fit.
+What is given up is real and worth naming: ShedLock handles lock extension, a minimum lock
+duration, and clock skew, and those are the three things a hand-rolled version gets subtly
+wrong. Revisit if a second instance ever exposes one of them.
+
+**Decided: one mechanism for all five, not a claim-based outbox.** The technically better
+design lets both instances work the notification queue through `FOR UPDATE SKIP LOCKED`
+rather than one skipping — but it needs a `SENDING` state and a reaper for claims stranded
+by a dying instance, and dispatch volume is nowhere near justifying parallel workers. It
+becomes right when it becomes necessary.
+
+**It cannot be a transaction-scoped advisory lock.** `pg_advisory_xact_lock` would be
+smaller and needs no table, but the dispatcher makes HTTP calls to Slack and to customer
+webhooks inside its sweep, and holding a pooled connection open across those calls trades
+one failure mode for a worse one. The lock has to outlive a transaction, which means a TTL.
+
+Acceptance:
+
+- A `scheduler_lock` table via Liquibase; one row per job name, carrying `locked_until`.
+- Acquisition is a **single atomic statement** — `INSERT … ON CONFLICT (name) DO UPDATE …
+  WHERE locked_until < now()` — so two instances racing cannot both win.
+- All five scheduled methods acquire before doing work and skip silently when they cannot.
+- The `reconcileOnStartup` and `sweepOnStartup` entry points take the lock too. Two
+  instances booting together is precisely when this collides.
+- A lock TTL comfortably longer than its job's worst case, so an instance dying mid-sweep
+  releases it on expiry rather than wedging the job for ever.
+- **A test that runs two dispatchers concurrently against one `PENDING` row and asserts one
+  delivery.** This is the criterion the story exists for. `FZ-114` records the same lesson
+  from the other side: a scheduler whose test called the method underneath the scheduled
+  entry point passed for as long as the only path that runs in production never worked.
+
+### FZ-122 — Measure the Container, and Decide the Platform
+**Status:** TODO
+
+A spike. Its output is two numbers and one decision, not code that is kept.
+
+**The Dockerfile's comment is true and incomplete.** It says the heap is sized from the
+container's memory limit rather than the host's, which is correct — but the JVM's default
+`MaxRAMPercentage` is 25%, so a 1 GB container caps the heap near 256 MB and leaves most of
+what is being paid for reserved and unused. `backend_memory = 1024` was chosen on that
+basis. Whether it is the right number has never been measured.
+
+**Measure container RSS, not JVM heap.** A hosted runtime bills and OOM-kills on container
+memory; actuator says where the memory went, which is what tells you what to tune. Both
+already exist — `spring-boot-starter-actuator` exposes `metrics`, and `FZ-062` registered
+Micrometer — so this needs no dependency and no code.
+
+Three moments peak differently and all three matter:
+
+1. **Startup while Liquibase migrates** — usually the metaspace peak, and where a container
+   sized on idle dies before serving its first request.
+2. **Steady state idle** — what is paid for 24 hours a day.
+3. **Under load** — `POST /api/policy/evaluate` plus a dispatcher batch.
+   `connectors/test/run-tests.js` and `scripts/seed-demo.sh` already exist and are more
+   honest than a synthetic loop.
+
+Then repeat at half the size with `MaxRAMPercentage` raised and see whether it holds. Size
+on the **load peak plus headroom**, never on idle.
+
+**Two platform facts must be verified in the same spike, because either one changes the
+answer:**
+
+- **Does App Runner run ARM64?** `backend.tf` sets `cpu_architecture = "ARM64"` and the
+  image is built for it. If App Runner is x86-only the image is rebuilt and the ARM pricing
+  advantage — the reason two Fargate tasks cost $28.84 rather than $36 — disappears.
+- **App Runner egress is `DEFAULT` or `VPC`, not per-destination.** Reaching RDS in a
+  private subnet needs a VPC connector, and then *every* outbound call routes through the
+  VPC — Slack, customer webhooks, Stripe and SES included. That needs a NAT, which is the
+  single largest line item the platform was chosen to remove. A Fargate task in a public
+  subnet has a public IP and an internet gateway route and needs no NAT at all, so the
+  saving may belong to public-subnet Fargate rather than to App Runner. **Confirm against
+  current AWS documentation before committing to either.**
+
+Acceptance: a measured CPU/memory pair, a `MaxRAMPercentage` value, and a written platform
+choice with the egress and architecture questions answered rather than assumed.
+
+### FZ-123 — Apply the Beta Deployment
+**Status:** TODO · **Blocked by:** `FZ-121`, `FZ-122` · **Resolves:** `OI-15`
+
+The first `terraform apply`. Always-on and publicly reachable, at the smallest posture that
+is honestly available, on the platform `FZ-122` chooses and at the size it measures.
+
+Three changes are independent of that choice and should happen regardless:
+
+- **`terraform destroy` must be able to run.** `deletion_protection` on RDS and Cognito,
+  `skip_final_snapshot = false`, and `prevent_destroy` on both secrets currently block it —
+  correct for production and wrong for a pre-customer beta, where the first mistake is
+  otherwise unrecoverable without console surgery. They become variables, defaulting to the
+  safe value.
+- **`frontend.tf` moves to `PriceClass_All`.** It reads `PriceClass_100` — North America and
+  Europe — with the comment *"widen when customers are elsewhere."* The frontend is a small
+  bundle inside CloudFront's perpetual always-free tier, so every other market costs
+  approximately nothing. One line.
+- **`backend_desired_count` stays at 1 until `FZ-121` ships**, and the variable's description
+  stops promising a redundancy the application cannot currently survive.
+
+Acceptance:
+
+- A public URL serving the frontend and the API, with certificates valid and Liquibase
+  migrated.
+- `/actuator/health/readiness` is what the platform health-checks, not the aggregate
+  endpoint — `FZ-062` established readiness reports false while migrations run, which is
+  exactly when an instance must not be sent traffic.
+- The two Secrets Manager values are injected from Secrets Manager, never from configuration.
+- `terraform destroy` runs cleanly against the beta workspace.
+- The first month's actual bill is recorded against the estimate, because every figure in
+  the plan is derived from list prices and none of it has been invoiced.
+
+**It cannot ship a working signup.** Outside the `local` profile there is no real
+`IdentityProvider` (`OI-2`), so nobody can sign in to what this deploys. That is `FZ-046`,
+and this story should say so in its output rather than report an environment that is only
+half true — the same honesty `FZ-086` chose when its closing summary admitted the same gap.

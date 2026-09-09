@@ -1,3 +1,4 @@
+| **Five scheduled jobs had no distributed locking** — every one ran on every instance, so at the default desired count of two the notification dispatcher delivered each pending row twice and the lifecycle reconciler recorded two activations of one restriction. Latent only because nothing had been applied yet | Milestone 13 planning | `FZ-121` — a `scheduler_lock` row per job, taken in one atomic statement against the database's clock |
 | **The deployment-check retention purge never ran** — the scheduled method self-invoked the transactional one, so Spring's proxy was bypassed and the `` delete threw `TransactionRequiredException` on every pass. Its test called the inner method on the injected bean, which does go through the proxy, so the suite passed and the only path that runs in production was the one nothing exercised | a running backend, `FZ-113` | `FZ-114` |
 # FreezeHub — Open Issues
 
@@ -63,7 +64,7 @@ So every guideline currently names an image that does not exist, and the README 
 Discoverability — a Marketplace or Catalog listing — is a separate and lesser problem, deferred to `FZ-096`.
 
 ### OI-15 — The deployed cost posture, and which AWS services are actually needed
-**Severity:** Decision · **Owner:** needs a story · **Raised:** 2026-09-05
+**Severity:** Decision · **Owner:** `FZ-123` · **Raised:** 2026-09-05
 
 `FZ-063` designed a production-shaped AWS environment and it has never been applied. Nothing is deployed and the account spends **$0.007 a month, all S3** (AWS Cost Explorer, four months). Applying it as written costs about **$96 a month with no customers.**
 
@@ -128,6 +129,17 @@ The px column is new and needs a judgement rather than a conversion. Much of it 
 So this is not the mechanical sweep it was first written as. Whoever takes it has to separate *"this px is what the mockup says"* from *"this rem is what the file happened to have"*, and only convert the second. Converting all of it would overwrite the system with itself.
 
 Still not visible as a defect, and still the reason the app looks approximately-themed rather than exactly-themed.
+
+### OI-20 — EU data residency is deferred by choosing us-east-1
+**Severity:** Decision · **Owner:** needs a story · **Raised:** 2026-09-08
+
+The deployment region was decided as `us-east-1` (the `variables.tf` default) with the residency question knowingly deferred. Latency is not the issue — the Policy API is one HTTPS POST per deploy, and 250 ms from Sydney is nothing against a pipeline step measured in minutes. Residency is.
+
+FreezeHub is sold to companies with a compliance function, and an EU buyer's security review routinely asks where customer data lives. The asymmetry is what makes this worth recording: EU buyers frequently require EU residency, US buyers rarely require US residency, so a single region in the EU would have answered both and cost the same. Changing it before the first apply is a variable; changing it after is a migration of live data.
+
+The seam is in good shape, which is why this is a decision rather than a gap: the backend has no AWS coupling at all — no SDK, nothing in `pom.xml`, nothing in `application.yml` — so a second region is a Terraform workspace rather than a redesign.
+
+Becomes urgent at the first EU deal with a security questionnaire, not before.
 
 ## Resolved
 

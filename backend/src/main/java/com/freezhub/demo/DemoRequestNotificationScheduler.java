@@ -1,5 +1,7 @@
 package com.freezhub.demo;
 
+import com.freezhub.shared.scheduling.SchedulerLock;
+import java.time.Duration;
 import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,14 +24,23 @@ public class DemoRequestNotificationScheduler {
 
     private static final Logger log = LoggerFactory.getLogger(DemoRequestNotificationScheduler.class);
 
-    private final DemoRequestNotifier notifier;
+    private static final Duration LEASE = Duration.ofMinutes(5);
 
-    public DemoRequestNotificationScheduler(DemoRequestNotifier notifier) {
+    private final DemoRequestNotifier notifier;
+    private final SchedulerLock lock;
+
+    public DemoRequestNotificationScheduler(DemoRequestNotifier notifier, SchedulerLock lock) {
         this.notifier = notifier;
+        this.lock = lock;
     }
 
     @Scheduled(fixedDelayString = "${freezehub.demo-requests.interval:PT30S}")
     public void sweep() {
+        // One lead, one alert — two instances would announce every demo request twice.
+        lock.runIfAcquired("demo-request-notify", LEASE, this::announcePending);
+    }
+
+    private void announcePending() {
         int sent = notifier.notifyPending(Instant.now());
         if (sent > 0) {
             log.info("Announced {} demo request(s)", sent);

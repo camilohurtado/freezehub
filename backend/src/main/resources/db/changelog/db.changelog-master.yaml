@@ -41,3 +41,5 @@ databaseChangeLog:
       file: db/changelog/020-stripe.yaml
   - include:
       file: db/changelog/021-api-key-last-used.yaml
+  - include:
+      file: db/changelog/022-scheduler-lock.yaml

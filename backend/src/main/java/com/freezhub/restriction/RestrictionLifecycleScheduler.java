@@ -4,6 +4,8 @@ import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import com.freezhub.shared.scheduling.SchedulerLock;
+import java.time.Duration;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -33,24 +35,35 @@ public class RestrictionLifecycleScheduler {
 
     private static final Logger log = LoggerFactory.getLogger(RestrictionLifecycleScheduler.class);
 
+    private static final Duration LEASE = Duration.ofMinutes(5);
+
     private final RestrictionLifecycleService restrictionLifecycleService;
     private final StartingSoonNotifier startingSoonNotifier;
+    private final SchedulerLock lock;
 
     public RestrictionLifecycleScheduler(RestrictionLifecycleService restrictionLifecycleService,
-                                         StartingSoonNotifier startingSoonNotifier) {
+                                         StartingSoonNotifier startingSoonNotifier,
+                                         SchedulerLock lock) {
         this.restrictionLifecycleService = restrictionLifecycleService;
         this.startingSoonNotifier = startingSoonNotifier;
+        this.lock = lock;
     }
 
     @EventListener(ApplicationReadyEvent.class)
     public void reconcileOnStartup() {
         log.info("Reconciling restriction lifecycle on startup");
-        sweep();
+        // Two instances booting together is precisely when this collides (FZ-121).
+        lock.runIfAcquired("restriction-lifecycle", LEASE, this::sweep);
     }
 
     @Scheduled(fixedDelayString = "${freezehub.lifecycle.interval:PT1M}")
     public void reconcilePeriodically() {
-        sweep();
+        /*
+         * The status update is idempotent — its WHERE clause saves it — but the outbox
+         * and audit writes that follow are not. Unlocked, two instances announce one
+         * freeze twice and record two activations of it (FZ-121).
+         */
+        lock.runIfAcquired("restriction-lifecycle", LEASE, this::sweep);
     }
 
     /**
