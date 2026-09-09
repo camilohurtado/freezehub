@@ -64,7 +64,9 @@ So every guideline currently names an image that does not exist, and the README 
 Discoverability — a Marketplace or Catalog listing — is a separate and lesser problem, deferred to `FZ-096`.
 
 ### OI-15 — The deployed cost posture, and which AWS services are actually needed
-**Severity:** Decision · **Owner:** `FZ-123` · **Raised:** 2026-09-05
+**Severity:** Decision · **Owner:** `FZ-123` · **Raised:** 2026-09-05 · **Platform decided:** `D-28`
+
+**Update, 2026-09-08 (`FZ-122`).** The platform half of this is closed. **AWS has closed App Runner to new customers**, so the comparison this issue framed cannot be made: the existing ECS Fargate Terraform stays. Sizing is now measured rather than assumed — `0.5 vCPU` and `1 GB`, which is Fargate's smallest legal pairing and not a guess — and the NAT gateway is removable by putting tasks in public subnets. What remains open is the money: every figure below is list-price arithmetic, and `FZ-123` records the first real invoice against it.
 
 `FZ-063` designed a production-shaped AWS environment and it has never been applied. Nothing is deployed and the account spends **$0.007 a month, all S3** (AWS Cost Explorer, four months). Applying it as written costs about **$96 a month with no customers.**
 
