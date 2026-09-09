@@ -1809,7 +1809,7 @@ half true — the same honesty `FZ-086` chose when its closing summary admitted 
 backend. This is the part it deliberately did not do in a review.
 
 ### FZ-124 — A Request That Never Answers
-**Status:** TODO · **Owner of** `OI-22`
+**Status:** DONE · **Resolves** `OI-22`
 
 `apiRequest` passes the caller's `AbortSignal` through and adds nothing of its own, so a
 request that is accepted and never answered leaves every screen in its loading state
