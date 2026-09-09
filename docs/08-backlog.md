@@ -1828,7 +1828,10 @@ them as errors would flash a failure banner every time somebody navigates away. 
 as the same `AbortError`, so the wrapper has to know which signal fired and say so.
 
 Scope is the one wrapper, its tests, and the one line of retry policy the change collides
-with: a timeout costs its whole deadline before it is reported, so the default two retries
-would have meant sixty seconds of spinner before the person saw a word. No screen changes
-beyond that — every page already renders `error.message`, which is precisely why the
-message is the deliverable.
+with. A timeout has already cost its whole deadline before it is reported, so the default
+two retries meant a minute of spinner before the person saw a word — and retrying even
+once was found, in the running application, to leave the query pending indefinitely: both
+attempts were made and abandoned and the screen still said "Loading restrictions…" a
+minute later. Timeouts are therefore not retried, which is also the behaviour that shows a
+message soonest. No screen changes beyond that — every page already renders
+`error.message`, which is precisely why the message is the deliverable.

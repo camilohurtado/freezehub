@@ -69,8 +69,8 @@ export class ApiError extends Error {
    *
    * Status `0` because there was no response to take one from — the request was abandoned
    * before the server said anything. It is what the retry policy branches on: a timeout
-   * has already cost its whole deadline before it is reported, so it does not get the
-   * same number of further attempts as a failure that came back quickly.
+   * has already cost its whole deadline before it is reported, and is not retried at all —
+   * see `QueryProvider` for what that was decided against.
    */
   get isTimeout(): boolean {
     return this.status === 0

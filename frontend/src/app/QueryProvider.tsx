@@ -31,15 +31,24 @@ export function QueryProvider({ children }: { children: ReactNode }) {
                 return false
               }
               /*
-               * A timeout is worth one more go — a task restarting behind the load
-               * balancer is exactly the case that recovers — but not two (`FZ-124`).
-               * A timeout costs its full deadline before it is even reported, so the
-               * default here would have meant sixty seconds of spinner before the
-               * person saw a word. Forty is still long; twenty was judged too eager to
-               * give up on a deploy in progress.
+               * A timeout is not retried at all (`FZ-124`), and this was decided by
+               * watching it rather than by reasoning about it.
+               *
+               * The arithmetic argued against retrying on its own: a timeout has already
+               * cost its whole deadline before it is reported, so the default two retries
+               * meant a minute of spinner before the person saw a word. What settled it
+               * was that retrying *once* left the query in its pending state indefinitely
+               * in the running application — both attempts were made and abandoned, and
+               * the screen still said "Loading restrictions…" a minute later. With no
+               * retry the same page shows the message and a "Try again" button at twenty
+               * seconds, every time.
+               *
+               * A spinner that never resolves is precisely the defect this story exists to
+               * remove, so the behaviour that reliably avoids it wins. `Try again` puts
+               * the retry back in the hands of the person, who can see what is happening.
                */
               if (error instanceof ApiError && error.isTimeout) {
-                return failureCount < 1
+                return false
               }
               return failureCount < 2
             },
