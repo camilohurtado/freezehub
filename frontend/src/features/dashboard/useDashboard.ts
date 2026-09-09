@@ -1,12 +1,8 @@
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { getRestriction, listRestrictions } from '../../api/restrictions'
-import {
-  getDeploymentCheckSummary,
-  previewDeploymentCheck,
-} from '../../api/deploymentChecks'
+import { getDeploymentCheckSummary } from '../../api/deploymentChecks'
 import { useAuth } from '../auth/authContext'
 import type {
-  DeploymentCheckPreview,
   DeploymentCheckSummary,
   RestrictionDetail,
   RestrictionSummary,
@@ -73,22 +69,5 @@ export function useDeploymentCheckSummary() {
   return useQuery<DeploymentCheckSummary>({
     queryKey: ['deployment-checks', 'summary'],
     queryFn: ({ signal }) => getDeploymentCheckSummary(token, signal),
-  })
-}
-
-/**
- * "Can I deploy?" (`FZ-120`).
- *
- * A mutation although it is a GET, deliberately: `useQuery` would cache the answer and
- * serve it again, and a stale ALLOW shown while a freeze is in force is the same failure
- * the machine endpoint is a POST to prevent. It is also asked on purpose, by clicking —
- * not fetched because a screen opened.
- */
-export function useDeploymentPreview() {
-  const { token } = useAuth()
-
-  return useMutation<DeploymentCheckPreview, Error, { application: string; environment: string }>({
-    mutationFn: ({ application, environment }) =>
-      previewDeploymentCheck(token, application, environment),
   })
 }

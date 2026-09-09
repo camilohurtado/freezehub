@@ -1614,6 +1614,8 @@ What it needs is a human-authenticated evaluation that answers from the same cod
 
 Built as `GET /api/deployment-checks/preview?application=&environment=`, beside the console that shows the history rather than under `/api/policy`, which accepts an API key and nothing else. A `GET` because nothing is enforced on the answer and a GET cannot record.
 
+**The control lives on the checks console, not the dashboard** — operator's call, made after seeing it on both. `1c` drew it under the dashboard's status block, but the checks screen is the one about the deployment gate, so the question and its history sit together. It also puts "nothing is recorded" beside the list where somebody would otherwise expect their own check to appear.
+
 `PolicyService.decide` was extracted from `evaluate` and now carries the matching rules and the sentence describing them; both callers derive their answer from it, so the product cannot disagree with the gate. `DeploymentCheckPreviewTest` asks both paths the same three questions and compares the answers field by field, and asserts that a preview leaves no check row and no audit entry.
 
 Worth having. It answers "is the freeze on for me?" without reading a restriction and working out whether its scope covers you — which is exactly the sum this product exists to do for people.

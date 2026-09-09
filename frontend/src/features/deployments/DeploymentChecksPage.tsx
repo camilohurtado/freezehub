@@ -4,6 +4,7 @@ import { useDeploymentChecks } from './useDeploymentChecks'
 import { useDeploymentCheckSummary } from '../dashboard/useDashboard'
 import { checkTotals } from '../dashboard/dashboardSentences'
 import { ChecksChart } from './ChecksChart'
+import { DeployCheck } from './DeployCheck'
 import type { DeploymentCheck } from '../../types/api'
 import styles from './DeploymentChecksPage.module.css'
 
@@ -70,6 +71,14 @@ export function DeploymentChecksPage() {
         are the questions, not the outcomes — FreezeHub is not told whether a deployment
         went ahead afterwards.
       </p>
+
+      {/*
+        * The question first, then its history. Somebody arriving here wants to know
+        * whether they are blocked now more often than they want a fortnight's chart, and
+        * the answer is one they have to ask for rather than one the page can already know
+        * (`FZ-120`).
+        */}
+      <DeployCheck />
 
       {summary.data && <ChecksChart days={summary.data.daily} />}
 

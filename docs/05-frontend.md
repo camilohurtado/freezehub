@@ -52,8 +52,6 @@ Sourced from `GET /api/restrictions?status=…`; the list endpoint already suppo
 
 Each entry links to its detail route. No scope is shown here: the list endpoint returns summaries without scope by design (`FZ-021`).
 
-**"Can I deploy?"** (`FZ-120`) sits between the forward list and the metrics: an application, an environment, and the answer the deployment gate would give, from `GET /api/deployment-checks/preview`. The decision, the sentence and the matched restrictions are all rendered as the backend sent them — nothing here decides anything, because a product that could disagree with the gate would not be worth asking. Asked with a mutation rather than a query, deliberately: a cached answer is a stale one, and it is a question somebody puts rather than something the page fetches on open.
-
 ### Restriction list (`FZ-032`)
 
 Browsing and filtering by status. Filter state belongs in the URL query string so a filtered view is linkable and survives reload. Ordering is the backend's (soonest start first) and is not re-sorted client-side.
@@ -74,6 +72,16 @@ Scope pickers need teams/applications/environments to choose from, fetched from 
 ### Restriction detail (`FZ-034`)
 
 Full representation from `GET /api/restrictions/{id}`, including scope. Shows status, dates, reason, level, and scope. Offers **cancel** (`POST /api/restrictions/{id}/cancel`) and **edit** (`PUT`) — but only when the backend rules permit, i.e. edit only while `SCHEDULED`, cancel only while `SCHEDULED` or `ACTIVE`. Those affordances are *hidden or disabled* from the returned `status`; the backend still enforces them, and a `409` is surfaced rather than swallowed.
+
+### Deployment checks (`FZ-071`, `FZ-120`)
+
+Every question the gate was asked and what it answered, with a fortnight's chart and figures above the list. Filter state lives in the URL, so "everything we refused" is a link.
+
+**"Can I deploy?"** (`FZ-120`) sits at the top of this page, above the chart: an application, an environment, and the answer the gate would give, from `GET /api/deployment-checks/preview`. The decision, the sentence and the matched restrictions are all rendered as the backend sent them — nothing here decides anything, because a product that could disagree with the gate would not be worth asking.
+
+Two consequences of `D-29` are visible on this screen and are the reason the control lives here rather than on the dashboard. A person's check is **not** recorded, so it never appears in the list underneath it — the panel says so, beside the list where somebody would otherwise look for it. And the preview invalidates no query: there is no new row for the list to fetch.
+
+Asked with a mutation rather than a query, deliberately: a cached answer is a stale one, and it is a question somebody puts rather than something the page fetches on open.
 
 ## API interaction conventions
 

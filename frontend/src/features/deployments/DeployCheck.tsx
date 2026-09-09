@@ -1,12 +1,17 @@
 import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router'
 import { useApplications, useEnvironments } from '../catalog/useCatalog'
-import { useDeploymentPreview } from './useDashboard'
+import { useDeploymentPreview } from './useDeploymentChecks'
 import { formatShort } from '../../utils/datetime'
 import styles from './DeployCheck.module.css'
 
 /**
  * "Can I deploy?" — `1c`'s check panel and `1k`'s field (`FZ-120`).
+ *
+ * On the checks console rather than the dashboard, by the operator's call: this is the
+ * screen about the deployment gate, so the question and its history sit together. It also
+ * puts the note that nothing is recorded exactly where it does the most work — beside the
+ * list a person would otherwise expect their own check to appear in (`D-29`).
  *
  * The answer comes from the backend whole: decision, sentence and matched restrictions
  * are all rendered as sent. Nothing here decides anything, which is the point — the
