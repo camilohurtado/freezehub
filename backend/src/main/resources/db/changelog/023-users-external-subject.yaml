@@ -1,0 +1,33 @@
+databaseChangeLog:
+  # The column never held anything Cognito-specific: it holds whatever subject an OIDC
+  # issuer put in the `sub` claim, and the backend has no coupling to a provider at all
+  # (OI-16). The old name asserted a coupling that does not exist, and the next reader
+  # would have believed it.
+  #
+  # A rename rather than a new column, because there is no production data and no second
+  # writer: `renameColumn` is one statement and PostgreSQL carries the unique constraint
+  # and its index across with it. The constraint keeps its generated name, which now names
+  # a column that no longer exists — renamed below, so the schema does not half-say
+  # "Cognito" from a place nobody thinks to look.
+  - changeSet:
+      id: 023-users-external-subject
+      author: freezehub
+      changes:
+        - renameColumn:
+            tableName: users
+            oldColumnName: cognito_subject
+            newColumnName: external_subject
+            columnDataType: varchar(255)
+        # PostgreSQL keeps a constraint's generated name across a column rename, so the
+        # unique constraint would go on saying "users_cognito_subject_key" from the one
+        # place nobody thinks to look. Renaming the constraint renames its index too.
+        - sql:
+            sql: ALTER TABLE users RENAME CONSTRAINT users_cognito_subject_key TO users_external_subject_key
+      rollback:
+        - sql:
+            sql: ALTER TABLE users RENAME CONSTRAINT users_external_subject_key TO users_cognito_subject_key
+        - renameColumn:
+            tableName: users
+            oldColumnName: external_subject
+            newColumnName: cognito_subject
+            columnDataType: varchar(255)

@@ -72,6 +72,7 @@ Discoverability — a Marketplace or Catalog listing — is a separate and lesse
 
 | | $/month | |
 |---|---|---|
+| **`cognito_subject` named a vendor in the schema** — the column holds whatever subject an OIDC issuer put in the `sub` claim, and the backend has no coupling to that provider, so the name asserted one that does not exist | `OI-15` assessment | `FZ-132` — renamed to `external_subject`, constraint and index with it, rehearsed against a clone of the live database |
 | **Dark mode was removed with the Industry theme** — `FZ-100` pinned `color-scheme: light` because Industry shipped no dark ramp, and Broadsheet shipped none either, so a reader on a dark system got a light application with no warning | `FZ-100` | `FZ-131` — derived from the ramps' own shared lightness scale, so no module changed |
 | NAT Gateway | 32.85 | so two idle containers can reach ECR and CloudWatch |
 | Fargate, 2 tasks | 28.84 | `backend_desired_count = 2` |
@@ -91,13 +92,6 @@ Discoverability — a Marketplace or Catalog listing — is a separate and lesse
 2. Whether the beta posture becomes real: `backend_desired_count`, subnet placement, and relaxable deletion protection would all have to become variables. As it stands `terraform destroy` cannot run at all, because `deletion_protection` on RDS and Cognito, `skip_final_snapshot = false`, and `prevent_destroy` on both secrets deliberately block it — correct for production, wrong for a pre-customer beta.
 
 Nothing is urgent while nothing is deployed. It becomes urgent the day someone outside the team needs a URL.
-
-### OI-16 — `cognito_subject` leaks a vendor name into the schema
-**Severity:** Gap · **Owner:** needs a story · **Found in:** `OI-15` assessment
-
-`users.cognito_subject` names a provider rather than a concept, and the backend is not actually coupled to that provider — the column holds whatever subject an OIDC issuer put in a JWT. `identity_subject` or `external_subject` would say what it is.
-
-Cosmetic, and worth doing anyway: the name makes the next reader assume a coupling that does not exist, and it is a rename migration plus a handful of accessors while there is no production data to migrate.
 
 ### OI-18 — Module spacing does not use the design system's scale
 **Severity:** Gap · **Owner:** needs a story · **Found in:** `FZ-101`

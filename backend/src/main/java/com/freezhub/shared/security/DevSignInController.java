@@ -56,7 +56,7 @@ public class DevSignInController {
 
         User user = matches.getFirst();
         return new DevTokenResponse(
-                LocalTokenIssuer.issue(jwtEncoder, user.getCognitoSubject()),
+                LocalTokenIssuer.issue(jwtEncoder, user.getExternalSubject()),
                 user.getId(),
                 user.getOrganizationId(),
                 user.getEmail(),

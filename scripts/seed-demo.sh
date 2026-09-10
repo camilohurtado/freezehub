@@ -50,7 +50,7 @@ docker compose exec -T postgres psql -U freezehub -d freezehub >/dev/null <<SQL
 WITH org AS (
   INSERT INTO organization (name) VALUES ('$ORGANIZATION') RETURNING id
 )
-INSERT INTO users (organization_id, cognito_subject, email, role)
+INSERT INTO users (organization_id, external_subject, email, role)
 SELECT id, '$ADMIN_SUBJECT', '$ADMIN_EMAIL', 'ADMINISTRATOR' FROM org;
 SQL
 

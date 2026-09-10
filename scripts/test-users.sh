@@ -36,7 +36,7 @@ if [ "$ADD_MEMBER" -eq 1 ]; then
 
     EMAIL="member-$(date +%s)@northwind.test"
     psql >/dev/null <<SQL
-INSERT INTO users (organization_id, cognito_subject, email, role)
+INSERT INTO users (organization_id, external_subject, email, role)
 VALUES ($ORG, 'test-member-' || md5(random()::text), '$EMAIL', 'MEMBER');
 SQL
     say "Added a MEMBER to organization $ORG"

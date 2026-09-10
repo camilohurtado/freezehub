@@ -6,7 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface UserRepository extends JpaRepository<User, Long> {
 
-    Optional<User> findByCognitoSubject(String cognitoSubject);
+    Optional<User> findByExternalSubject(String externalSubject);
 
     /**
      * Email is unique per organization, not globally, so this can legitimately return

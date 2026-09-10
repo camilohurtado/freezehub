@@ -260,7 +260,7 @@ No Cognito user pool exists until `FZ-063`, so the browser currently has no way 
 Acceptance:
 
 - Exposed **only** under the `local` Spring profile — `@Profile("local")`, like `LocalJwtConfig`. No deployed environment activates that profile, so the endpoint cannot exist there.
-- Accepts an identifier for an existing `users` row and returns a signed token whose `sub` matches that user's `cognito_subject`.
+- Accepts an identifier for an existing `users` row and returns a signed token whose `sub` matches that user's `external_subject`.
 - Returns 404/400 for an unknown user rather than minting a token for an identity that does not exist.
 - A test asserts the endpoint is **absent** when the `local` profile is not active — the security property, not just the happy path.
 - Replaced by the Cognito Hosted UI redirect at `FZ-063`.
@@ -1869,3 +1869,33 @@ for a toggle. Nothing in the interface sets it, and that is stated where it is d
 
 Out of scope: a toggle in the interface, and a stored preference. Neither has been asked
 for; the reader's system already says which they want.
+
+### FZ-132 — A Column That Does Not Name Its Vendor
+**Status:** DONE · **Resolves** `OI-16`
+
+`users.cognito_subject` named a provider rather than a concept. The column holds whatever
+subject an OIDC issuer put in the `sub` claim, and the backend has no coupling to Cognito
+at all — no SDK, nothing in `pom.xml`, nothing in `application.yml`. The name asserted a
+coupling that does not exist, and a name is the first thing a reader believes.
+
+Now `external_subject`. Cognito stays named in prose, because it is genuinely the chosen
+provider (`06-security.md`); what changes is the schema, which should describe the concept
+it stores.
+
+**A rename, not a new column plus a backfill.** There is no production data and no second
+writer, so `renameColumn` is one statement — and the whole point of doing it now is that
+`FZ-046` has not yet wired a real provider. Once there are rows in a deployed environment
+this stops being free.
+
+**The constraint is renamed too.** PostgreSQL carries a generated constraint name across a
+column rename, so `users_cognito_subject_key` would have gone on saying "Cognito" from the
+one place nobody thinks to look — the schema half-renamed is worse than not renamed,
+because it reads as an oversight rather than a decision.
+
+**Rehearsed against real rows.** The integration suite runs the changelog on an empty
+database every time, which cannot show what a rename does to data. The live local database
+was cloned, the application started against the copy, and the result checked: column
+renamed, constraint and its index renamed with it, all three rows intact and distinct, and
+a real token round-trip resolving a user through the renamed column. The rollback
+statements were then executed against that copy and returned it to the old shape. The copy
+was dropped; the live database was never touched.

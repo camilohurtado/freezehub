@@ -23,8 +23,8 @@ public class User {
     @Column(name = "organization_id", nullable = false)
     private Long organizationId;
 
-    @Column(name = "cognito_subject", nullable = false)
-    private String cognitoSubject;
+    @Column(name = "external_subject", nullable = false)
+    private String externalSubject;
 
     @Column(nullable = false)
     private String email;
@@ -42,9 +42,9 @@ public class User {
     protected User() {
     }
 
-    public User(Long organizationId, String cognitoSubject, String email, UserRole role) {
+    public User(Long organizationId, String externalSubject, String email, UserRole role) {
         this.organizationId = organizationId;
-        this.cognitoSubject = cognitoSubject;
+        this.externalSubject = externalSubject;
         this.email = email;
         this.role = role;
     }
@@ -69,8 +69,8 @@ public class User {
         return organizationId;
     }
 
-    public String getCognitoSubject() {
-        return cognitoSubject;
+    public String getExternalSubject() {
+        return externalSubject;
     }
 
     public String getEmail() {

@@ -214,7 +214,7 @@ An organization's first (`ADMINISTRATOR`) user is provisioned out-of-band, manua
 
 1. Create the Cognito identity: `aws cognito-idp admin-create-user --user-pool-id <pool-id> --username <email>` (Cognito emails a temporary password).
 2. Note the returned `sub` (or look it up via `aws cognito-idp admin-get-user`).
-3. Insert the matching row: `INSERT INTO users (organization_id, cognito_subject, email, role) VALUES (<org-id>, '<sub>', '<email>', 'ADMINISTRATOR');`
+3. Insert the matching row: `INSERT INTO users (organization_id, external_subject, email, role) VALUES (<org-id>, '<sub>', '<email>', 'ADMINISTRATOR');`
 
 Every subsequent user is added in-product by an Administrator:
 
