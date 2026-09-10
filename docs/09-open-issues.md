@@ -72,6 +72,7 @@ Discoverability — a Marketplace or Catalog listing — is a separate and lesse
 
 | | $/month | |
 |---|---|---|
+| **Layout spacing did not use the design system's scale**, so the system's density was unreachable by changing tokens — and it turned out to be two screens that were never re-pitched rather than the whole application | `FZ-101` | `FZ-133` — 159 token uses, 0 rem literals, px furniture deliberately untouched |
 | **`cognito_subject` named a vendor in the schema** — the column holds whatever subject an OIDC issuer put in the `sub` claim, and the backend has no coupling to that provider, so the name asserted one that does not exist | `OI-15` assessment | `FZ-132` — renamed to `external_subject`, constraint and index with it, rehearsed against a clone of the live database |
 | **Dark mode was removed with the Industry theme** — `FZ-100` pinned `color-scheme: light` because Industry shipped no dark ramp, and Broadsheet shipped none either, so a reader on a dark system got a light application with no warning | `FZ-100` | `FZ-131` — derived from the ramps' own shared lightness scale, so no module changed |
 | NAT Gateway | 32.85 | so two idle containers can reach ECR and CloudWatch |
@@ -93,27 +94,6 @@ Discoverability — a Marketplace or Catalog listing — is a separate and lesse
 
 Nothing is urgent while nothing is deployed. It becomes urgent the day someone outside the team needs a URL.
 
-### OI-18 — Module spacing does not use the design system's scale
-**Severity:** Gap · **Owner:** needs a story · **Found in:** `FZ-101`
-
-The consequence is that a system's density is unreachable by changing tokens. Broadsheet specifies a 1.25× airier scale, and the application receives it mostly through the type scale — the layout keeps the spacing each screen was written with, whatever the tokens say.
-
-**Re-counted 2026-09-08**, because the original figures were stale and the shape of the problem has changed. `padding` / `gap` / `margin` declarations across the CSS Modules:
-
-| | Then (`FZ-101`) | Now |
-|---|---|---|
-| `var(--space-*)` | 21 | **76** |
-| rem literals | 120 | **47** |
-| px literals | — | **111** |
-
-`FZ-103` was recorded as closing this. **It did not** — it addressed the colour rule, the type scale and the furniture, and the token count roughly quadrupled as screens were rewritten, but two thirds of spacing is still literal.
-
-The px column is new and needs a judgement rather than a conversion. Much of it is deliberate: the Broadsheet deck specifies its furniture in px — a 4px rule over a 1px one, 12px between chart columns, 8px between chips — and those are the design, not drift. The rem literals are the ones that are simply old.
-
-So this is not the mechanical sweep it was first written as. Whoever takes it has to separate *"this px is what the mockup says"* from *"this rem is what the file happened to have"*, and only convert the second. Converting all of it would overwrite the system with itself.
-
-Still not visible as a defect, and still the reason the app looks approximately-themed rather than exactly-themed.
-
 ### OI-20 — EU data residency is deferred by choosing us-east-1
 **Severity:** Decision · **Owner:** needs a story · **Raised:** 2026-09-08
 
@@ -132,6 +112,15 @@ Becomes urgent at the first EU deal with a security questionnaire, not before.
 `/actuator/metrics` and `/actuator/info` are aggregate across every organization — `freezehub.policy.evaluations` counts every customer's deployment checks, and `jvm.*` describes the process. `FZ-065` narrowed them from "any authenticated member" (verified live: a member of one tenant could read them) to ADMINISTRATOR, which shrinks the audience but does not change what they are: figures no customer should see at all.
 
 The real fix is `management.server.port` on a port the load balancer does not publish, so nothing outside the VPC can reach anything but `/actuator/health`. That is a Terraform change — a second container port, a security-group rule, and the health check pointed at it — which is why it belongs to the story that applies the deployment rather than to the review that found it.
+
+### OI-28 — Restrictions still wears the Industry furniture
+**Severity:** Gap · **Owner:** needs a story · **Found in:** `FZ-133`
+
+Broadsheet's rule is that structure comes from the serif scale and negative space, "not from rules, borders or boxes". Every screen re-cut for it obeys that. `RestrictionsPage` does not: the status filter is a bordered `fieldset` with a legend, the table sits inside a boxed panel with its own border and radius, and the status chips are outlined boxes.
+
+It is the only screen left like this, and it is the most-visited one after the dashboard. `FZ-133` put its spacing on the token scale, which is what `OI-18` asked for, and doing so made plain that spacing was the symptom rather than the cause — the screen is a faithful Industry layout that survived the theme swap.
+
+Not a sweep: re-cutting it means deciding what carries the filter without a box, and what a status chip looks like when it is not outlined. `1e` in the deck draws a list screen, so there is a reference to work from rather than a blank page.
 
 ## Resolved
 

@@ -1899,3 +1899,34 @@ renamed, constraint and its index renamed with it, all three rows intact and dis
 a real token round-trip resolving a user through the renamed column. The rollback
 statements were then executed against that copy and returned it to the old shape. The copy
 was dropped; the live database was never touched.
+
+### FZ-133 — Spacing on the Scale
+**Status:** DONE · **Resolves** `OI-18`
+
+`OI-18` recorded that layout spacing was mostly literal, so the system's density was
+unreachable by changing tokens: Broadsheet specifies a 1.25× airier scale and the
+application received it through the type scale alone.
+
+**The count said 47 rem literals; the map said four files.** Two screens carried almost all
+of them — `RestrictionsPage` and `CatalogPage`, 33 between them — with `AuditPage` and one
+line of `RestrictionDetailPage` making up the rest. Everything else had already moved onto
+the tokens as screens were rewritten. The issue read as a survey of the whole application;
+it was two screens that were never re-pitched.
+
+**The rule, so the judgement is inspectable rather than per-declaration taste:**
+
+| Literal | Becomes | Why |
+|---|---|---|
+| within ~2px of a step | that step | 12px → `--space-2` (10), 14px → `--space-3` (15), 16px → `--space-3` |
+| exactly a step | that step | 20px → `--space-4`, 10px → `--space-2`, 5px → `--space-1` |
+| below the scale (≤2.5px) | plain `px` | a 2px nudge under a chip is furniture, not layout, and forcing it onto the scale would triple it |
+| any `px` already there | untouched | the deck specifies its furniture in px — a 4px rule over a 1px one, 12px between chart columns. `OI-18` warned that converting those would overwrite the system with itself |
+
+Recounted after the change: **159 token uses, 0 rem literals, 133 px** — the px column
+unchanged, which is the point.
+
+**Found while photographing it, and not fixed here:** `RestrictionsPage` is still wearing
+Industry's furniture — a bordered filter fieldset with a legend, the table inside a boxed
+panel, outlined status chips — while every screen re-cut for Broadsheet uses rules and
+negative space instead. Spacing was the symptom `OI-18` recorded; that is the cause, and it
+is a redesign rather than a sweep. Recorded as `OI-28`.
