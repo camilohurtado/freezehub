@@ -35,18 +35,27 @@ export function RestrictionsPage() {
         </Link>
       </div>
 
-      <fieldset className={styles.filters}>
-        <legend className={styles.legend}>Filter by status</legend>
-        {ALL_STATUSES.map((status) => (
-          <label key={status} className={styles.filter}>
-            <input
-              type="checkbox"
-              checked={selected.includes(status)}
-              onChange={() => toggleStatus(status)}
-            />
-            {status.toLowerCase()}
-          </label>
-        ))}
+      {/*
+        * A group rather than a fieldset (FZ-134). The box a fieldset draws is Industry's,
+        * and the accessible name a legend gives is the only thing that was load-bearing —
+        * `role="group"` with `aria-labelledby` keeps that and nothing else.
+        */}
+      <div className={styles.filters} role="group" aria-labelledby="filter-by-status">
+        <span className={styles.filterLabel} id="filter-by-status">
+          Filter by status
+        </span>
+        {ALL_STATUSES.map((status) => {
+          const on = selected.includes(status)
+          return (
+            <label
+              key={status}
+              className={`tag ${on ? 'tag-accent' : 'tag-outline'} ${styles.chip}`}
+            >
+              <input type="checkbox" checked={on} onChange={() => toggleStatus(status)} />
+              {status.toLowerCase()}
+            </label>
+          )
+        })}
         {selected.length > 0 && (
           <button
             className={styles.clear}
@@ -56,7 +65,7 @@ export function RestrictionsPage() {
             Clear
           </button>
         )}
-      </fieldset>
+      </div>
 
       {isPending && (
         <p className={styles.state} role="status">
@@ -83,11 +92,13 @@ export function RestrictionsPage() {
 
       {!isPending && !isError && data.length > 0 && (
         <div className={styles.tableWrap}>
-          <table className={styles.table}>
+          {/* The system's own table (FZ-134), as the checks console has drawn one since
+              `FZ-071`. It was a local copy that boxed itself. */}
+          <table className="table">
             <caption className={styles.caption}>
               {data.length} restriction{data.length === 1 ? '' : 's'}, soonest start first
             </caption>
-            <thead>
+            <thead className={styles.head}>
               <tr>
                 <th scope="col">Name</th>
                 <th scope="col">Status</th>
