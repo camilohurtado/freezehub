@@ -4,10 +4,14 @@ variable "environment" {
   default     = "beta"
 }
 
+# No default, deliberately (FZ-135, OI-20). This is the one variable that cannot be changed
+# after the first apply without moving customer data *and* re-creating every identity: a
+# Cognito user pool is region-bound and cannot be migrated, and the `sub` it issues is
+# stored in `users.external_subject`. `us-east-1` sat here as a default and was therefore
+# never chosen by anybody. It must now be stated, exactly like `domain_name`.
 variable "region" {
-  description = "AWS region for everything except the CloudFront certificate."
+  description = "AWS region for everything except the CloudFront certificate, which AWS requires from us-east-1. Must be stated: changing it after the first apply is a data migration, not a variable."
   type        = string
-  default     = "us-east-1"
 }
 
 variable "domain_name" {

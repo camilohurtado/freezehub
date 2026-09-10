@@ -34,13 +34,21 @@ You need, and Terraform will not create for you:
 
 ## Applying
 
+**Decide the region first, and write it down.** `region` has no default (`FZ-135`): it is
+the one variable that cannot be changed afterwards without moving the database *and*
+re-creating every identity, because a Cognito user pool is region-bound and the `sub` it
+issues is stored in `users.external_subject`. It is also the answer to "where does customer
+data live" — the database, the user pool, the logs and the secrets are all in it. Only the
+CloudFront certificate sits elsewhere, in `us-east-1`, because AWS accepts it from nowhere
+else; it holds no customer data. See `OI-20` for the EU-versus-US argument.
+
 ```bash
 # once per account: the bucket that holds state, which contains secrets
-cd bootstrap && terraform init && terraform apply
+cd bootstrap && terraform init && terraform apply -var region=<the same region>
 # note the bucket name it prints, then uncomment and fill in the backend block in
 # ../versions.tf
 
-cd .. && cp terraform.tfvars.example terraform.tfvars   # set domain_name, hosted_zone_id
+cd .. && cp terraform.tfvars.example terraform.tfvars   # set region, domain_name, hosted_zone_id
 terraform init
 terraform plan     # read-only; read it before applying
 terraform apply

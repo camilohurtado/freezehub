@@ -1964,3 +1964,46 @@ implemented it — `.table` is `width: 100%`, so inside a scrolling box it shran
 every title broke to one word per line. The two timestamps were taking 53% of the table
 between them, measured, leaving the name column 108px. A `min-width` makes the scroll real,
 and below 48rem the timestamp is allowed to wrap so the name gets its width back.
+
+### FZ-135 — Decide the Region Before Anything Is Applied
+**Status:** BLOCKED · **Owns** `OI-20` · **Blocks** `FZ-046`, `FZ-123`
+
+`OI-20` recorded that `us-east-1` was chosen by being the `variables.tf` default, with the
+residency question knowingly deferred. This story does the part that is not a decision —
+establishing what the choice actually costs, and stopping the default from making it — and
+leaves the choice itself to the operator, because it is a commercial judgement about who
+the product is sold to.
+
+**What it costs to change, today:** one variable. The Terraform is already parameterised
+end to end — `var.region` drives the single default provider, availability zones are read
+from `aws_availability_zones` and sliced rather than named, and the only pinned `us-east-1`
+is the ACM certificate for CloudFront, which AWS accepts from nowhere else. A certificate
+holds no customer data, so that pin is not a residency question. The state bucket in
+`bootstrap/` takes its own region variable.
+
+**What it costs after the first apply — worse than `OI-20` said.** It recorded "a migration
+of live data", meaning the database. It is also every identity: **a Cognito user pool is
+region-bound and cannot be moved**, and the `sub` it issues is what `users.external_subject`
+stores. Moving region after `FZ-046` creates the pool means a new pool, new subjects for
+every user, and a re-mapping of that column — a migration of who people are, not just of
+what they own. Right now the pool does not exist and there are no identities, which is why
+this is in front of `FZ-046` rather than after it.
+
+**Where customer data would live**, which is what a security questionnaire actually asks:
+the database, the user pool, the CloudWatch log groups and the Secrets Manager entries are
+all in `var.region`. The S3 bucket holds the built frontend, and CloudFront caches it at
+edges worldwide — static assets, no customer data. So a single EU region answers the
+question completely, with the certificate as the only US-resident object.
+
+**Recommendation: `eu-west-1`.** `OI-20`'s asymmetry is the argument and it still holds —
+EU buyers frequently require EU residency, US buyers rarely require US residency — and
+Ireland carries every service this uses. The cost figures in `infra/README.md` were taken
+against `us-east-1` and would need re-checking; the difference is single-digit percent, not
+a different posture.
+
+**Done here, because it is not the decision:** `region` no longer has a default. It must be
+stated, exactly like `domain_name`, so that the next person to run `terraform apply` cannot
+inherit a region nobody chose. `terraform validate` needs no variable values, so CI is
+unaffected, and the deploy workflow deliberately never runs Terraform.
+
+**Not done here:** choosing. Set `region` in `terraform.tfvars` and this unblocks.
