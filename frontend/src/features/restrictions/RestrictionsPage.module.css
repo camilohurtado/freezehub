@@ -28,44 +28,63 @@
   white-space: nowrap;
 }
 
+/*
+ * The filter, as the deck draws a multi-select (`1e`): a small caps label and chips —
+ * filled when chosen, outlined when not — with no box around any of it (FZ-134).
+ *
+ * It was a bordered `fieldset` with a `legend`, the last of Industry's furniture left in
+ * the application. Broadsheet's rule is that structure comes from the type scale and
+ * negative space rather than from rules and boxes, and a border here drew a frame around
+ * four words.
+ */
 .filters {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   flex-wrap: wrap;
-  gap: var(--space-3);
+  gap: var(--space-2);
   margin: 0 0 var(--space-4);
-  padding: var(--space-2) var(--space-3);
-  border: 1px solid var(--fh-border);
-  border-radius: var(--radius-md);
 }
 
-.legend {
-  padding: 0 var(--space-1);
-  color: var(--fh-text-muted);
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+.filterLabel {
+  composes: fieldLabel from global;
+  margin-right: var(--space-1);
 }
 
-.filter {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  font-size: 0.875rem;
-  text-transform: capitalize;
+/*
+ * The checkbox keeps its place in the accessibility tree and its own keyboard behaviour;
+ * the chip is its label. Same technique as the system's own `.seg-opt`, which is why the
+ * focus ring is drawn from the input rather than left to the browser to lose.
+ */
+.chip {
   cursor: pointer;
+  text-transform: capitalize;
+  user-select: none;
 }
 
+.chip input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.chip:has(input:focus-visible) {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* A link, not a fifth chip: clearing is not one of the things being chosen. */
 .clear {
-  margin-left: auto;
-  padding: var(--space-1) var(--space-2);
-  border: 1px solid var(--fh-border-strong);
-  border-radius: var(--radius-md);
-  background: transparent;
-  color: inherit;
+  margin-left: var(--space-1);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--fh-accent-ink);
   font: inherit;
-  font-size: 0.8125rem;
+  font-size: 13px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
   cursor: pointer;
 }
 
@@ -92,46 +111,40 @@
   cursor: pointer;
 }
 
-/* Narrow screens scroll the table rather than squashing the date columns. */
+/*
+ * Narrow screens scroll the table rather than squashing the date columns. No border and
+ * no radius: the panel around it was Industry's, and the system's own `.table` already
+ * separates rows with hairlines — the checks console has been drawing one this way since
+ * `FZ-071` (FZ-134).
+ */
 .tableWrap {
   overflow-x: auto;
-  border: 1px solid var(--fh-border);
-  border-radius: var(--radius-md);
 }
 
-.table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.875rem;
+/*
+ * The `min-width` is what makes the line above true. `.table` is `width: 100%`, so inside
+ * a scrolling box it shrank to fit instead of overflowing: at 390px every name broke to
+ * one word per line and the reason underneath it did the same. It has read that way since
+ * the screen was written — the comment described an intention nothing implemented (FZ-134).
+ *
+ * 44rem is the width at which the five columns stop fighting; below that the reader gets a
+ * horizontal scroll, which is the honest trade for a table with two timestamps in it.
+ */
+.tableWrap > table {
+  min-width: 44rem;
 }
 
-.caption {
-  padding: var(--space-2) var(--space-3);
-  color: var(--fh-text-muted);
-  font-size: 0.8125rem;
-  text-align: left;
-}
-
-.table th {
-  padding: var(--space-2) var(--space-3);
-  border-bottom: 1px solid var(--fh-border);
-  background: var(--fh-surface-strong);
-  color: var(--fh-text-muted);
-  font-size: 0.75rem;
-  letter-spacing: 0.04em;
-  text-align: left;
-  text-transform: uppercase;
+/* The look comes from the global `.table`; only the header's no-wrap is local, because
+   these column names are short and wrapping them costs a row of height for nothing. */
+.head th {
   white-space: nowrap;
 }
 
-.table td {
-  padding: var(--space-2) var(--space-3);
-  border-bottom: 1px solid var(--fh-border);
-  vertical-align: top;
-}
-
-.table tbody tr:last-child td {
-  border-bottom: none;
+.caption {
+  padding: 0 0 var(--space-2);
+  color: var(--fh-text-muted);
+  font-size: 13px;
+  text-align: left;
 }
 
 .name {
@@ -155,4 +168,21 @@
 
 .when {
   white-space: nowrap;
+}
+
+/*
+ * On a phone the two timestamps were taking 53% of the table between them — measured, not
+ * guessed — which left the name column 108px and broke every title into one word per line.
+ * Letting the timestamp wrap onto two lines is the cheapest way to give the name back its
+ * width; the columns still scroll, but the thing a reader is scanning for stays readable
+ * without scrolling to it (FZ-134).
+ */
+@media (max-width: 48rem) {
+  .when {
+    white-space: normal;
+  }
+
+  .tableWrap > table {
+    min-width: 34rem;
+  }
 }

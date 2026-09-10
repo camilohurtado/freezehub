@@ -1930,3 +1930,37 @@ Industry's furniture — a bordered filter fieldset with a legend, the table ins
 panel, outlined status chips — while every screen re-cut for Broadsheet uses rules and
 negative space instead. Spacing was the symptom `OI-18` recorded; that is the cause, and it
 is a redesign rather than a sweep. Recorded as `OI-28`.
+
+### FZ-134 — Restrictions, Re-cut for Broadsheet
+**Status:** DONE · **Resolves** `OI-28`
+
+The last screen still wearing Industry's furniture. `FZ-133` put its spacing on the token
+scale and, in photographing it, made plain that spacing was the symptom: the screen was a
+faithful Industry layout that survived the theme swap.
+
+Two boxes removed, both replaced with something the system already draws:
+
+- **The status filter** was a bordered `fieldset` with a `legend` — a frame around four
+  words. It is now a small caps label and chips, which is how the deck draws a multi-select
+  (`1e`, where scope is "chips instead of native multi-selects"): filled when chosen,
+  outlined when not. The `fieldset` gave the group its accessible name, so that became
+  `role="group"` with `aria-labelledby`; the checkboxes are still checkboxes, visually
+  hidden behind their chips exactly as the system's own `.seg-opt` hides its radios.
+- **The table** was a local copy of `.table` inside a bordered, rounded panel. It now uses
+  the system's `.table`, unboxed, as the checks console has since `FZ-071`.
+
+**Two corrections to `OI-28`, which I wrote and got partly wrong:**
+
+1. It said `1e` "draws a list screen". It does not — `1e` is create-restriction. What it
+   draws is the *multi-select*, which is the part this needed. There is no list screen in
+   the deck; the reference for the table was the checks console, in the application.
+2. It called the outlined status chips Industry furniture. They are not: `FZ-103` chose an
+   outline for `active` deliberately, so that the magenta beside it stays the only claim
+   that something is in force. They are untouched.
+
+**Found while photographing the phone**, and fixed here: the table's own comment said
+narrow screens "scroll the table rather than squashing the date columns", and nothing
+implemented it — `.table` is `width: 100%`, so inside a scrolling box it shrank to fit and
+every title broke to one word per line. The two timestamps were taking 53% of the table
+between them, measured, leaving the name column 108px. A `min-width` makes the scroll real,
+and below 48rem the timestamp is allowed to wrap so the name gets its width back.

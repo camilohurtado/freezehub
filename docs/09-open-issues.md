@@ -72,6 +72,7 @@ Discoverability — a Marketplace or Catalog listing — is a separate and lesse
 
 | | $/month | |
 |---|---|---|
+| **Restrictions still wore the Industry furniture** — a bordered filter `fieldset` with a legend and the table inside a boxed panel, while Broadsheet takes its structure from the type scale and negative space. The last screen left like it | `FZ-133` | `FZ-134` — chips as the deck draws a multi-select, the system's own unboxed table, and the narrow-screen scroll its comment had always claimed |
 | **Layout spacing did not use the design system's scale**, so the system's density was unreachable by changing tokens — and it turned out to be two screens that were never re-pitched rather than the whole application | `FZ-101` | `FZ-133` — 159 token uses, 0 rem literals, px furniture deliberately untouched |
 | **`cognito_subject` named a vendor in the schema** — the column holds whatever subject an OIDC issuer put in the `sub` claim, and the backend has no coupling to that provider, so the name asserted one that does not exist | `OI-15` assessment | `FZ-132` — renamed to `external_subject`, constraint and index with it, rehearsed against a clone of the live database |
 | **Dark mode was removed with the Industry theme** — `FZ-100` pinned `color-scheme: light` because Industry shipped no dark ramp, and Broadsheet shipped none either, so a reader on a dark system got a light application with no warning | `FZ-100` | `FZ-131` — derived from the ramps' own shared lightness scale, so no module changed |
@@ -112,15 +113,6 @@ Becomes urgent at the first EU deal with a security questionnaire, not before.
 `/actuator/metrics` and `/actuator/info` are aggregate across every organization — `freezehub.policy.evaluations` counts every customer's deployment checks, and `jvm.*` describes the process. `FZ-065` narrowed them from "any authenticated member" (verified live: a member of one tenant could read them) to ADMINISTRATOR, which shrinks the audience but does not change what they are: figures no customer should see at all.
 
 The real fix is `management.server.port` on a port the load balancer does not publish, so nothing outside the VPC can reach anything but `/actuator/health`. That is a Terraform change — a second container port, a security-group rule, and the health check pointed at it — which is why it belongs to the story that applies the deployment rather than to the review that found it.
-
-### OI-28 — Restrictions still wears the Industry furniture
-**Severity:** Gap · **Owner:** needs a story · **Found in:** `FZ-133`
-
-Broadsheet's rule is that structure comes from the serif scale and negative space, "not from rules, borders or boxes". Every screen re-cut for it obeys that. `RestrictionsPage` does not: the status filter is a bordered `fieldset` with a legend, the table sits inside a boxed panel with its own border and radius, and the status chips are outlined boxes.
-
-It is the only screen left like this, and it is the most-visited one after the dashboard. `FZ-133` put its spacing on the token scale, which is what `OI-18` asked for, and doing so made plain that spacing was the symptom rather than the cause — the screen is a faithful Industry layout that survived the theme swap.
-
-Not a sweep: re-cutting it means deciding what carries the filter without a box, and what a status chip looks like when it is not outlined. `1e` in the deck draws a list screen, so there is a reference to work from rather than a blank page.
 
 ## Resolved
 
