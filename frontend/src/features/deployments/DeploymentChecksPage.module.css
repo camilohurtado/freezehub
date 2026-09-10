@@ -63,7 +63,7 @@
 }
 
 .swatchRefused {
-  background: var(--color-accent-2-700);
+  background: var(--fh-danger);
 }
 
 .swatchAllowed {
@@ -98,7 +98,7 @@
 /* Refused sits on top of allowed, so the magenta is against the eye-line rather than
    buried at the baseline. */
 .barRefused {
-  background: var(--color-accent-2-700);
+  background: var(--fh-danger);
 }
 
 .barAllowed {
@@ -132,7 +132,7 @@
 }
 
 .figureValueAlarming {
-  color: var(--color-accent-2-700);
+  color: var(--fh-danger);
 }
 
 .figureLabel {

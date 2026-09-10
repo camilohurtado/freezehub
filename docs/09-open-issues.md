@@ -72,6 +72,7 @@ Discoverability — a Marketplace or Catalog listing — is a separate and lesse
 
 | | $/month | |
 |---|---|---|
+| **Dark mode was removed with the Industry theme** — `FZ-100` pinned `color-scheme: light` because Industry shipped no dark ramp, and Broadsheet shipped none either, so a reader on a dark system got a light application with no warning | `FZ-100` | `FZ-131` — derived from the ramps' own shared lightness scale, so no module changed |
 | NAT Gateway | 32.85 | so two idle containers can reach ECR and CloudWatch |
 | Fargate, 2 tasks | 28.84 | `backend_desired_count = 2` |
 | ALB | 16.43 | TLS and a stable hostname |
@@ -97,17 +98,6 @@ Nothing is urgent while nothing is deployed. It becomes urgent the day someone o
 `users.cognito_subject` names a provider rather than a concept, and the backend is not actually coupled to that provider — the column holds whatever subject an OIDC issuer put in a JWT. `identity_subject` or `external_subject` would say what it is.
 
 Cosmetic, and worth doing anyway: the name makes the next reader assume a coupling that does not exist, and it is a rename migration plus a handful of accessors while there is no production data to migrate.
-
-### OI-17 — Dark mode was removed with the Industry theme
-**Severity:** Gap · **Owner:** needs a story · **Found in:** `FZ-100`
-
-The frontend supported `prefers-color-scheme: dark` through the `--fh-*` tokens. Industry ships no dark ramp, so `FZ-100` pinned `color-scheme: light` and dropped the block.
-
-Anyone on a dark OS now gets a light application with no warning. Reinstating it is not a port — it means choosing dark values for every role in the system, including how the accent-as-field treatment and the hairline frames read on a dark ground.
-
-Recorded rather than silently removed, because taking away something an application already did is the kind of change nobody remembers making.
-
-
 
 ### OI-18 — Module spacing does not use the design system's scale
 **Severity:** Gap · **Owner:** needs a story · **Found in:** `FZ-101`

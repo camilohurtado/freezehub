@@ -1835,3 +1835,37 @@ attempts were made and abandoned and the screen still said "Loading restrictions
 minute later. Timeouts are therefore not retried, which is also the behaviour that shows a
 message soonest. No screen changes beyond that — every page already renders
 `error.message`, which is precisely why the message is the deliverable.
+
+### FZ-131 — Dark Mode, Derived Rather Than Invented
+**Status:** DONE · **Resolves** `OI-17`
+
+The application supported `prefers-color-scheme: dark` until `FZ-100`, which pinned
+`color-scheme: light` because Industry shipped no dark ramp. Broadsheet ships none either,
+so anyone on a dark OS got a light application with no warning — and taking away something
+an application already did is the kind of change nobody remembers making, which is why it
+was recorded rather than dropped.
+
+**Derived from the system's own construction rule, not invented beside it.** Broadsheet's
+ramps are generated in OKLCH *on one shared lightness scale*; in a dark context that scale
+runs the other way, so step 100 is the darkest and 900 the lightest. Every module keeps
+asking for the step it already asks for — a tinted fill is still 100, text on a tint is
+still 800 — and the ink becomes the ground while the paper becomes the type.
+
+**Two roles are remapped rather than mirrored**, because the step that carries a role
+changes with the ground: accent-at-paragraph-size moves from 700 to 600, and the "in force"
+ink moves to 500. Mirroring sent the refusal magenta to a pale pink that read as decoration
+rather than as a deployment being stopped — the one rule for colour survives only if
+magenta still looks like a refusal.
+
+**Found on the way, and fixed:** eighteen declarations across seven modules reached past
+`--fh-danger` for `--color-accent-2-700` directly. Identical in light — the frame is
+byte-for-byte unchanged — but it meant the "in force" ink could not be remapped in one
+place, which is exactly what an alias is for. They now use the alias.
+
+**Decided:** a `[data-theme]` hook ships alongside the media query. `prefers-color-scheme`
+alone cannot be seen on a light machine, so nothing about the dark set could be verified,
+reviewed or screenshotted — the hook earns its place today rather than being scaffolding
+for a toggle. Nothing in the interface sets it, and that is stated where it is defined.
+
+Out of scope: a toggle in the interface, and a stored preference. Neither has been asked
+for; the reader's system already says which they want.

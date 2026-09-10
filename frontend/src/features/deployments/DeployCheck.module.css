@@ -71,7 +71,7 @@
 }
 
 .verdictBlock {
-  color: var(--color-accent-2-700);
+  color: var(--fh-danger);
 }
 
 .evaluatedAt {

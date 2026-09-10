@@ -186,7 +186,7 @@
 .meterFull {
   height: 4px;
   margin-top: 6px;
-  background: var(--color-accent-2-700);
+  background: var(--fh-danger);
 }
 
 /* — the key shown once — */
@@ -195,7 +195,7 @@
   margin: 0 0 var(--space-4);
   padding: var(--space-3) var(--space-4);
   background: var(--color-surface);
-  border-left: 3px solid var(--color-accent-2-700);
+  border-left: 3px solid var(--fh-danger);
 }
 
 .revealedKeyValue {
@@ -209,7 +209,7 @@
 .revealedKeyWarning {
   margin: 0;
   font-size: 14px;
-  color: var(--color-accent-2-700);
+  color: var(--fh-danger);
 }
 
 /* — forms and actions — */
@@ -265,7 +265,7 @@
    something" — and it is a ghost, not a fill, so it is not the easiest thing to hit. */
 .danger {
   background: transparent;
-  color: var(--color-accent-2-700);
+  color: var(--fh-danger);
 }
 
 .danger:hover {
