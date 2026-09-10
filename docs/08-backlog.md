@@ -1802,3 +1802,36 @@ Acceptance:
 `IdentityProvider` (`OI-2`), so nobody can sign in to what this deploys. That is `FZ-046`,
 and this story should say so in its output rather than report an environment that is only
 half true — the same honesty `FZ-086` chose when its closing summary admitted the same gap.
+
+## Milestone 14 — What Beta Found
+
+`FZ-065` reviewed the seven areas Milestone 8 named and fixed what it found on the
+backend. This is the part it deliberately did not do in a review.
+
+### FZ-124 — A Request That Never Answers
+**Status:** DONE · **Resolves** `OI-22`
+
+`apiRequest` passes the caller's `AbortSignal` through and adds nothing of its own, so a
+request that is accepted and never answered leaves every screen in its loading state
+indefinitely — no error, no retry, no way for the person to tell a slow page from a broken
+one. `FZ-065` fixed exactly this on the backend's outbound calls (`D-30`); this is the same
+defect on the other side of the wire, and the side a customer actually looks at.
+
+The realistic cause is not an unreachable API — that fails fast and is already handled —
+but a connection that is accepted and then abandoned: a load balancer holding the socket to
+a task that has wedged. It is invisible in local development, where the API is either up or
+refusing connections.
+
+**Decide when starting it:** a timeout has to be told apart from a cancellation. TanStack
+Query aborts requests on unmount and on refetch, and those aborts are *normal* — rendering
+them as errors would flash a failure banner every time somebody navigates away. Both arrive
+as the same `AbortError`, so the wrapper has to know which signal fired and say so.
+
+Scope is the one wrapper, its tests, and the one line of retry policy the change collides
+with. A timeout has already cost its whole deadline before it is reported, so the default
+two retries meant a minute of spinner before the person saw a word — and retrying even
+once was found, in the running application, to leave the query pending indefinitely: both
+attempts were made and abandoned and the screen still said "Loading restrictions…" a
+minute later. Timeouts are therefore not retried, which is also the behaviour that shows a
+message soonest. No screen changes beyond that — every page already renders
+`error.message`, which is precisely why the message is the deliverable.

@@ -149,17 +149,11 @@ Becomes urgent at the first EU deal with a security questionnaire, not before.
 
 The real fix is `management.server.port` on a port the load balancer does not publish, so nothing outside the VPC can reach anything but `/actuator/health`. That is a Terraform change — a second container port, a security-group rule, and the health check pointed at it — which is why it belongs to the story that applies the deployment rather than to the review that found it.
 
-### OI-22 — The frontend has no request timeout, so a hung API leaves a spinner for ever
-**Severity:** Gap · **Owner:** needs a story · **Raised:** 2026-09-09
-
-`apiRequest` passes the caller's `AbortSignal` through and adds nothing of its own. A request that is accepted and never answered — a load balancer holding a connection to a wedged task is the realistic case — leaves every screen in its loading state indefinitely, with no error and no retry: the same class of defect `FZ-065` fixed on the backend's outbound calls, on the other side of the wire.
-
-Left out of `FZ-065` deliberately. The fix is `AbortSignal.any([caller, AbortSignal.timeout(n)])` in the one wrapper, but it changes the failure mode of every request in the application, and `AbortSignal.any` needs checking against the jsdom the test suite runs on. That is a change worth its own story and its own tests, not a line added at the end of a review.
-
 ## Resolved
 
 | Issue | Found in | Resolved by |
 |---|---|---|
+| **The frontend had no request timeout** — a request accepted and never answered left every screen in its loading state indefinitely, with no error and no retry: the defect `FZ-065` had just fixed on the backend's outbound calls, on the side a customer looks at | `FZ-065` | `FZ-124` |
 | **Five scheduled jobs had no distributed locking** — every one ran on every instance, so at the default desired count of two the notification dispatcher delivered each pending row twice and the lifecycle reconciler recorded two activations of one restriction. Latent only because nothing had been applied yet | Milestone 13 planning | `FZ-121` — a `scheduler_lock` row per job, taken in one atomic statement against the database's clock |
 | **The deployment-check retention purge never ran** — the scheduled method self-invoked the transactional one, so Spring's proxy was bypassed and the `@Modifying` delete threw `TransactionRequiredException` on every pass. Its test called the inner method on the injected bean, which does go through the proxy, so the suite passed and the only path that runs in production was the one nothing exercised | a running backend, `FZ-113` | `FZ-114` |
 | **No rate limiting anywhere** — defensible while `/actuator/health` was the only endpoint reachable without a credential, and a prerequisite for signup, which creates a Cognito identity and sends an email | `FZ-080` | `FZ-087` — per-IP fixed window, in application; it also found that forwarded headers were unconfigured, so a limiter would have bucketed every customer together behind the load balancer |
