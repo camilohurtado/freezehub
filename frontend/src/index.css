@@ -115,7 +115,188 @@
      "body copy is 15px" here shrank the whole application by 6%. Body copy is set on
      the body; the root stays whatever the browser and the reader chose. */
   line-height: 1.55;
-  color-scheme: light;   /* Broadsheet shows no dark surfaces — OI-17 */
+  /* Both, now that there is a dark set to switch to (FZ-131). Form controls, scrollbars
+     and the canvas behind the page follow the resolved scheme, so a dark page does not
+     get a white scrollbar down the side of it. */
+  color-scheme: light dark;
+}
+
+/*
+ * ————— the dark set (FZ-131, closing OI-17) —————
+ *
+ * Not a second palette invented alongside the first. Broadsheet's ramps are generated in
+ * OKLCH *on one shared lightness scale*, and that is the rule this is derived from: in a
+ * dark context the scale runs the other way, so step 100 is the darkest and 900 the
+ * lightest. Every module keeps asking for the step it already asks for — a tinted fill is
+ * still 100, text on a tint is still 800 — and not one CSS Module needed editing.
+ *
+ * What newsprint does when the light goes: the ink becomes the ground and the paper
+ * becomes the type. Both accents move up their own ramp until they read on ink, and they
+ * keep their jobs: cyan is still the only colour that means "you can act on this", magenta
+ * still the only one that means "a deployment is being stopped".
+ *
+ * The values live once, here, and are mapped twice below — once for the reader whose
+ * system is dark, once for an explicit choice. Duplicating the mapping is the price CSS
+ * charges for having no way to share a declaration block between two selectors; the price
+ * is paid on the mapping, never on the values.
+ */
+:root {
+  --dk-bg: #201e1d;
+  --dk-surface: #2a2827;
+  --dk-text: #f3f2f2;
+  /* 22%, not the light set's 16%: a hairline at 16% of paper-on-ink disappears. */
+  --dk-divider: color-mix(in srgb, #f3f2f2 22%, transparent);
+
+  --dk-neutral-100: #2d2b2b;
+  --dk-neutral-200: #444141;
+  --dk-neutral-300: #605d5d;
+  --dk-neutral-400: #7d7979;
+  --dk-neutral-500: #9b9797;
+  --dk-neutral-600: #bab6b6;
+  --dk-neutral-700: #d7d3d3;
+  --dk-neutral-800: #eae7e7;
+  --dk-neutral-900: #f8f4f4;
+
+  --dk-accent-100: #0a303e;
+  --dk-accent-200: #004961;
+  --dk-accent-300: #006786;
+  --dk-accent-400: #1186ac;
+  --dk-accent-500: #38a6cf;
+  --dk-accent-600: #62c5ee;
+  --dk-accent-700: #99e0ff;
+  --dk-accent-800: #cbeeff;
+  --dk-accent-900: #e9f8ff;
+
+  --dk-accent-2-100: #4b1528;
+  --dk-accent-2-200: #790e3d;
+  --dk-accent-2-300: #aa0b56;
+  --dk-accent-2-400: #d82071;
+  --dk-accent-2-500: #ff458e;
+  --dk-accent-2-600: #ff90b1;
+  --dk-accent-2-700: #ffc0d0;
+  --dk-accent-2-800: #ffdee6;
+  --dk-accent-2-900: #fff1f4;
+
+  /* A shadow on ink is not a paler ink, it is a darker one. */
+  --dk-shadow-sm: 0 1px 2px color-mix(in srgb, #000 45%, transparent);
+  --dk-shadow-md: 0 3px 10px color-mix(in srgb, #000 50%, transparent);
+  --dk-shadow-lg: 0 12px 32px color-mix(in srgb, #000 60%, transparent);
+}
+
+/*
+ * The mapping, written once as a rule and applied by both selectors below.
+ *
+ * `:not([data-theme='light'])` so that an explicit light choice beats a dark system —
+ * without it the media query would win and the choice would do nothing.
+ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --color-bg: var(--dk-bg);
+    --color-surface: var(--dk-surface);
+    --color-text: var(--dk-text);
+    --color-divider: var(--dk-divider);
+
+    /* Base accents move to step 500: bright enough to carry near-black text on a
+       button, which is what `.btn-primary` asks of this token. */
+    --color-accent: var(--dk-accent-500);
+    --color-accent-2: var(--dk-accent-2-500);
+
+    --color-neutral-100: var(--dk-neutral-100);
+    --color-neutral-200: var(--dk-neutral-200);
+    --color-neutral-300: var(--dk-neutral-300);
+    --color-neutral-400: var(--dk-neutral-400);
+    --color-neutral-500: var(--dk-neutral-500);
+    --color-neutral-600: var(--dk-neutral-600);
+    --color-neutral-700: var(--dk-neutral-700);
+    --color-neutral-800: var(--dk-neutral-800);
+    --color-neutral-900: var(--dk-neutral-900);
+
+    --color-accent-100: var(--dk-accent-100);
+    --color-accent-200: var(--dk-accent-200);
+    --color-accent-300: var(--dk-accent-300);
+    --color-accent-400: var(--dk-accent-400);
+    --color-accent-500: var(--dk-accent-500);
+    --color-accent-600: var(--dk-accent-600);
+    --color-accent-700: var(--dk-accent-700);
+    --color-accent-800: var(--dk-accent-800);
+    --color-accent-900: var(--dk-accent-900);
+
+    --color-accent-2-100: var(--dk-accent-2-100);
+    --color-accent-2-200: var(--dk-accent-2-200);
+    --color-accent-2-300: var(--dk-accent-2-300);
+    --color-accent-2-400: var(--dk-accent-2-400);
+    --color-accent-2-500: var(--dk-accent-2-500);
+    --color-accent-2-600: var(--dk-accent-2-600);
+    --color-accent-2-700: var(--dk-accent-2-700);
+    --color-accent-2-800: var(--dk-accent-2-800);
+    --color-accent-2-900: var(--dk-accent-2-900);
+
+    --shadow-sm: var(--dk-shadow-sm);
+    --shadow-md: var(--dk-shadow-md);
+    --shadow-lg: var(--dk-shadow-lg);
+
+    /*
+     * Two aliases are remapped rather than inherited, because the step that carries a
+     * role changes with the ground.
+     *
+     * `--fh-accent-ink` is accent at paragraph size: 700 on paper, 600 on ink, where the
+     * lighter step is the legible one. `--fh-danger` is the "in force" ink, and the
+     * mirrored 700 is a pale pink that reads as decoration rather than as a refusal —
+     * 500 is the step that still says magenta on a dark ground.
+     */
+    --fh-accent-ink: var(--dk-accent-600);
+    --fh-danger: var(--dk-accent-2-500);
+  }
+}
+
+/* The same mapping for an explicit choice. Nothing in the interface sets this attribute
+   yet — see the story: it is here so the dark set can be seen, reviewed and screenshotted
+   on a machine whose system is light, which is every machine this was built on. */
+:root[data-theme='dark'] {
+  --color-bg: var(--dk-bg);
+  --color-surface: var(--dk-surface);
+  --color-text: var(--dk-text);
+  --color-divider: var(--dk-divider);
+
+  --color-accent: var(--dk-accent-500);
+  --color-accent-2: var(--dk-accent-2-500);
+
+  --color-neutral-100: var(--dk-neutral-100);
+  --color-neutral-200: var(--dk-neutral-200);
+  --color-neutral-300: var(--dk-neutral-300);
+  --color-neutral-400: var(--dk-neutral-400);
+  --color-neutral-500: var(--dk-neutral-500);
+  --color-neutral-600: var(--dk-neutral-600);
+  --color-neutral-700: var(--dk-neutral-700);
+  --color-neutral-800: var(--dk-neutral-800);
+  --color-neutral-900: var(--dk-neutral-900);
+
+  --color-accent-100: var(--dk-accent-100);
+  --color-accent-200: var(--dk-accent-200);
+  --color-accent-300: var(--dk-accent-300);
+  --color-accent-400: var(--dk-accent-400);
+  --color-accent-500: var(--dk-accent-500);
+  --color-accent-600: var(--dk-accent-600);
+  --color-accent-700: var(--dk-accent-700);
+  --color-accent-800: var(--dk-accent-800);
+  --color-accent-900: var(--dk-accent-900);
+
+  --color-accent-2-100: var(--dk-accent-2-100);
+  --color-accent-2-200: var(--dk-accent-2-200);
+  --color-accent-2-300: var(--dk-accent-2-300);
+  --color-accent-2-400: var(--dk-accent-2-400);
+  --color-accent-2-500: var(--dk-accent-2-500);
+  --color-accent-2-600: var(--dk-accent-2-600);
+  --color-accent-2-700: var(--dk-accent-2-700);
+  --color-accent-2-800: var(--dk-accent-2-800);
+  --color-accent-2-900: var(--dk-accent-2-900);
+
+  --shadow-sm: var(--dk-shadow-sm);
+  --shadow-md: var(--dk-shadow-md);
+  --shadow-lg: var(--dk-shadow-lg);
+
+  --fh-accent-ink: var(--dk-accent-600);
+  --fh-danger: var(--dk-accent-2-500);
 }
 
 * {

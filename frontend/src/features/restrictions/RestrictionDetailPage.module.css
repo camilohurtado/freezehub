@@ -230,7 +230,7 @@
 /* Magenta because a refusal is a deployment that was stopped — the same claim the tag
    and the dashboard rail make, in the same ink. */
 .figureAlarming {
-  color: var(--color-accent-2-700);
+  color: var(--fh-danger);
 }
 
 .figureCaption {
@@ -242,7 +242,7 @@
 /* A delivery that failed means somebody was not told, so it takes the in-force ink even
    though it is a link. */
 .failedLink {
-  color: var(--color-accent-2-700);
+  color: var(--fh-danger);
 }
 
 .impactState {
