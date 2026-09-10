@@ -96,7 +96,7 @@ Discoverability — a Marketplace or Catalog listing — is a separate and lesse
 Nothing is urgent while nothing is deployed. It becomes urgent the day someone outside the team needs a URL.
 
 ### OI-20 — EU data residency is deferred by choosing us-east-1
-**Severity:** Decision · **Owner:** needs a story · **Raised:** 2026-09-08
+**Severity:** Decision · **Owner:** `FZ-135` · **Raised:** 2026-09-08
 
 The deployment region was decided as `us-east-1` (the `variables.tf` default) with the residency question knowingly deferred. Latency is not the issue — the Policy API is one HTTPS POST per deploy, and 250 ms from Sydney is nothing against a pipeline step measured in minutes. Residency is.
 
@@ -104,7 +104,20 @@ FreezeHub is sold to companies with a compliance function, and an EU buyer's sec
 
 The seam is in good shape, which is why this is a decision rather than a gap: the backend has no AWS coupling at all — no SDK, nothing in `pom.xml`, nothing in `application.yml` — so a second region is a Terraform workspace rather than a redesign.
 
-Becomes urgent at the first EU deal with a security questionnaire, not before.
+**Corrected by `FZ-135`: it becomes urgent at the first `apply`, not at the first EU deal.**
+Two things were understated above.
+
+"A migration of live data" is the database, and it is not the expensive half. **A Cognito
+user pool is region-bound and cannot be moved**, and the `sub` it issues is what
+`users.external_subject` stores — so moving region after `FZ-046` creates the pool means a
+new pool, a new subject for every user, and a re-mapping of that column. It is a migration
+of who people are, not only of what they own. The pool does not exist yet, which is the
+whole of the window.
+
+And the cost of choosing now is smaller than "a Terraform workspace": the configuration is
+already parameterised end to end — availability zones are read and sliced rather than
+named, and the only pinned `us-east-1` is the CloudFront certificate, which AWS accepts
+from nowhere else and which holds no customer data. It is one variable, until it is applied.
 
 
 ### OI-21 — Actuator is on the application's own port, reachable by any administrator of any tenant
