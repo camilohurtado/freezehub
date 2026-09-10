@@ -26,7 +26,7 @@ public class UserResolvingJwtAuthenticationConverter implements Converter<Jwt, A
 
     @Override
     public AbstractAuthenticationToken convert(Jwt jwt) {
-        User user = userRepository.findByCognitoSubject(jwt.getSubject())
+        User user = userRepository.findByExternalSubject(jwt.getSubject())
                 .orElseThrow(() -> new InvalidBearerTokenException(
                         new OAuth2Error("invalid_token", "No user provisioned for this identity", null).toString()));
 

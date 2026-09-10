@@ -23,7 +23,7 @@ Restated from `CLAUDE.md` and `02-architecture.md` — this document must not co
 - Flow: Cognito authenticates the user and issues an **access token** (JWT). The frontend attaches it as `Authorization: Bearer <token>` on API requests.
 - Backend: Spring Security configured as an **OAuth2 Resource Server**, validating the JWT signature and claims against the Cognito user pool's JWKS endpoint (issuer URI supplied per environment via configuration, not hardcoded).
 - Identity mapping: Cognito's `sub` claim is the external identity identifier. FreezeHub resolves it to a `users` row scoped to one `organization_id`.
-  - This resolves `03-data-model.md`'s open item on the `users` table: add `cognito_subject VARCHAR NOT NULL UNIQUE`. (Updated in that document as part of this change.)
+  - This resolves `03-data-model.md`'s open item on the `users` table: add `external_subject VARCHAR NOT NULL UNIQUE`. (Updated in that document as part of this change.) **Named `cognito_subject` until `FZ-132`** (`OI-16`), which is the same column: it holds the issuer's `sub` claim, and naming the issuer in the schema claimed a coupling the backend does not have.
 - Organization resolution: on every authenticated request, `organization_id` comes from the resolved `users` row — never from client input.
 
 **Resolved by `FZ-012`:** user provisioning is **admin-provisioned bootstrap + in-product invite**:
