@@ -12,6 +12,7 @@ import java.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
@@ -34,8 +35,13 @@ public class WebhookNotificationSender implements NotificationSender {
 
     private final RestClient restClient;
 
-    public WebhookNotificationSender(RestClient.Builder restClientBuilder) {
-        this.restClient = restClientBuilder.build();
+    /*
+     * The guarded client (FZ-126): no redirects, and every destination resolved and checked
+     * on the way out. This one calls an address a customer chose, which is what separates
+     * it from the demo notifier's own builder.
+     */
+    public WebhookNotificationSender(@Qualifier("outboundDeliveryRestClient") RestClient restClient) {
+        this.restClient = restClient;
     }
 
     @Override
