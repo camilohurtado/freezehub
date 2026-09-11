@@ -150,7 +150,7 @@ BEGIN;
 WITH org AS (
   INSERT INTO organization (name) VALUES ('$COMPANY_SQL') RETURNING id
 ), admin AS (
-  INSERT INTO users (organization_id, cognito_subject, email, role)
+  INSERT INTO users (organization_id, external_subject, email, role)
   SELECT id, 'provisioned-' || id || '-' || md5(random()::text), '$ADMIN_SQL', 'ADMINISTRATOR'
   FROM org
 )

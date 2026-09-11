@@ -260,7 +260,7 @@ No Cognito user pool exists until `FZ-063`, so the browser currently has no way 
 Acceptance:
 
 - Exposed **only** under the `local` Spring profile — `@Profile("local")`, like `LocalJwtConfig`. No deployed environment activates that profile, so the endpoint cannot exist there.
-- Accepts an identifier for an existing `users` row and returns a signed token whose `sub` matches that user's `cognito_subject`.
+- Accepts an identifier for an existing `users` row and returns a signed token whose `sub` matches that user's `external_subject`.
 - Returns 404/400 for an unknown user rather than minting a token for an identity that does not exist.
 - A test asserts the endpoint is **absent** when the `local` profile is not active — the security property, not just the happy path.
 - Replaced by the Cognito Hosted UI redirect at `FZ-063`.
@@ -1836,7 +1836,135 @@ minute later. Timeouts are therefore not retried, which is also the behaviour th
 message soonest. No screen changes beyond that — every page already renders
 `error.message`, which is precisely why the message is the deliverable.
 
-## Milestone 14 — Security Requirements
+### FZ-131 — Dark Mode, Derived Rather Than Invented
+**Status:** DONE · **Resolves** `OI-17`
+
+The application supported `prefers-color-scheme: dark` until `FZ-100`, which pinned
+`color-scheme: light` because Industry shipped no dark ramp. Broadsheet ships none either,
+so anyone on a dark OS got a light application with no warning — and taking away something
+an application already did is the kind of change nobody remembers making, which is why it
+was recorded rather than dropped.
+
+**Derived from the system's own construction rule, not invented beside it.** Broadsheet's
+ramps are generated in OKLCH *on one shared lightness scale*; in a dark context that scale
+runs the other way, so step 100 is the darkest and 900 the lightest. Every module keeps
+asking for the step it already asks for — a tinted fill is still 100, text on a tint is
+still 800 — and the ink becomes the ground while the paper becomes the type.
+
+**Two roles are remapped rather than mirrored**, because the step that carries a role
+changes with the ground: accent-at-paragraph-size moves from 700 to 600, and the "in force"
+ink moves to 500. Mirroring sent the refusal magenta to a pale pink that read as decoration
+rather than as a deployment being stopped — the one rule for colour survives only if
+magenta still looks like a refusal.
+
+**Found on the way, and fixed:** eighteen declarations across seven modules reached past
+`--fh-danger` for `--color-accent-2-700` directly. Identical in light — the frame is
+byte-for-byte unchanged — but it meant the "in force" ink could not be remapped in one
+place, which is exactly what an alias is for. They now use the alias.
+
+**Decided:** a `[data-theme]` hook ships alongside the media query. `prefers-color-scheme`
+alone cannot be seen on a light machine, so nothing about the dark set could be verified,
+reviewed or screenshotted — the hook earns its place today rather than being scaffolding
+for a toggle. Nothing in the interface sets it, and that is stated where it is defined.
+
+Out of scope: a toggle in the interface, and a stored preference. Neither has been asked
+for; the reader's system already says which they want.
+
+### FZ-132 — A Column That Does Not Name Its Vendor
+**Status:** DONE · **Resolves** `OI-16`
+
+`users.cognito_subject` named a provider rather than a concept. The column holds whatever
+subject an OIDC issuer put in the `sub` claim, and the backend has no coupling to Cognito
+at all — no SDK, nothing in `pom.xml`, nothing in `application.yml`. The name asserted a
+coupling that does not exist, and a name is the first thing a reader believes.
+
+Now `external_subject`. Cognito stays named in prose, because it is genuinely the chosen
+provider (`06-security.md`); what changes is the schema, which should describe the concept
+it stores.
+
+**A rename, not a new column plus a backfill.** There is no production data and no second
+writer, so `renameColumn` is one statement — and the whole point of doing it now is that
+`FZ-046` has not yet wired a real provider. Once there are rows in a deployed environment
+this stops being free.
+
+**The constraint is renamed too.** PostgreSQL carries a generated constraint name across a
+column rename, so `users_cognito_subject_key` would have gone on saying "Cognito" from the
+one place nobody thinks to look — the schema half-renamed is worse than not renamed,
+because it reads as an oversight rather than a decision.
+
+**Rehearsed against real rows.** The integration suite runs the changelog on an empty
+database every time, which cannot show what a rename does to data. The live local database
+was cloned, the application started against the copy, and the result checked: column
+renamed, constraint and its index renamed with it, all three rows intact and distinct, and
+a real token round-trip resolving a user through the renamed column. The rollback
+statements were then executed against that copy and returned it to the old shape. The copy
+was dropped; the live database was never touched.
+
+### FZ-133 — Spacing on the Scale
+**Status:** DONE · **Resolves** `OI-18`
+
+`OI-18` recorded that layout spacing was mostly literal, so the system's density was
+unreachable by changing tokens: Broadsheet specifies a 1.25× airier scale and the
+application received it through the type scale alone.
+
+**The count said 47 rem literals; the map said four files.** Two screens carried almost all
+of them — `RestrictionsPage` and `CatalogPage`, 33 between them — with `AuditPage` and one
+line of `RestrictionDetailPage` making up the rest. Everything else had already moved onto
+the tokens as screens were rewritten. The issue read as a survey of the whole application;
+it was two screens that were never re-pitched.
+
+**The rule, so the judgement is inspectable rather than per-declaration taste:**
+
+| Literal | Becomes | Why |
+|---|---|---|
+| within ~2px of a step | that step | 12px → `--space-2` (10), 14px → `--space-3` (15), 16px → `--space-3` |
+| exactly a step | that step | 20px → `--space-4`, 10px → `--space-2`, 5px → `--space-1` |
+| below the scale (≤2.5px) | plain `px` | a 2px nudge under a chip is furniture, not layout, and forcing it onto the scale would triple it |
+| any `px` already there | untouched | the deck specifies its furniture in px — a 4px rule over a 1px one, 12px between chart columns. `OI-18` warned that converting those would overwrite the system with itself |
+
+Recounted after the change: **159 token uses, 0 rem literals, 133 px** — the px column
+unchanged, which is the point.
+
+**Found while photographing it, and not fixed here:** `RestrictionsPage` is still wearing
+Industry's furniture — a bordered filter fieldset with a legend, the table inside a boxed
+panel, outlined status chips — while every screen re-cut for Broadsheet uses rules and
+negative space instead. Spacing was the symptom `OI-18` recorded; that is the cause, and it
+is a redesign rather than a sweep. Recorded as `OI-28`.
+
+### FZ-134 — Restrictions, Re-cut for Broadsheet
+**Status:** DONE · **Resolves** `OI-28`
+
+The last screen still wearing Industry's furniture. `FZ-133` put its spacing on the token
+scale and, in photographing it, made plain that spacing was the symptom: the screen was a
+faithful Industry layout that survived the theme swap.
+
+Two boxes removed, both replaced with something the system already draws:
+
+- **The status filter** was a bordered `fieldset` with a `legend` — a frame around four
+  words. It is now a small caps label and chips, which is how the deck draws a multi-select
+  (`1e`, where scope is "chips instead of native multi-selects"): filled when chosen,
+  outlined when not. The `fieldset` gave the group its accessible name, so that became
+  `role="group"` with `aria-labelledby`; the checkboxes are still checkboxes, visually
+  hidden behind their chips exactly as the system's own `.seg-opt` hides its radios.
+- **The table** was a local copy of `.table` inside a bordered, rounded panel. It now uses
+  the system's `.table`, unboxed, as the checks console has since `FZ-071`.
+
+**Two corrections to `OI-28`, which I wrote and got partly wrong:**
+
+1. It said `1e` "draws a list screen". It does not — `1e` is create-restriction. What it
+   draws is the *multi-select*, which is the part this needed. There is no list screen in
+   the deck; the reference for the table was the checks console, in the application.
+2. It called the outlined status chips Industry furniture. They are not: `FZ-103` chose an
+   outline for `active` deliberately, so that the magenta beside it stays the only claim
+   that something is in force. They are untouched.
+
+**Found while photographing the phone**, and fixed here: the table's own comment said
+narrow screens "scroll the table rather than squashing the date columns", and nothing
+implemented it — `.table` is `width: 100%`, so inside a scrolling box it shrank to fit and
+every title broke to one word per line. The two timestamps were taking 53% of the table
+between them, measured, leaving the name column 108px. A `min-width` makes the scroll real,
+and below 48rem the timestamp is allowed to wrap so the name gets its width back.
+## Milestone 15 — Security Requirements
 
 `FZ-065` reviewed the areas it named — tenant isolation, API keys, date/time, lifecycle — and
 found them sound. This milestone reviews what that story did not scope, against OWASP, and

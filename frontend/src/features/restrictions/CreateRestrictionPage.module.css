@@ -191,7 +191,7 @@
  * something will be stopped.
  */
 .willMatchBlocking {
-  border-top: 4px solid var(--color-accent-2-700);
+  border-top: 4px solid var(--fh-danger);
   padding-top: 14px;
 }
 
@@ -203,7 +203,7 @@
 .willMatchLabelBlocking {
   composes: fieldLabel from global;
   margin-bottom: 10px;
-  color: var(--color-accent-2-700);
+  color: var(--fh-danger);
 }
 
 .willMatchText {
@@ -216,7 +216,7 @@
   margin: 10px 0 0;
   font-size: 14px;
   line-height: 1.6;
-  color: var(--color-accent-2-700);
+  color: var(--fh-danger);
 }
 
 .figures {
@@ -242,7 +242,7 @@
 }
 
 .overlapWarning {
-  border-left: 3px solid var(--color-accent-2-700);
+  border-left: 3px solid var(--fh-danger);
   padding-left: var(--space-3);
 }
 

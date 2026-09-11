@@ -72,6 +72,10 @@ Discoverability — a Marketplace or Catalog listing — is a separate and lesse
 
 | | $/month | |
 |---|---|---|
+| **Restrictions still wore the Industry furniture** — a bordered filter `fieldset` with a legend and the table inside a boxed panel, while Broadsheet takes its structure from the type scale and negative space. The last screen left like it | `FZ-133` | `FZ-134` — chips as the deck draws a multi-select, the system's own unboxed table, and the narrow-screen scroll its comment had always claimed |
+| **Layout spacing did not use the design system's scale**, so the system's density was unreachable by changing tokens — and it turned out to be two screens that were never re-pitched rather than the whole application | `FZ-101` | `FZ-133` — 159 token uses, 0 rem literals, px furniture deliberately untouched |
+| **`cognito_subject` named a vendor in the schema** — the column holds whatever subject an OIDC issuer put in the `sub` claim, and the backend has no coupling to that provider, so the name asserted one that does not exist | `OI-15` assessment | `FZ-132` — renamed to `external_subject`, constraint and index with it, rehearsed against a clone of the live database |
+| **Dark mode was removed with the Industry theme** — `FZ-100` pinned `color-scheme: light` because Industry shipped no dark ramp, and Broadsheet shipped none either, so a reader on a dark system got a light application with no warning | `FZ-100` | `FZ-131` — derived from the ramps' own shared lightness scale, so no module changed |
 | NAT Gateway | 32.85 | so two idle containers can reach ECR and CloudWatch |
 | Fargate, 2 tasks | 28.84 | `backend_desired_count = 2` |
 | ALB | 16.43 | TLS and a stable hostname |
@@ -90,45 +94,6 @@ Discoverability — a Marketplace or Catalog listing — is a separate and lesse
 2. Whether the beta posture becomes real: `backend_desired_count`, subnet placement, and relaxable deletion protection would all have to become variables. As it stands `terraform destroy` cannot run at all, because `deletion_protection` on RDS and Cognito, `skip_final_snapshot = false`, and `prevent_destroy` on both secrets deliberately block it — correct for production, wrong for a pre-customer beta.
 
 Nothing is urgent while nothing is deployed. It becomes urgent the day someone outside the team needs a URL.
-
-### OI-16 — `cognito_subject` leaks a vendor name into the schema
-**Severity:** Gap · **Owner:** needs a story · **Found in:** `OI-15` assessment
-
-`users.cognito_subject` names a provider rather than a concept, and the backend is not actually coupled to that provider — the column holds whatever subject an OIDC issuer put in a JWT. `identity_subject` or `external_subject` would say what it is.
-
-Cosmetic, and worth doing anyway: the name makes the next reader assume a coupling that does not exist, and it is a rename migration plus a handful of accessors while there is no production data to migrate.
-
-### OI-17 — Dark mode was removed with the Industry theme
-**Severity:** Gap · **Owner:** needs a story · **Found in:** `FZ-100`
-
-The frontend supported `prefers-color-scheme: dark` through the `--fh-*` tokens. Industry ships no dark ramp, so `FZ-100` pinned `color-scheme: light` and dropped the block.
-
-Anyone on a dark OS now gets a light application with no warning. Reinstating it is not a port — it means choosing dark values for every role in the system, including how the accent-as-field treatment and the hairline frames read on a dark ground.
-
-Recorded rather than silently removed, because taking away something an application already did is the kind of change nobody remembers making.
-
-
-
-### OI-18 — Module spacing does not use the design system's scale
-**Severity:** Gap · **Owner:** needs a story · **Found in:** `FZ-101`
-
-The consequence is that a system's density is unreachable by changing tokens. Broadsheet specifies a 1.25× airier scale, and the application receives it mostly through the type scale — the layout keeps the spacing each screen was written with, whatever the tokens say.
-
-**Re-counted 2026-09-08**, because the original figures were stale and the shape of the problem has changed. `padding` / `gap` / `margin` declarations across the CSS Modules:
-
-| | Then (`FZ-101`) | Now |
-|---|---|---|
-| `var(--space-*)` | 21 | **76** |
-| rem literals | 120 | **47** |
-| px literals | — | **111** |
-
-`FZ-103` was recorded as closing this. **It did not** — it addressed the colour rule, the type scale and the furniture, and the token count roughly quadrupled as screens were rewritten, but two thirds of spacing is still literal.
-
-The px column is new and needs a judgement rather than a conversion. Much of it is deliberate: the Broadsheet deck specifies its furniture in px — a 4px rule over a 1px one, 12px between chart columns, 8px between chips — and those are the design, not drift. The rem literals are the ones that are simply old.
-
-So this is not the mechanical sweep it was first written as. Whoever takes it has to separate *"this px is what the mockup says"* from *"this rem is what the file happened to have"*, and only convert the second. Converting all of it would overwrite the system with itself.
-
-Still not visible as a defect, and still the reason the app looks approximately-themed rather than exactly-themed.
 
 ### OI-20 — EU data residency is deferred by choosing us-east-1
 **Severity:** Decision · **Owner:** needs a story · **Raised:** 2026-09-08

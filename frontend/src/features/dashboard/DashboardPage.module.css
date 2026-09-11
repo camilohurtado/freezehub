@@ -46,7 +46,7 @@
    takes it except a hard-freeze tag, which is the same claim about one restriction. */
 .railBlocking {
   font: 600 17px var(--font-heading);
-  color: var(--color-accent-2-700);
+  color: var(--fh-danger);
 }
 
 .railClear {
@@ -135,7 +135,7 @@
 }
 
 .metricValueAlarming {
-  color: var(--color-accent-2-700);
+  color: var(--fh-danger);
 }
 
 .metricCaption {

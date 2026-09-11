@@ -29,9 +29,9 @@ public class InviteService {
         }
 
         UserRole role = requestedRole != null ? requestedRole : UserRole.MEMBER;
-        String cognitoSubject = identityProvider.createUser(email);
+        String externalSubject = identityProvider.createUser(email);
 
-        return userRepository.save(new User(organizationId, cognitoSubject, email, role));
+        return userRepository.save(new User(organizationId, externalSubject, email, role));
     }
 
 }
