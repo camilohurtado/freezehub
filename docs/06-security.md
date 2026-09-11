@@ -85,6 +85,20 @@ A separate header (rather than reusing `Authorization`) keeps human (JWT) and ma
 
 **Resolved by `FZ-052` — the hash is not salted.** This document originally said "salted hash (e.g. SHA-256)". A salt defeats rainbow tables and offline brute force against *low-entropy* secrets; neither attack applies to a 256-bit random value, because there is nothing to guess. A per-key salt would also mean the hash of an incoming key no longer identifies its row, forcing either a second lookup handle inside the token or hashing every stored row on every call — and the Policy API is asked on every deployment. What this section actually requires is unchanged and holds exactly: the raw key is never stored, and lookup is by hash.
 
+## Outbound Destinations (Where FreezeHub Will Call)
+
+**Implemented by `FZ-126`, resolving `OI-23`.** A webhook or Slack URL is chosen by a customer's administrator and then called *from inside the deployment's network*. Until this existed the only check was `startsWith("https://")`, which says nothing about which host.
+
+Three rules, enforced on every delivery rather than when the integration is saved — a name validated at save time can be repointed the minute after:
+
+- **Redirects are not followed.** A `302` from an attacker's own HTTPS endpoint to `http://169.254.169.254/` is the whole attack, and checking the address of a request that is then redirected elsewhere checks nothing. A `3xx` is a delivery *failure*, not a success: a response nobody followed is not a delivery.
+- **Every resolved address must be public.** Loopback, link-local (where a container runtime serves the task's own credentials), private, carrier-grade NAT, unique-local, any-local and multicast are refused — and *every* address a name resolves to must pass, because a name with several records only needs one of them to be useful.
+- **A userinfo authority is refused outright.** `https://hooks.slack.com@10.0.0.5/` starts with `https://`, reads like Slack, and addresses an internal host.
+
+The refusal is visible to the customer on the notifications screen and names the *class* of address, never the address itself — telling somebody their name resolved to `10.0.0.5` confirms the internal range to whoever pointed it there.
+
+**What this does not close, stated because it matters:** the window between FreezeHub's resolution and the HTTP client's own, which is a DNS rebind. Closing that means connecting to a pinned address with the `Host` header set by hand. The durable answer is egress control in the network — a security group, or egress through a proxy — which belongs to `FZ-123` and which this does not replace. These rules apply to customer-supplied destinations only; the demo-request notifier calls a webhook this organization configures for itself.
+
 ## Outbound Authentication (Webhook Signing)
 
 Everything above is about authenticating what reaches FreezeHub. This is the other direction: letting a customer's receiver verify that a webhook delivery actually came from FreezeHub (`FZ-048`, decision `D-2` in `07-decisions.md`).

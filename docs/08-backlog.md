@@ -1999,7 +1999,7 @@ so the control is egress rather than validation. That reframing is what makes `F
 deployment story rather than a validator story.
 
 ### FZ-126 — Egress Control for Outbound Deliveries
-**Status:** TODO · **Owns:** `OI-23` · **Decide with:** `FZ-122`, `FZ-123`
+**Status:** DONE in the application · **Owns:** `OI-23` · **Network half:** `FZ-123`
 
 Acceptance:
 
@@ -2013,6 +2013,21 @@ Acceptance:
   drop: a destination that will never work should say so.
 - Tests cover a redirect to a link-local address, a userinfo authority, and a hostname that
   resolves to a private address.
+
+
+**Built (`FZ-126`).** All four acceptance criteria are in the application, with one
+correction to the first: it said not following redirects "is a request-factory setting". On
+the factory this application had — `SimpleClientHttpRequestFactory` over
+`HttpURLConnection`, which `FZ-065`'s hang stack trace names — there is no redirect setter
+at all. It took a different factory: the JDK `HttpClient` with `followRedirects(NEVER)`,
+which is also where the connect timeout now lives.
+
+The guard is a request interceptor on a `RestClient` bean that only the customer-facing
+senders take, so the demo-request notifier — which calls a webhook this organization
+configures for itself — is deliberately not subject to it.
+
+**Verified by taking the fix away**: with `Redirect.NORMAL`, the delivery follows the `302`
+to the second server and raises nothing at all, which is what the product did before this.
 
 **The `https://` requirement stays** and keeps its existing reason — these carry credentials
 and announcements. What changes is that it is never again read as a statement about *which

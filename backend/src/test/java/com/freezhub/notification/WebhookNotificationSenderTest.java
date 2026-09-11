@@ -45,7 +45,9 @@ class WebhookNotificationSenderTest {
     void setUp() {
         RestClient.Builder builder = RestClient.builder();
         endpoint = MockRestServiceServer.bindTo(builder).build();
-        sender = new WebhookNotificationSender(builder);
+        // The sender takes the built, guarded client now (FZ-126); MockRestServiceServer
+        // still binds to the builder it came from.
+        sender = new WebhookNotificationSender(builder.build());
     }
 
     private Integration destination(String config) {
