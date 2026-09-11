@@ -1964,3 +1964,125 @@ implemented it — `.table` is `width: 100%`, so inside a scrolling box it shran
 every title broke to one word per line. The two timestamps were taking 53% of the table
 between them, measured, leaving the name column 108px. A `min-width` makes the scroll real,
 and below 48rem the timestamp is allowed to wrap so the name gets its width back.
+## Milestone 15 — Security Requirements
+
+`FZ-065` reviewed the areas it named — tenant isolation, API keys, date/time, lifecycle — and
+found them sound. This milestone reviews what that story did not scope, against OWASP, and
+fixes what the review found.
+
+**Order.** `FZ-125` first: it is the specification the rest read. `FZ-128` is sequenced with
+`FZ-046`, not before it. `FZ-126` is decided together with `FZ-122`/`FZ-123`, because egress
+is one decision seen from two sides.
+
+```text
+FZ-125 ──┬── FZ-126   (with FZ-122 / FZ-123)
+         ├── FZ-127
+         ├── FZ-128   (with FZ-046)
+         ├── FZ-129
+         └── FZ-130
+```
+
+### FZ-125 — Security Requirements and OWASP Coverage
+**Status:** DONE · **Owns:** `OI-23`–`OI-27`
+
+Specification only, no code: `docs/06-security.md` gains a **Threat Model and OWASP
+Coverage** section and, inside Human Authentication, the **token validation rules** a
+deployed environment must enforce.
+
+**Deliberately six findings rather than a coverage matrix.** Several OWASP categories cannot
+be answered honestly while nothing is deployed and `FZ-046` does not exist, and a matrix that
+answers them anyway is worth less than none. The matrix is worth writing once there is
+something running to answer it about.
+
+The one finding worth reading the section for: **a webhook URL is attacker-chosen by design**,
+so the control is egress rather than validation. That reframing is what makes `FZ-126` a
+deployment story rather than a validator story.
+
+### FZ-126 — Egress Control for Outbound Deliveries
+**Status:** TODO · **Owns:** `OI-23` · **Decide with:** `FZ-122`, `FZ-123`
+
+Acceptance:
+
+- Redirects are **not** followed on outbound deliveries. This is the single change that
+  closes the `https://`-to-`http://` downgrade, and it is a request-factory setting.
+- The resolved address is checked **at connect time**, not at save time, and loopback,
+  link-local, private and unique-local ranges are refused. Checking at save leaves a name
+  that can be repointed afterwards.
+- A userinfo authority no longer satisfies the scheme check — the host is what is tested.
+- The refusal is a delivery failure the customer can see on the notification, not a silent
+  drop: a destination that will never work should say so.
+- Tests cover a redirect to a link-local address, a userinfo authority, and a hostname that
+  resolves to a private address.
+
+**The `https://` requirement stays** and keeps its existing reason — these carry credentials
+and announcements. What changes is that it is never again read as a statement about *which
+host*, only about the transport.
+
+Whether the boundary is additionally enforced in the network — a security group, or egress
+through a proxy — is `FZ-123`'s to decide, and is the more durable half of the fix.
+
+### FZ-127 — Dependency and Image Scanning
+**Status:** TODO · **Owns:** `OI-24`
+
+Acceptance:
+
+- The build fails on a dependency with a known exploitable vulnerability, at a severity
+  threshold written down rather than left to a default.
+- **The container image is scanned as well as the dependency tree** — the base image is not
+  in `pom.xml`, so a dependency scan alone does not cover what ships.
+- The frontend's dependencies are scanned too; `npm` is a dependency tree like any other.
+- A finding that cannot be fixed immediately is suppressible **with an expiry date**, not
+  indefinitely. A permanent suppression is how a scanner becomes decoration.
+
+Prefer what is already available in the toolchain over a new service. This is a CI change,
+not a platform.
+
+### FZ-128 — Enforce the Token Validation Rules
+**Status:** TODO · **Owns:** `OI-25` · **Sequenced with:** `FZ-046`
+
+Implements what `06-security.md` § Token validation rules specifies: `token_use` is `access`,
+audience is validated against `client_id` rather than `aud`, and the issuer is configuration
+with no default.
+
+Acceptance is the negative half, because the positive half is what the library already does:
+
+- An **ID token** from the same pool is refused with `401`.
+- A token from **another pool** is refused with `401`.
+- A token for **another app client** is refused with `401`.
+
+Not built ahead of `FZ-046`, for the reason `D-4` gives about that adapter: a validator
+written against a pool nothing can reach is a validator that has never refused anything.
+
+### FZ-129 — Response Headers on the Distribution
+**Status:** TODO · **Owns:** `OI-26`
+
+An `aws_cloudfront_response_headers_policy` and its association. Content-Security-Policy,
+HSTS, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`.
+
+The policy that needs thought is CSP: the frontend holds its bearer token in
+`sessionStorage`, so a script injection is how that token leaves, and CSP is the control
+against it. Write it tight enough to matter — the app loads no third-party script today, and
+that is the moment to say so in a header.
+
+Cheapest item in the milestone, and it should not wait for the rest.
+
+### FZ-130 — Rate Limiting Beyond the Unauthenticated Endpoints
+**Status:** TODO · **Owns:** `OI-27`
+
+Extends `FZ-087`'s limiter, which was deliberately scoped to signup and demo requests.
+
+**The endpoint that matters is `/api/policy/**`, and for an unusual reason.** It is not
+credential exposure — a 256-bit key is not guessable. It is that `freeze-check.sh` fails
+closed, so the endpoint whose unavailability blocks every customer's deployments is the one
+currently unmetered.
+
+Acceptance:
+
+- Failed API-key attempts are limited per source, and a limit is `429` with `Retry-After`,
+  as `FZ-087` established.
+- **A successful, authenticated policy evaluation is limited per key, generously, and never
+  in a way that refuses a legitimate deploy.** A limiter that blocks a real pipeline has
+  reproduced the outage `D-21` exists to prevent, from the other direction. If that cannot
+  be done safely, say so and limit only the failures.
+- The Stripe webhook endpoint is limited; Stripe retries, so a `429` there is safe.
+- Limits are configuration, not constants.

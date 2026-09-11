@@ -53,6 +53,20 @@ Provisioning a real Cognito user pool is infrastructure work (`FZ-063`), which i
 - **Local/test profile:** the backend issues and validates JWTs signed with a locally-generated key, matching the claim shape Cognito would produce (at minimum `sub`). No AWS dependency.
 - **Any deployed environment** (including a shared dev/staging AWS environment) validates against the real Cognito JWKS endpoint. There is no environment where the local signing key is trusted outside a developer's own machine or CI test run.
 
+### Token validation rules for a deployed environment
+
+**Specified by `FZ-125`, before `FZ-046` implements any of it.** Nothing below is built: there is no `issuer-uri` and no `JwtDecoder` outside the `local` profile today (`OI-2`), which is precisely why the rules are written now rather than discovered later. Every one of them is a check that a signature-valid token still fails.
+
+**Cognito issues ID tokens and access tokens from the same issuer, signed by the same JWKS.** Signature validation alone therefore accepts both, and an ID token presented where an access token is meant is a valid token being used outside its purpose. Three consequences, none optional:
+
+- **`token_use` must equal `access`.** This is the check that distinguishes the two, and it is the one a default resource-server configuration does not make.
+- **Audience is validated against `client_id`, not `aud`.** A Cognito *access* token carries the app client in `client_id`; `aud` is populated on the ID token. A validator configured on `aud` in the ordinary way silently validates nothing, which is worse than not validating, because it reports success.
+- **The issuer is validated against the configured pool**, supplied per environment as configuration and never defaulted — the same fail-fast as the missing `JwtDecoder` and the missing encryption key.
+
+Expiry and signature are assumed rather than stated; they are what the library already does. These three are the ones it does not.
+
+**A test must present each rejected shape and assert a `401`** — an ID token, a token from another pool, and a token for another app client. A validator with no negative test is a validator nobody has seen refuse anything, which `FZ-114` and `FZ-121` have each already demonstrated the cost of in a different corner of this codebase.
+
 ## Machine Authentication (API Keys)
 
 CI/CD and other machine clients authenticate to the Policy Evaluation API (and other machine-facing endpoints) using an **API key**, sent as a dedicated header:
@@ -119,6 +133,39 @@ Every other authenticated action is available to any user within their own organ
 - **Recoverable secret material is encrypted at rest** (`FZ-049`, decision `D-3`). `integration.config` and `integration.signing_secret` are AES-256-GCM encrypted in the application before they reach the database, so a database connection, a dump or a backup yields ciphertext. It does **not** protect against a compromised application, which holds the key.
 - **The encryption key** comes from `freezehub.secrets.encryption-key` — 32 bytes, Base64. A deployed environment sources it from AWS Secrets Manager and **must** supply it: there is no default outside the `local` profile, and the application refuses to start without one, the same fail-fast as the missing `JwtDecoder`. The committed local key protects a developer's own database and is worth nothing.
 - Encryption sits behind a `SecretProtector` port, so storing secrets *in* a provider and keeping only a reference is a second implementation rather than a rewrite. See `D-3`.
+
+## Threat Model and OWASP Coverage
+
+**Written by `FZ-125`**, a review of the whole application rather than of one change. It records what an attacker can reach and what is missing, and it is deliberately narrow: six findings that can be acted on now, not a coverage matrix for categories nothing yet exercises. Several OWASP categories cannot be answered honestly until something is deployed and `FZ-046` exists, and a matrix that answers them anyway is worth less than no matrix.
+
+### What the review confirmed rather than assumed
+
+`FZ-065` had already checked tenant isolation, API-key handling, date/time and the restriction lifecycle **by running things**, and this review did not repeat that work. What it re-read and found sound: the development sign-in is fenced three independent ways — `@Profile("local")` on the controller, on its security chain and on the token issuer — and outside that profile the application refuses to start at all for want of a `JwtDecoder`. API keys are 256 bits, never stored raw, checked for revocation before use, and reach `/api/policy/**` and nothing else. Recoverable secret material is AES-256-GCM encrypted before it reaches the database (`D-3`). Outbound deliveries are HMAC-signed over timestamp and body (`D-2`). CORS has no permissive default. The Stripe webhook has its own chain and verifies signatures. The bearer token is held in `sessionStorage` rather than `localStorage`, deliberately.
+
+### The findings
+
+| | Finding | OWASP | Owner |
+|---|---|---|---|
+| 1 | Outbound webhooks reach any host the network can reach | A10 Server-Side Request Forgery | `OI-23` · `FZ-126` |
+| 2 | Nothing scans dependencies or images | A06 Vulnerable and Outdated Components | `OI-24` · `FZ-127` |
+| 3 | Deployed token validation is unspecified | A07 Identification and Authentication Failures | `OI-25` · `FZ-128` |
+| 4 | No response-headers policy on the distribution | A05 Security Misconfiguration | `OI-26` · `FZ-129` |
+| 5 | Rate limiting covers only the unauthenticated endpoints | A07 · A04 | `OI-27` · `FZ-130` |
+| 6 | Actuator is on the application's own port | A05 Security Misconfiguration | `OI-21` · `FZ-123` |
+
+### The requirements these produce
+
+**Egress is a boundary, not a validator.** A webhook URL is attacker-chosen by definition — that is the feature. The requirement is therefore not "validate the URL better" but **the application must not be able to reach anything it has no business reaching**: redirects are not followed on outbound deliveries, the resolved address is rejected at connect time rather than at save time, and link-local, loopback, private and unique-local ranges are refused. Validating at save and resolving at send is a gap a name can be moved through, so the check belongs where the connection is made.
+
+**A `https://` prefix is not a destination check.** `startsWith("https://")` is satisfied by a userinfo-bearing authority whose host is an internal address, and it is bypassed entirely by a redirect to `http://`. It stays, because these carry credentials and announcements — but it is a transport requirement and must never again be read as a host requirement.
+
+**The credential a delivery could steal is the one worth bounding.** The blast radius of this class is whatever the runtime's own metadata endpoint will hand out, so the deployment's egress posture (`FZ-122`, `FZ-123`) and this finding are the same decision seen from two sides, and should be decided together.
+
+**A dependency nobody scans is a dependency nobody has approved.** The product's whole claim is to be the control that gates a customer's deployments; shipping unreviewed transitive dependencies is the answer that reads worst on the questionnaire that claim invites. The requirement is that a build fails on a known-exploitable dependency, and that the container image is scanned as well as the dependency tree, because the base image is not in `pom.xml`.
+
+**Every authentication check needs a test that watches it refuse.** Stated in full under Token validation rules above, and it generalises: this codebase has twice shipped a guard whose test exercised the path production does not use (`FZ-114`, `FZ-121`).
+
+**Rate limiting is an availability control here, not only a credential one.** A 256-bit key is not brute-forcible, so the exposure on `/api/policy/**` is cost and availability rather than compromise — but that endpoint is the one whose unavailability blocks every customer's deployments (`D-21`, `D-24`), which makes it the endpoint least able to afford being hammered.
 
 ## Out of Scope for MVP
 
