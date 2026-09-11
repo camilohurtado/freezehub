@@ -149,6 +149,57 @@ Becomes urgent at the first EU deal with a security questionnaire, not before.
 
 The real fix is `management.server.port` on a port the load balancer does not publish, so nothing outside the VPC can reach anything but `/actuator/health`. That is a Terraform change — a second container port, a security-group rule, and the health check pointed at it — which is why it belongs to the story that applies the deployment rather than to the review that found it.
 
+### OI-23 — Outbound webhooks reach any host the network can reach
+**Severity:** Defect · **Owner:** `FZ-126` · **Found in:** `FZ-125`
+
+`WebhookNotificationSender` posts to a customer-supplied URL, and the only validation is `IntegrationConfigs.requireHttpsUrl` — `startsWith("https://")` plus a `URI.create`. There is no host check anywhere in the codebase: no `InetAddress` resolution, no loopback or link-local test, no allowlist.
+
+Three things make the scheme check weaker than it reads:
+
+- **Redirects are followed.** An attacker-controlled HTTPS endpoint answering with a redirect to an `http://` link-local address reaches it, and on a container runtime that address is where the task's own IAM credentials are served. That is the path from a tenant's administrator to the deployment's cloud account.
+- **A userinfo authority satisfies the prefix.** `https://something.example.com@<internal-address>/` starts with `https://` and resolves to the internal host.
+- **Validating at save and resolving at send is a gap a DNS name can be moved through.** The check has to be at connect time.
+
+It is blind — `toBodilessEntity()` discards the response — so there is no direct read-back, but status and timing still distinguish an open internal port from a closed one, and the request carries a body to whatever it reaches.
+
+It requires an `ADMINISTRATOR`, so this is escalation rather than anonymous compromise. That does not lower it much: the premise of a multi-tenant product is that a customer's administrator cannot reach its provider's infrastructure.
+
+**Decided in `FZ-125`: the fix is egress, not validation.** A webhook URL is attacker-chosen by design, so the boundary belongs where the connection is made. That makes this the same decision as the deployment's egress posture (`FZ-122`, `FZ-123`) seen from the other side, and the two should be settled together.
+
+### OI-24 — Nothing scans dependencies or images
+**Severity:** Gap · **Owner:** `FZ-127` · **Found in:** `FZ-125`
+
+There are three workflows — `verify.yml`, `deploy.yml`, `publish-connectors.yml` — and none of them scans anything. No Dependabot configuration, no CodeQL, no image scanner, no dependency checker. Nothing in the repository knows whether a dependency has a published vulnerability.
+
+The base image is not in `pom.xml`, so a dependency scan alone would not cover it; the image needs scanning too.
+
+Worth stating plainly because of what this product is: FreezeHub asks customers to put it on the path of every deployment they make. The first security questionnaire will ask this question, and there is currently no answer.
+
+### OI-25 — Token validation for a deployed environment is unspecified
+**Severity:** Decision · **Owner:** `FZ-128` · **Found in:** `FZ-125`
+
+There is no `issuer-uri` and no `JwtDecoder` outside the `local` profile, consistent with `OI-2`. So the rules a deployed environment will validate against have never been written, and `FZ-046` would otherwise choose them while implementing them.
+
+The specific hazard is that **Cognito issues ID tokens and access tokens from the same issuer, signed by the same keys**, so signature validation accepts both — and its access token carries the app client in `client_id` rather than `aud`, so an audience validator configured the ordinary way passes everything while appearing to check something.
+
+`FZ-125` wrote the rules into `06-security.md` § Token validation rules. This entry stays open until something enforces them, with a test that watches each rejected shape fail.
+
+### OI-26 — No response-headers policy on the distribution
+**Severity:** Gap · **Owner:** `FZ-129` · **Found in:** `FZ-125`
+
+`infra/frontend.tf` creates the CloudFront distribution with no `response_headers_policy`, so the application is served with no Content-Security-Policy, no HSTS, no `X-Content-Type-Options`, no `Referrer-Policy` and no `Permissions-Policy`.
+
+The frontend holds its bearer token in `sessionStorage` — a deliberate and defensible choice, documented in `AuthProvider.tsx`, and one that makes a script-injection the way the token leaves. A Content-Security-Policy is the control that matters against that, and it is currently absent rather than weak.
+
+One Terraform resource and an association. It is the cheapest item on this list.
+
+### OI-27 — Rate limiting covers only the unauthenticated endpoints
+**Severity:** Gap · **Owner:** `FZ-130` · **Found in:** `FZ-125`
+
+`FZ-087` limited signup and demo requests, deliberately and correctly — those were the endpoints that existed without a credential. Nothing limits anything else: not failed API-key attempts on `/api/policy/**`, not the Stripe webhook, not authenticated traffic.
+
+A 256-bit key is not brute-forcible, so this is availability and cost rather than credential compromise. That is the reason it matters here rather than a reason it does not: `/api/policy/**` is the endpoint whose unavailability blocks every customer's deployments, because `freeze-check.sh` fails closed (`D-21`, `D-24`). It is the least affordable endpoint in the product to leave unmetered.
+
 ## Resolved
 
 | Issue | Found in | Resolved by |
