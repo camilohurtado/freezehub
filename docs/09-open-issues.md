@@ -72,10 +72,6 @@ Discoverability — a Marketplace or Catalog listing — is a separate and lesse
 
 | | $/month | |
 |---|---|---|
-| **Restrictions still wore the Industry furniture** — a bordered filter `fieldset` with a legend and the table inside a boxed panel, while Broadsheet takes its structure from the type scale and negative space. The last screen left like it | `FZ-133` | `FZ-134` — chips as the deck draws a multi-select, the system's own unboxed table, and the narrow-screen scroll its comment had always claimed |
-| **Layout spacing did not use the design system's scale**, so the system's density was unreachable by changing tokens — and it turned out to be two screens that were never re-pitched rather than the whole application | `FZ-101` | `FZ-133` — 159 token uses, 0 rem literals, px furniture deliberately untouched |
-| **`cognito_subject` named a vendor in the schema** — the column holds whatever subject an OIDC issuer put in the `sub` claim, and the backend has no coupling to that provider, so the name asserted one that does not exist | `OI-15` assessment | `FZ-132` — renamed to `external_subject`, constraint and index with it, rehearsed against a clone of the live database |
-| **Dark mode was removed with the Industry theme** — `FZ-100` pinned `color-scheme: light` because Industry shipped no dark ramp, and Broadsheet shipped none either, so a reader on a dark system got a light application with no warning | `FZ-100` | `FZ-131` — derived from the ramps' own shared lightness scale, so no module changed |
 | NAT Gateway | 32.85 | so two idle containers can reach ECR and CloudWatch |
 | Fargate, 2 tasks | 28.84 | `backend_desired_count = 2` |
 | ALB | 16.43 | TLS and a stable hostname |
@@ -127,10 +123,74 @@ from nowhere else and which holds no customer data. It is one variable, until it
 
 The real fix is `management.server.port` on a port the load balancer does not publish, so nothing outside the VPC can reach anything but `/actuator/health`. That is a Terraform change — a second container port, a security-group rule, and the health check pointed at it — which is why it belongs to the story that applies the deployment rather than to the review that found it.
 
+### OI-23 — Outbound webhooks reach any host the network can reach
+**Severity:** Defect · **Owner:** `FZ-126` · **Found in:** `FZ-125`
+
+`WebhookNotificationSender` posts to a customer-supplied URL, and the only validation is `IntegrationConfigs.requireHttpsUrl` — `startsWith("https://")` plus a `URI.create`. There is no host check anywhere in the codebase: no `InetAddress` resolution, no loopback or link-local test, no allowlist.
+
+Three things make the scheme check weaker than it reads:
+
+- **Redirects are followed.** An attacker-controlled HTTPS endpoint answering with a redirect to an `http://` link-local address reaches it, and on a container runtime that address is where the task's own IAM credentials are served. That is the path from a tenant's administrator to the deployment's cloud account.
+- **A userinfo authority satisfies the prefix.** `https://something.example.com@<internal-address>/` starts with `https://` and resolves to the internal host.
+- **Validating at save and resolving at send is a gap a DNS name can be moved through.** The check has to be at connect time.
+
+It is blind — `toBodilessEntity()` discards the response — so there is no direct read-back, but status and timing still distinguish an open internal port from a closed one, and the request carries a body to whatever it reaches.
+
+It requires an `ADMINISTRATOR`, so this is escalation rather than anonymous compromise. That does not lower it much: the premise of a multi-tenant product is that a customer's administrator cannot reach its provider's infrastructure.
+
+**Decided in `FZ-125`: the fix is egress, not validation.** A webhook URL is attacker-chosen by design, so the boundary belongs where the connection is made. That makes this the same decision as the deployment's egress posture (`FZ-122`, `FZ-123`) seen from the other side, and the two should be settled together.
+
+**The application half is closed by `FZ-126`** — redirects are not followed, every resolved
+address is checked on the way out, and a userinfo authority is refused. Verified by removing
+the fix: with redirects followed, the delivery reaches the second address and raises nothing.
+
+**This entry stays open for the network half**, which `FZ-126` always said was the more
+durable one and left to `FZ-123`: a security group or an egress proxy, so that the boundary
+does not depend on the application resolving a name correctly. The residual gap in the
+meantime is a DNS rebind between FreezeHub's resolution and the client's own.
+
+### OI-24 — Nothing scans dependencies or images
+**Severity:** Gap · **Owner:** `FZ-127` · **Found in:** `FZ-125`
+
+There are three workflows — `verify.yml`, `deploy.yml`, `publish-connectors.yml` — and none of them scans anything. No Dependabot configuration, no CodeQL, no image scanner, no dependency checker. Nothing in the repository knows whether a dependency has a published vulnerability.
+
+The base image is not in `pom.xml`, so a dependency scan alone would not cover it; the image needs scanning too.
+
+Worth stating plainly because of what this product is: FreezeHub asks customers to put it on the path of every deployment they make. The first security questionnaire will ask this question, and there is currently no answer.
+
+### OI-25 — Token validation for a deployed environment is unspecified
+**Severity:** Decision · **Owner:** `FZ-128` · **Found in:** `FZ-125`
+
+There is no `issuer-uri` and no `JwtDecoder` outside the `local` profile, consistent with `OI-2`. So the rules a deployed environment will validate against have never been written, and `FZ-046` would otherwise choose them while implementing them.
+
+The specific hazard is that **Cognito issues ID tokens and access tokens from the same issuer, signed by the same keys**, so signature validation accepts both — and its access token carries the app client in `client_id` rather than `aud`, so an audience validator configured the ordinary way passes everything while appearing to check something.
+
+`FZ-125` wrote the rules into `06-security.md` § Token validation rules. This entry stays open until something enforces them, with a test that watches each rejected shape fail.
+
+### OI-26 — No response-headers policy on the distribution
+**Severity:** Gap · **Owner:** `FZ-129` · **Found in:** `FZ-125`
+
+`infra/frontend.tf` creates the CloudFront distribution with no `response_headers_policy`, so the application is served with no Content-Security-Policy, no HSTS, no `X-Content-Type-Options`, no `Referrer-Policy` and no `Permissions-Policy`.
+
+The frontend holds its bearer token in `sessionStorage` — a deliberate and defensible choice, documented in `AuthProvider.tsx`, and one that makes a script-injection the way the token leaves. A Content-Security-Policy is the control that matters against that, and it is currently absent rather than weak.
+
+One Terraform resource and an association. It is the cheapest item on this list.
+
+### OI-27 — Rate limiting covers only the unauthenticated endpoints
+**Severity:** Gap · **Owner:** `FZ-130` · **Found in:** `FZ-125`
+
+`FZ-087` limited signup and demo requests, deliberately and correctly — those were the endpoints that existed without a credential. Nothing limits anything else: not failed API-key attempts on `/api/policy/**`, not the Stripe webhook, not authenticated traffic.
+
+A 256-bit key is not brute-forcible, so this is availability and cost rather than credential compromise. That is the reason it matters here rather than a reason it does not: `/api/policy/**` is the endpoint whose unavailability blocks every customer's deployments, because `freeze-check.sh` fails closed (`D-21`, `D-24`). It is the least affordable endpoint in the product to leave unmetered.
+
 ## Resolved
 
 | Issue | Found in | Resolved by |
 |---|---|---|
+| **Restrictions still wore the Industry furniture** — a bordered filter `fieldset` with a legend and the table inside a boxed panel, while Broadsheet takes its structure from the type scale and negative space. The last screen left like it | `FZ-133` | `FZ-134` — chips as the deck draws a multi-select, the system's own unboxed table, and the narrow-screen scroll its comment had always claimed |
+| **Layout spacing did not use the design system's scale**, so the system's density was unreachable by changing tokens — and it turned out to be two screens that were never re-pitched rather than the whole application | `FZ-101` | `FZ-133` — 159 token uses, 0 rem literals, px furniture deliberately untouched |
+| **`cognito_subject` named a vendor in the schema** — the column holds whatever subject an OIDC issuer put in the `sub` claim, and the backend has no coupling to that provider, so the name asserted one that does not exist | `OI-15` assessment | `FZ-132` — renamed to `external_subject`, constraint and index with it, rehearsed against a clone of the live database |
+| **Dark mode was removed with the Industry theme** — `FZ-100` pinned `color-scheme: light` because Industry shipped no dark ramp, and Broadsheet shipped none either, so a reader on a dark system got a light application with no warning | `FZ-100` | `FZ-131` — derived from the ramps' own shared lightness scale, so no module changed |
 | **The frontend had no request timeout** — a request accepted and never answered left every screen in its loading state indefinitely, with no error and no retry: the defect `FZ-065` had just fixed on the backend's outbound calls, on the side a customer looks at | `FZ-065` | `FZ-124` |
 | **Five scheduled jobs had no distributed locking** — every one ran on every instance, so at the default desired count of two the notification dispatcher delivered each pending row twice and the lifecycle reconciler recorded two activations of one restriction. Latent only because nothing had been applied yet | Milestone 13 planning | `FZ-121` — a `scheduler_lock` row per job, taken in one atomic statement against the database's clock |
 | **The deployment-check retention purge never ran** — the scheduled method self-invoked the transactional one, so Spring's proxy was bypassed and the `@Modifying` delete threw `TransactionRequiredException` on every pass. Its test called the inner method on the injected bean, which does go through the proxy, so the suite passed and the only path that runs in production was the one nothing exercised | a running backend, `FZ-113` | `FZ-114` |

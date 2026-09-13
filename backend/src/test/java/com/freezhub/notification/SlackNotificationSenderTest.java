@@ -41,7 +41,9 @@ class SlackNotificationSenderTest {
     void setUp() {
         RestClient.Builder builder = RestClient.builder();
         slack = MockRestServiceServer.bindTo(builder).build();
-        sender = new SlackNotificationSender(builder);
+        // The sender takes the built, guarded client now (FZ-126); MockRestServiceServer
+        // still binds to the builder it came from.
+        sender = new SlackNotificationSender(builder.build());
     }
 
     private Integration destination(String config) {
