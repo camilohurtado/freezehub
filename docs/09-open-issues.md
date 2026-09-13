@@ -131,6 +131,15 @@ It requires an `ADMINISTRATOR`, so this is escalation rather than anonymous comp
 
 **Decided in `FZ-125`: the fix is egress, not validation.** A webhook URL is attacker-chosen by design, so the boundary belongs where the connection is made. That makes this the same decision as the deployment's egress posture (`FZ-122`, `FZ-123`) seen from the other side, and the two should be settled together.
 
+**The application half is closed by `FZ-126`** — redirects are not followed, every resolved
+address is checked on the way out, and a userinfo authority is refused. Verified by removing
+the fix: with redirects followed, the delivery reaches the second address and raises nothing.
+
+**This entry stays open for the network half**, which `FZ-126` always said was the more
+durable one and left to `FZ-123`: a security group or an egress proxy, so that the boundary
+does not depend on the application resolving a name correctly. The residual gap in the
+meantime is a DNS rebind between FreezeHub's resolution and the client's own.
+
 ### OI-24 — Nothing scans dependencies or images
 **Severity:** Gap · **Owner:** `FZ-127` · **Found in:** `FZ-125`
 

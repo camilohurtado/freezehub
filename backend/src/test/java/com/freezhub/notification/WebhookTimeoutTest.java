@@ -3,12 +3,14 @@ package com.freezhub.notification;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
-import com.freezhub.ContainersConfig;
 import com.freezhub.integration.Integration;
 import com.freezhub.integration.IntegrationType;
 import com.freezhub.restriction.ChangeRestriction;
 import com.freezhub.restriction.RestrictionLevel;
+import com.freezhub.shared.web.OutboundAddressPolicy;
+import com.freezhub.shared.web.OutboundHttpConfig;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.time.Duration;
@@ -18,10 +20,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Import;
-import org.springframework.test.context.ActiveProfiles;
 
 /**
  * A receiver that accepts the connection and never answers (`FZ-065`).
@@ -31,13 +29,10 @@ import org.springframework.test.context.ActiveProfiles;
  * organization, so a socket that never returns holds a database connection open and stops
  * announcements for every other tenant behind it.
  *
- * <p>Written against the {@link WebhookNotificationSender} bean the application actually
- * builds, not a hand-made {@code RestClient}: what is under test is the configuration
- * Spring hands it, which is exactly where the timeout is or is not.
+ * <p>Written against {@link OutboundHttpConfig#deliveryClient}, the same assembly the bean
+ * is built from, rather than a hand-made {@code RestClient}: what is under test is the
+ * configuration the sender is handed, which is exactly where the timeout is or is not.
  */
-@SpringBootTest
-@ActiveProfiles("local")
-@Import(ContainersConfig.class)
 class WebhookTimeoutTest {
 
     /**
@@ -47,8 +42,25 @@ class WebhookTimeoutTest {
      */
     private static final Duration MUST_RETURN_WITHIN = Duration.ofSeconds(25);
 
-    @Autowired
-    private WebhookNotificationSender sender;
+    /**
+     * Permits the loopback tarpit, because `FZ-126` now refuses it before a socket is ever
+     * opened — correctly, and with its own tests. What this test is about is what happens
+     * once a connection *is* made and nothing comes back, so the address rules are switched
+     * off here rather than worked around.
+     *
+     * <p>No Spring context any more either: the sender is built from the same assembly the
+     * bean uses, which is what carries the timeouts.
+     */
+    private static final OutboundAddressPolicy PERMISSIVE =
+            new OutboundAddressPolicy(host -> new InetAddress[0]) {
+                @Override
+                public void requireCallable(java.net.URI uri) {
+                }
+            };
+
+    private final WebhookNotificationSender sender = new WebhookNotificationSender(
+            OutboundHttpConfig.deliveryClient(
+                    PERMISSIVE, Duration.ofSeconds(5), Duration.ofSeconds(10)));
 
     @Test
     void aReceiverThatNeverAnswersDoesNotBlockDeliveryForever() throws Exception {
