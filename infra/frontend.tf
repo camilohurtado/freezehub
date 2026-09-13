@@ -140,7 +140,7 @@ resource "aws_cloudfront_response_headers_policy" "frontend" {
 
   security_headers_config {
     content_security_policy {
-      override                = true
+      override = true
       content_security_policy = join("; ", [
         "default-src 'self'",
         "script-src 'self'",
