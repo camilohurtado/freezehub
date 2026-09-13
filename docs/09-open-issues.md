@@ -167,15 +167,6 @@ The specific hazard is that **Cognito issues ID tokens and access tokens from th
 
 `FZ-125` wrote the rules into `06-security.md` § Token validation rules. This entry stays open until something enforces them, with a test that watches each rejected shape fail.
 
-### OI-26 — No response-headers policy on the distribution
-**Severity:** Gap · **Owner:** `FZ-129` · **Found in:** `FZ-125`
-
-`infra/frontend.tf` creates the CloudFront distribution with no `response_headers_policy`, so the application is served with no Content-Security-Policy, no HSTS, no `X-Content-Type-Options`, no `Referrer-Policy` and no `Permissions-Policy`.
-
-The frontend holds its bearer token in `sessionStorage` — a deliberate and defensible choice, documented in `AuthProvider.tsx`, and one that makes a script-injection the way the token leaves. A Content-Security-Policy is the control that matters against that, and it is currently absent rather than weak.
-
-One Terraform resource and an association. It is the cheapest item on this list.
-
 ### OI-27 — Rate limiting covers only the unauthenticated endpoints
 **Severity:** Gap · **Owner:** `FZ-130` · **Found in:** `FZ-125`
 
@@ -187,6 +178,7 @@ A 256-bit key is not brute-forcible, so this is availability and cost rather tha
 
 | Issue | Found in | Resolved by |
 |---|---|---|
+| **No response-headers policy on the distribution** — no CSP, HSTS, `X-Content-Type-Options`, `Referrer-Policy` or `Permissions-Policy`, while the frontend holds its bearer token in `sessionStorage`, which makes a script injection how that token leaves | `FZ-125` | `FZ-129` — derived from what the application loads, and rehearsed against the real bundle before any apply |
 | **Restrictions still wore the Industry furniture** — a bordered filter `fieldset` with a legend and the table inside a boxed panel, while Broadsheet takes its structure from the type scale and negative space. The last screen left like it | `FZ-133` | `FZ-134` — chips as the deck draws a multi-select, the system's own unboxed table, and the narrow-screen scroll its comment had always claimed |
 | **Layout spacing did not use the design system's scale**, so the system's density was unreachable by changing tokens — and it turned out to be two screens that were never re-pitched rather than the whole application | `FZ-101` | `FZ-133` — 159 token uses, 0 rem literals, px furniture deliberately untouched |
 | **`cognito_subject` named a vendor in the schema** — the column holds whatever subject an OIDC issuer put in the `sub` claim, and the backend has no coupling to that provider, so the name asserted one that does not exist | `OI-15` assessment | `FZ-132` — renamed to `external_subject`, constraint and index with it, rehearsed against a clone of the live database |

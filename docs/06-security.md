@@ -139,6 +139,16 @@ Every other authenticated action is available to any user within their own organ
 2. That `organization_id` is attached to the request's security context and is the only source of truth for scoping queries and writes.
 3. Application/service code must filter every tenant-owned read and write by this resolved `organization_id`. A client-supplied organization identifier appearing anywhere in a request is not authorization and must not be used as one (Governing Principle 2, `01-domain.md` invariant 4).
 
+## Response Headers on the Distribution
+
+**Implemented by `FZ-129`, resolving `OI-26`.** CloudFront serves every response with a Content-Security-Policy, HSTS (one year, subdomains, **not** preloaded — preload is a one-way door), `X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, and a `Permissions-Policy` switching off the browser features the product has no use for.
+
+The CSP is the one that carries weight, because **the frontend holds its bearer token in `sessionStorage`** — a deliberate choice documented in `AuthProvider.tsx` — which makes a script injection the way that token leaves. It is written from what the application actually loads rather than from a template, and is strict where it can be: `script-src 'self'` with no third-party script anywhere in the product, `connect-src` naming only the API, and `frame-ancestors 'none'`.
+
+One allowance is deliberate and worth stating: `style-src-attr 'unsafe-inline'`. React sets four inline style attributes and two are load-bearing — the usage bar's width and the checks chart's bar heights are computed from data. Scoping the allowance to the *attribute* keeps `<style>` elements and stylesheets strict, and an injected style attribute is a far weaker primitive than an injected script.
+
+**A policy is only worth having if the application still works under it**, so it was rehearsed against the real production bundle before any apply: fonts and API calls succeeded, the chart's bars measured 149px rather than collapsing, and a third-party script and a cross-origin `fetch` were both refused.
+
 ## Secrets Management
 
 - Cognito app client configuration: environment-specific configuration values (issuer URI, client ID), not secrets by themselves. Any actual secret material uses AWS Secrets Manager in deployed environments (`02-architecture.md`), and environment variables locally.
