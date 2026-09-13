@@ -72,10 +72,6 @@ Discoverability — a Marketplace or Catalog listing — is a separate and lesse
 
 | | $/month | |
 |---|---|---|
-| **Restrictions still wore the Industry furniture** — a bordered filter `fieldset` with a legend and the table inside a boxed panel, while Broadsheet takes its structure from the type scale and negative space. The last screen left like it | `FZ-133` | `FZ-134` — chips as the deck draws a multi-select, the system's own unboxed table, and the narrow-screen scroll its comment had always claimed |
-| **Layout spacing did not use the design system's scale**, so the system's density was unreachable by changing tokens — and it turned out to be two screens that were never re-pitched rather than the whole application | `FZ-101` | `FZ-133` — 159 token uses, 0 rem literals, px furniture deliberately untouched |
-| **`cognito_subject` named a vendor in the schema** — the column holds whatever subject an OIDC issuer put in the `sub` claim, and the backend has no coupling to that provider, so the name asserted one that does not exist | `OI-15` assessment | `FZ-132` — renamed to `external_subject`, constraint and index with it, rehearsed against a clone of the live database |
-| **Dark mode was removed with the Industry theme** — `FZ-100` pinned `color-scheme: light` because Industry shipped no dark ramp, and Broadsheet shipped none either, so a reader on a dark system got a light application with no warning | `FZ-100` | `FZ-131` — derived from the ramps' own shared lightness scale, so no module changed |
 | NAT Gateway | 32.85 | so two idle containers can reach ECR and CloudWatch |
 | Fargate, 2 tasks | 28.84 | `backend_desired_count = 2` |
 | ALB | 16.43 | TLS and a stable hostname |
@@ -96,7 +92,7 @@ Discoverability — a Marketplace or Catalog listing — is a separate and lesse
 Nothing is urgent while nothing is deployed. It becomes urgent the day someone outside the team needs a URL.
 
 ### OI-20 — EU data residency is deferred by choosing us-east-1
-**Severity:** Decision · **Owner:** needs a story · **Raised:** 2026-09-08
+**Severity:** Decision · **Owner:** `FZ-135` · **Raised:** 2026-09-08
 
 The deployment region was decided as `us-east-1` (the `variables.tf` default) with the residency question knowingly deferred. Latency is not the issue — the Policy API is one HTTPS POST per deploy, and 250 ms from Sydney is nothing against a pipeline step measured in minutes. Residency is.
 
@@ -104,7 +100,20 @@ FreezeHub is sold to companies with a compliance function, and an EU buyer's sec
 
 The seam is in good shape, which is why this is a decision rather than a gap: the backend has no AWS coupling at all — no SDK, nothing in `pom.xml`, nothing in `application.yml` — so a second region is a Terraform workspace rather than a redesign.
 
-Becomes urgent at the first EU deal with a security questionnaire, not before.
+**Corrected by `FZ-135`: it becomes urgent at the first `apply`, not at the first EU deal.**
+Two things were understated above.
+
+"A migration of live data" is the database, and it is not the expensive half. **A Cognito
+user pool is region-bound and cannot be moved**, and the `sub` it issues is what
+`users.external_subject` stores — so moving region after `FZ-046` creates the pool means a
+new pool, a new subject for every user, and a re-mapping of that column. It is a migration
+of who people are, not only of what they own. The pool does not exist yet, which is the
+whole of the window.
+
+And the cost of choosing now is smaller than "a Terraform workspace": the configuration is
+already parameterised end to end — availability zones are read and sliced rather than
+named, and the only pinned `us-east-1` is the CloudFront certificate, which AWS accepts
+from nowhere else and which holds no customer data. It is one variable, until it is applied.
 
 
 ### OI-21 — Actuator is on the application's own port, reachable by any administrator of any tenant
@@ -178,6 +187,10 @@ A 256-bit key is not brute-forcible, so this is availability and cost rather tha
 
 | Issue | Found in | Resolved by |
 |---|---|---|
+| **Restrictions still wore the Industry furniture** — a bordered filter `fieldset` with a legend and the table inside a boxed panel, while Broadsheet takes its structure from the type scale and negative space. The last screen left like it | `FZ-133` | `FZ-134` — chips as the deck draws a multi-select, the system's own unboxed table, and the narrow-screen scroll its comment had always claimed |
+| **Layout spacing did not use the design system's scale**, so the system's density was unreachable by changing tokens — and it turned out to be two screens that were never re-pitched rather than the whole application | `FZ-101` | `FZ-133` — 159 token uses, 0 rem literals, px furniture deliberately untouched |
+| **`cognito_subject` named a vendor in the schema** — the column holds whatever subject an OIDC issuer put in the `sub` claim, and the backend has no coupling to that provider, so the name asserted one that does not exist | `OI-15` assessment | `FZ-132` — renamed to `external_subject`, constraint and index with it, rehearsed against a clone of the live database |
+| **Dark mode was removed with the Industry theme** — `FZ-100` pinned `color-scheme: light` because Industry shipped no dark ramp, and Broadsheet shipped none either, so a reader on a dark system got a light application with no warning | `FZ-100` | `FZ-131` — derived from the ramps' own shared lightness scale, so no module changed |
 | **The frontend had no request timeout** — a request accepted and never answered left every screen in its loading state indefinitely, with no error and no retry: the defect `FZ-065` had just fixed on the backend's outbound calls, on the side a customer looks at | `FZ-065` | `FZ-124` |
 | **Five scheduled jobs had no distributed locking** — every one ran on every instance, so at the default desired count of two the notification dispatcher delivered each pending row twice and the lifecycle reconciler recorded two activations of one restriction. Latent only because nothing had been applied yet | Milestone 13 planning | `FZ-121` — a `scheduler_lock` row per job, taken in one atomic statement against the database's clock |
 | **The deployment-check retention purge never ran** — the scheduled method self-invoked the transactional one, so Spring's proxy was bypassed and the `@Modifying` delete threw `TransactionRequiredException` on every pass. Its test called the inner method on the injected bean, which does go through the proxy, so the suite passed and the only path that runs in production was the one nothing exercised | a running backend, `FZ-113` | `FZ-114` |
