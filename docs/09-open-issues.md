@@ -178,6 +178,19 @@ The frontend's npm tree is **clean**, and both base images — `eclipse-temurin:
 
 Nothing here is exploitable through a path this product exposes *as far as anybody has checked*, and that clause is the problem: nobody has checked, and seven CRITICALs in the HTTP connector is not a position to defend by reasoning.
 
+### OI-30 — The Dockerfiles follow floating tags, so what ships changes without a commit
+**Severity:** Gap · **Owner:** needs a story · **Found in:** `FZ-127`
+
+`backend/Dockerfile` builds `FROM eclipse-temurin:21-jdk` and runs `FROM eclipse-temurin:21-jre`; `connectors/Dockerfile` uses `alpine:3.20`. All three are tags, and a tag moves.
+
+This was not noticed until the scanner was switched on, and then it was noticed immediately: a local scan of `eclipse-temurin:21-jre` found nothing, and the same scan in CI found eight HIGH. The difference was not the scanner — it was the image. The locally cached pull was Ubuntu 24.04; the tag now resolves to **Ubuntu 26.04**, which ships `/usr/bin/pebble`, a Go binary whose standard library carries those eight.
+
+So the base of the deployed application changed distribution release under the project, silently, with no commit, no review and no way to tell from the repository which one a given build used.
+
+**The fix is to pin by digest** — `FROM eclipse-temurin:21-jre@sha256:…` — so that what ships is in the repository, an upgrade is a commit somebody approves, and the scanner's verdict is about a known artifact. Renovate or Dependabot can then propose digest bumps as ordinary pull requests.
+
+Worth pairing with the choice of base: a variant without `pebble` removes those eight findings outright rather than baselining them.
+
 ## Resolved
 
 | Issue | Found in | Resolved by |

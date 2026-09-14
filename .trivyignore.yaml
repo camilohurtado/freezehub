@@ -137,3 +137,35 @@ vulnerabilities:
   - id: GHSA-r7wm-3cxj-wff9
     statement: "com.fasterxml.jackson.core:jackson-core 2.17.2; fixed in 2.18.8, 2.21.4"
     expiredAt: 2026-10-13
+
+# The base image, not the application (FZ-127). `eclipse-temurin:21-jre` ships
+# /usr/bin/pebble — Canonical's service manager — built with Go 1.26.5, whose standard
+# library carries these. FreezeHub's container runs java directly and never invokes pebble,
+# but it is in the image, so it is in the scan, and pretending otherwise is what a baseline
+# is for rather than against.
+#
+# Owned by `OI-30`: the fix is to pin the base by digest and choose one without it.
+  - id: CVE-2026-33818
+    statement: "stdlib v1.26.5 in /usr/bin/pebble, from the base image; fixed in 1.26.6"
+    expiredAt: 2026-10-13
+  - id: CVE-2026-39821
+    statement: "stdlib v1.26.5 in /usr/bin/pebble, from the base image; fixed in 1.26.6"
+    expiredAt: 2026-10-13
+  - id: CVE-2026-46600
+    statement: "stdlib v1.26.5 in /usr/bin/pebble, from the base image; fixed in 1.26.6"
+    expiredAt: 2026-10-13
+  - id: CVE-2026-56853
+    statement: "stdlib v1.26.5 in /usr/bin/pebble, from the base image; fixed in 1.26.6"
+    expiredAt: 2026-10-13
+  - id: CVE-2026-56858
+    statement: "stdlib v1.26.5 in /usr/bin/pebble, from the base image; fixed in 1.26.6"
+    expiredAt: 2026-10-13
+  - id: CVE-2026-56859
+    statement: "stdlib v1.26.5 in /usr/bin/pebble, from the base image; fixed in 1.26.6"
+    expiredAt: 2026-10-13
+  - id: CVE-2026-56860
+    statement: "stdlib v1.26.5 in /usr/bin/pebble, from the base image; fixed in 1.26.6"
+    expiredAt: 2026-10-13
+  - id: CVE-2026-56862
+    statement: "stdlib v1.26.5 in /usr/bin/pebble, from the base image; fixed in 1.26.6"
+    expiredAt: 2026-10-13

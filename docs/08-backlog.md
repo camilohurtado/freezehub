@@ -2037,7 +2037,7 @@ Whether the boundary is additionally enforced in the network — a security grou
 through a proxy — is `FZ-123`'s to decide, and is the more durable half of the fix.
 
 ### FZ-127 — Dependency and Image Scanning
-**Status:** DONE · **Owns:** `OI-24` · **Found:** `OI-29`
+**Status:** DONE · **Owns:** `OI-24` · **Found:** `OI-29`, `OI-30`
 
 Acceptance:
 
