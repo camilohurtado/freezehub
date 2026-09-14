@@ -2069,7 +2069,7 @@ Not built ahead of `FZ-046`, for the reason `D-4` gives about that adapter: a va
 written against a pool nothing can reach is a validator that has never refused anything.
 
 ### FZ-129 — Response Headers on the Distribution
-**Status:** TODO · **Owns:** `OI-26`
+**Status:** DONE · **Owns:** `OI-26`
 
 An `aws_cloudfront_response_headers_policy` and its association. Content-Security-Policy,
 HSTS, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`.
@@ -2144,3 +2144,31 @@ inherit a region nobody chose. `terraform validate` needs no variable values, so
 unaffected, and the deploy workflow deliberately never runs Terraform.
 
 **Not done here:** choosing. Set `region` in `terraform.tfvars` and this unblocks.
+
+**Built (`FZ-129`).** An `aws_cloudfront_response_headers_policy` on the distribution's
+default behaviour: CSP, HSTS (one year, subdomains, no preload — preload is a one-way door),
+`X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy`, and a
+`Permissions-Policy` switching off everything the product has no use for.
+
+**The CSP is derived from what the application loads, directive by directive**, not copied
+from a template:
+
+| Directive | Why it says what it says |
+|---|---|
+| `script-src 'self'` | the application loads **no third-party script at all** — no analytics, no tag manager, no CDN. Worth stating in a header while it is still true |
+| `style-src 'self' https://fonts.googleapis.com` | Source Serif 4 arrives through an `@import` in `index.css` |
+| `style-src-attr 'unsafe-inline'` | React sets four inline style attributes and **two are load-bearing** — the usage bar's width and the checks chart's bar heights are computed from data. Scoping the allowance to the *attribute* keeps `<style>` elements and stylesheets strict |
+| `font-src 'self' https://fonts.gstatic.com` | where the `woff2` actually comes from |
+| `connect-src 'self' https://api.<domain>` | the only origin the application calls |
+| `img-src 'self'`, `object-src 'none'`, `base-uri 'none'`, `frame-ancestors 'none'` | nothing needs them, and refusing loudly is the point |
+
+**Verified against the real bundle before it was ever applied.** The production build was
+served locally behind these exact headers, and the browser was asked what happened: the
+Google Fonts stylesheet *and* the `woff2` both loaded, five API calls went through, and the
+chart's bars measured 149px rather than collapsing — which is what `style-src-attr` is
+there to prevent. Then the inverse, to prove the policy is enforced rather than merely
+present: a script from `cdn.jsdelivr.net` was **refused**, and a `fetch` to `example.com`
+was **refused**.
+
+Without that rehearsal the first evidence either way would have been a customer looking at
+a chart of flat bars.

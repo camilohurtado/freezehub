@@ -103,6 +103,95 @@ resource "aws_acm_certificate_validation" "frontend" {
   validation_record_fqdns = [for record in aws_route53_record.frontend_certificate_validation : record.fqdn]
 }
 
+# The headers every response carries (FZ-129, OI-26).
+#
+# The one that needed thought is the Content-Security-Policy, and it is written from what
+# the application actually loads rather than from a template. The frontend keeps its bearer
+# token in sessionStorage — deliberately, and documented in AuthProvider.tsx — so a script
+# injection is how that token leaves. This is the control against that, and it is only
+# worth having if it is tight enough to refuse the injection.
+#
+# Derived, directive by directive:
+#
+#   script-src 'self'      the application loads no third-party script at all. index.html
+#                          references one module, which the build emits under /assets. No
+#                          analytics, no tag manager, no CDN. That is worth saying in a
+#                          header while it is still true.
+#   style-src              Source Serif 4 comes from Google Fonts via an @import in
+#                          index.css, which fetches a stylesheet from fonts.googleapis.com
+#                          and font files from fonts.gstatic.com.
+#   style-src-attr         React sets four inline style attributes, and two of them are
+#                          load-bearing: the usage bar's width and the checks chart's bar
+#                          heights are computed from data and cannot live in a stylesheet.
+#                          Under CSP3 an inline style *attribute* is governed by this
+#                          directive, so allowing it here keeps <style> elements and
+#                          stylesheets strict. Without it the chart ships with every bar
+#                          collapsed to zero — the sort of thing a customer finds first.
+#   connect-src            the API, which is the only origin the application calls.
+#   frame-ancestors 'none' nothing embeds this, and a freeze console in somebody's iframe
+#                          is a clickjacking target with real consequences.
+#   img-src 'self'         no external image and no data: URI exists today. If one appears
+#                          this refuses it loudly, which is the point.
+#
+# Stripe is reached by navigating the top level away (window.location.assign), not by an
+# embedded frame or an XHR, so no directive here governs it.
+resource "aws_cloudfront_response_headers_policy" "frontend" {
+  name = "${local.name}-frontend"
+
+  security_headers_config {
+    content_security_policy {
+      override = true
+      content_security_policy = join("; ", [
+        "default-src 'self'",
+        "script-src 'self'",
+        "style-src 'self' https://fonts.googleapis.com",
+        "style-src-attr 'unsafe-inline'",
+        "font-src 'self' https://fonts.gstatic.com",
+        "img-src 'self'",
+        "connect-src 'self' https://${local.api_domain}",
+        "frame-ancestors 'none'",
+        "base-uri 'none'",
+        "form-action 'self'",
+        "object-src 'none'",
+      ])
+    }
+
+    # A year, and subdomains: api.<domain> is HTTPS too, behind its own certificate.
+    # `preload` is deliberately not set — submitting to the preload list is a one-way
+    # door that outlives any decision made here.
+    strict_transport_security {
+      override                   = true
+      access_control_max_age_sec = 31536000
+      include_subdomains         = true
+      preload                    = false
+    }
+
+    content_type_options {
+      override = true
+    }
+
+    frame_options {
+      override     = true
+      frame_option = "DENY"
+    }
+
+    referrer_policy {
+      override        = true
+      referrer_policy = "strict-origin-when-cross-origin"
+    }
+  }
+
+  # Permissions-Policy has no first-class field in this resource. Everything the product
+  # has no use for is switched off rather than left to the browser's default.
+  custom_headers_config {
+    items {
+      header   = "Permissions-Policy"
+      override = true
+      value    = "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()"
+    }
+  }
+}
+
 resource "aws_cloudfront_distribution" "frontend" {
   enabled             = true
   default_root_object = "index.html"
@@ -121,7 +210,8 @@ resource "aws_cloudfront_distribution" "frontend" {
     allowed_methods        = ["GET", "HEAD", "OPTIONS"]
     cached_methods         = ["GET", "HEAD"]
 
-    cache_policy_id = "658327ea-f89d-4fab-a63d-7e88639e58f6" # AWS managed: CachingOptimized
+    cache_policy_id            = "658327ea-f89d-4fab-a63d-7e88639e58f6" # AWS managed: CachingOptimized
+    response_headers_policy_id = aws_cloudfront_response_headers_policy.frontend.id
   }
 
   # The app is a single-page application: every route below / is served by index.html and
