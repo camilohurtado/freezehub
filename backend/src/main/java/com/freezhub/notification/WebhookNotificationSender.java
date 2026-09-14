@@ -1,9 +1,10 @@
 package com.freezhub.notification;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.cfg.DateTimeFeature;
+import tools.jackson.databind.json.JsonMapper;
 import com.freezhub.integration.Integration;
 import com.freezhub.integration.IntegrationType;
 import com.freezhub.integration.WebhookSigning;
@@ -29,9 +30,15 @@ public class WebhookNotificationSender implements NotificationSender {
 
     private static final Logger log = LoggerFactory.getLogger(WebhookNotificationSender.class);
 
-    private static final ObjectMapper MAPPER =
-            new ObjectMapper().registerModule(new JavaTimeModule())
-                    .disable(com.fasterxml.jackson.databind.SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+    /*
+     * Jackson 3 moved the date-format switches to DateTimeFeature and made the mapper
+     * immutable, so this is configured on the builder rather than disabled afterwards
+     * (FZ-136). The behaviour is the one the webhook contract documents: instants go out
+     * as ISO-8601 strings, never as epoch numbers.
+     */
+    private static final ObjectMapper MAPPER = JsonMapper.builder()
+            .disable(DateTimeFeature.WRITE_DATES_AS_TIMESTAMPS)
+            .build();
 
     private final RestClient restClient;
 
@@ -100,7 +107,7 @@ public class WebhookNotificationSender implements NotificationSender {
     private String serialise(WebhookPayload payload) {
         try {
             return MAPPER.writeValueAsString(payload);
-        } catch (JsonProcessingException impossible) {
+        } catch (JacksonException impossible) {
             throw new NotificationDeliveryException("Could not build the webhook payload");
         }
     }
@@ -113,7 +120,7 @@ public class WebhookNotificationSender implements NotificationSender {
                 throw new NotificationDeliveryException("Webhook integration has no url configured");
             }
             return url;
-        } catch (JsonProcessingException unreadable) {
+        } catch (JacksonException unreadable) {
             throw new NotificationDeliveryException("Webhook integration config is not valid JSON");
         }
     }

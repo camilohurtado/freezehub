@@ -1,7 +1,7 @@
 package com.freezhub.deployment;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import com.freezhub.policy.PolicyDecision;
 import com.freezhub.shared.security.ApiKeyPrincipal;
 import java.util.List;
@@ -56,7 +56,7 @@ public class DeploymentCheckRecorder {
         }
         try {
             return MAPPER.writeValueAsString(matched);
-        } catch (JsonProcessingException impossible) {
+        } catch (JacksonException impossible) {
             throw new IllegalStateException("Could not serialise matched restrictions", impossible);
         }
     }

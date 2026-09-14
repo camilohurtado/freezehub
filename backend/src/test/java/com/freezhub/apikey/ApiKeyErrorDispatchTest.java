@@ -13,14 +13,13 @@ import com.freezhub.shared.security.AuthenticatedUser;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.context.annotation.Import;
-import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.web.client.RestClient;
 
 /**
  * An error raised behind the machine chain must keep its own status (FZ-052).
@@ -41,8 +40,14 @@ import org.springframework.test.context.ActiveProfiles;
 @Import(ContainersConfig.class)
 class ApiKeyErrorDispatchTest {
 
-    @Autowired
-    private TestRestTemplate restTemplate;
+    /*
+     * Spring Boot 4 removed TestRestTemplate, so this drives the running server with the
+     * RestClient the application already depends on (`FZ-136`). `exchange` rather than
+     * `retrieve`, because every assertion here is about a status that `retrieve` would
+     * turn into an exception — the 401 and the 404 are the subject, not the failure.
+     */
+    @LocalServerPort
+    private int port;
 
     @Autowired
     private OrganizationRepository organizationRepository;
@@ -75,8 +80,11 @@ class ApiKeyErrorDispatchTest {
             headers.set("X-API-Key", apiKey);
         }
 
-        return restTemplate.exchange("/api/policy/does-not-exist", HttpMethod.POST,
-                new HttpEntity<>("{}", headers), String.class);
+        return RestClient.create().post()
+                .uri("http://localhost:" + port + "/api/policy/does-not-exist")
+                .headers(existing -> existing.addAll(headers))
+                .body("{}")
+                .exchange((request, response) -> ResponseEntity.status(response.getStatusCode()).build());
     }
 
     @Test

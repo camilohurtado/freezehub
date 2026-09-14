@@ -3,9 +3,9 @@ package com.freezhub.shared.web;
 import java.net.http.HttpClient;
 import java.time.Duration;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.web.client.ClientHttpRequestFactories;
-import org.springframework.boot.web.client.ClientHttpRequestFactorySettings;
-import org.springframework.boot.web.client.RestClientCustomizer;
+import org.springframework.boot.http.client.ClientHttpRequestFactoryBuilder;
+import org.springframework.boot.http.client.HttpClientSettings;
+import org.springframework.boot.restclient.RestClientCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.client.ClientHttpResponse;
@@ -43,12 +43,16 @@ public class OutboundHttpConfig {
         this.readTimeout = readTimeout;
     }
 
+    /*
+     * Spring Boot 4 replaced `ClientHttpRequestFactories.get(settings)` with a builder, and
+     * moved the settings into `HttpClientSettings` and the customizer into
+     * `org.springframework.boot.restclient` (FZ-136). The timeouts, and the reason for
+     * them, are unchanged.
+     */
     @Bean
     RestClientCustomizer outboundHttpTimeouts() {
-        return builder -> builder.requestFactory(ClientHttpRequestFactories.get(
-                ClientHttpRequestFactorySettings.DEFAULTS
-                        .withConnectTimeout(connectTimeout)
-                        .withReadTimeout(readTimeout)));
+        return builder -> builder.requestFactory(ClientHttpRequestFactoryBuilder.detect()
+                .build(HttpClientSettings.defaults().withTimeouts(connectTimeout, readTimeout)));
     }
 
     /**

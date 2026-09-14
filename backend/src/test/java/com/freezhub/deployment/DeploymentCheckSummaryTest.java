@@ -2,7 +2,7 @@ package com.freezhub.deployment;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import com.freezhub.ContainersConfig;
 import com.freezhub.catalog.Application;
 import com.freezhub.catalog.ApplicationRepository;

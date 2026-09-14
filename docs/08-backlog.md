@@ -2172,3 +2172,47 @@ was **refused**.
 
 Without that rehearsal the first evidence either way would have been a customer looking at
 a chart of flat bars.
+
+### FZ-136 — Upgrade the Platform Off Spring Boot 3.3.4
+**Status:** DONE · **Owns:** `OI-29`
+
+`FZ-127` switched the scanner on and measured 39 HIGH-or-above findings in the backend's
+dependency tree, 9 of them CRITICAL. **Decided (operator's call): the 4.x line, not 3.5.x.**
+
+**Spring Boot 3.3.4 → 4.1.1, plus Tomcat pinned to 11.0.25. The scan goes 39 → 0.**
+
+Boot 4 is a major version and it moved five things this application depended on. None of it
+was guessed — each was located in the actual jars before anything was edited:
+
+| What moved | Where it went |
+|---|---|
+| **Jackson 2 → 3** | `com.fasterxml.jackson.{core,databind}` → `tools.jackson.*`, across 24 files. Annotations stayed put. `JsonProcessingException` became the unchecked `JacksonException`, and Java-time support is built in, so `JavaTimeModule` is gone |
+| `SerializationFeature.WRITE_DATES_AS_TIMESTAMPS` | `DateTimeFeature`, set on an immutable mapper's builder |
+| `ClientHttpRequestFactories` / `RestClientCustomizer` | `ClientHttpRequestFactoryBuilder` + `HttpClientSettings`, and `org.springframework.boot.restclient` — a module the web starter no longer pulls |
+| `@AutoConfigureMockMvc`, `@DataJpaTest`, `@AutoConfigureTestDatabase` | per-technology test modules (`spring-boot-webmvc-test`, `-data-jpa-test`, `-jdbc-test`) |
+| `TestRestTemplate` | **removed.** The one test using it now drives the running server with `RestClient`, using `exchange` rather than `retrieve` because the statuses under assertion are exactly the ones `retrieve` would throw on |
+
+Testcontainers also had to move to 2.x, whose modules are renamed (`testcontainers-postgresql`,
+`testcontainers-junit-jupiter`), because Boot 4 no longer manages its versions.
+
+**The failure worth recording**, because it is the one a test suite catches and a reviewer
+would not: with everything compiling and the upgrade apparently done, **342 of 468 tests
+errored with `relation "organization" does not exist`**. Boot 4 moved Liquibase's
+auto-configuration into `spring-boot-liquibase`, and `liquibase-core` on its own no longer
+runs the changelog at startup. The schema was simply never created. One dependency fixed
+all 342.
+
+**Tomcat is pinned ahead of Boot's own default.** 4.1.1 brings 11.0.24, which still carries
+three CRITICALs; 11.0.25 has them fixed. Pinned in `<tomcat.version>` rather than waited
+for, because the alternative was shipping them or suppressing them.
+
+Verified: **468 tests pass**, the application **starts** against an empty database and
+Liquibase applies all 27 changesets, `/actuator/health` is UP, and the scan returns **0
+findings at HIGH or above**.
+
+**Merge order matters.** `FZ-127`'s `.trivyignore.yaml` baselines the 39 findings this
+removes. Once both are on `master`, regenerate it: the 40 Java entries are dead, and only
+the 8 base-image ones (`OI-30`) should remain.
+
+`OI-29` is raised on `FZ-127`'s branch rather than on `master`, so it is closed there or in
+whichever of the two lands second — not here, where the entry does not yet exist.
