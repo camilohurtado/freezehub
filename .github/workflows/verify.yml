@@ -191,3 +191,78 @@ jobs:
           [ "${{ steps.blocked.outcome }}" = "failure" ] || { echo "a BLOCK decision did not fail the step" >&2; status=1; }
           [ "${{ steps.rejected.outcome }}" = "failure" ] || { echo "a rejected credential did not fail the step" >&2; status=1; }
           exit $status
+
+  # Dependency and image scanning (FZ-127, OI-24).
+  #
+  # Trivy covers all three trees this repository ships — Maven, npm and the base images —
+  # which is why it is one tool rather than three. `HIGH,CRITICAL` is the gate and it is
+  # written here rather than left to a default; anything below that is reported by the
+  # scheduled run and does not block a pull request.
+  #
+  # The Maven scan resolves the dependency tree from the local repository, which is why it
+  # runs `dependency:go-offline` first: without a populated `~/.m2`, Trivy resolves every
+  # POM over the network and Maven Central answers `429 Too Many Requests` with a
+  # half-hour block. That is not hypothetical — it happened while this job was being
+  # written.
+  #
+  # The base images are scanned by name rather than by building the application image. The
+  # shipped image is base + jar, and both halves are covered: the jar's dependencies by the
+  # Maven scan, the base by these. Building the image here would cost a full Maven build
+  # inside Docker to learn the same two things.
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Populate the Maven repository
+        working-directory: backend
+        run: ./mvnw --batch-mode --no-transfer-progress -DskipTests dependency:go-offline
+
+      - name: Scan the backend dependencies
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: backend
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          exit-code: '1'
+          trivyignores: .trivyignore.yaml
+
+      - name: Scan the frontend dependencies
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: frontend
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          exit-code: '1'
+          skip-dirs: frontend/node_modules
+          trivyignores: .trivyignore.yaml
+
+      # The base images the Dockerfiles start FROM. Both were clean when this was written,
+      # which is the point of checking rather than assuming.
+      - name: Scan the backend base image
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: image
+          image-ref: eclipse-temurin:21-jre
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          exit-code: '1'
+          trivyignores: .trivyignore.yaml
+
+      - name: Scan the connector base image
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: image
+          image-ref: alpine:3.20
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          exit-code: '1'
+          trivyignores: .trivyignore.yaml

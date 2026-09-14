@@ -2037,7 +2037,7 @@ Whether the boundary is additionally enforced in the network — a security grou
 through a proxy — is `FZ-123`'s to decide, and is the more durable half of the fix.
 
 ### FZ-127 — Dependency and Image Scanning
-**Status:** TODO · **Owns:** `OI-24`
+**Status:** DONE · **Owns:** `OI-24` · **Found:** `OI-29`
 
 Acceptance:
 
@@ -2051,6 +2051,30 @@ Acceptance:
 
 Prefer what is already available in the toolchain over a new service. This is a CI change,
 not a platform.
+
+**Built (`FZ-127`).** A `security` job in `verify.yml` runs Trivy over all three trees this
+repository ships — the Maven tree, the npm tree, and both base images — gated at
+`HIGH,CRITICAL`, which is written in the workflow rather than left to a default. One tool
+rather than three, which is what "prefer what is already available" bought.
+
+Two things it taught, both worth keeping:
+
+- **The Maven scan needs a populated `~/.m2`.** Without one, Trivy resolves every POM over
+  the network and Maven Central answers `429 Too Many Requests` with a half-hour block. Not
+  hypothetical — it happened while this was being written, which is why the job runs
+  `dependency:go-offline` first.
+- **The base images are scanned by name, not by building the application image.** The
+  shipped image is base + jar, and both halves are covered — the jar's dependencies by the
+  Maven scan, the base by the image scans. Building it here would cost a full Maven build
+  inside Docker to learn the same two things.
+
+**The suppression file is dated and owned.** Everything HIGH-and-above in the tree today is
+listed in `.trivyignore.yaml` with `expiredAt: 2026-10-13` and `FZ-136` named as the owner,
+so the gate blocks anything *new* from the moment it is switched on, and blocks these too
+once the date passes. That is the difference between a baseline and a blanket.
+
+**Both halves were verified.** With the baseline the scan is clean and exits 0; remove one
+entry — `CVE-2025-24813`, a tomcat CRITICAL — and it exits 1 and names it.
 
 ### FZ-128 — Enforce the Token Validation Rules
 **Status:** TODO · **Owns:** `OI-25` · **Sequenced with:** `FZ-046`
@@ -2172,3 +2196,25 @@ was **refused**.
 
 Without that rehearsal the first evidence either way would have been a customer looking at
 a chart of flat bars.
+
+### FZ-136 — Upgrade the Platform Off Spring Boot 3.3.4
+**Status:** TODO · **Owns:** `OI-29` · **Blocks:** the `.trivyignore.yaml` expiry on 2026-10-13
+
+`FZ-127` switched the scanner on and measured what the tree actually carries: **39 findings
+at HIGH or above, 9 of them CRITICAL**, all of it in the Java dependencies. The npm tree and
+both base images are clean.
+
+**The work is already measured, which is most of what makes a version bump a story rather
+than a gamble.** Spring Boot **3.5.14** builds with no source changes and passes all **468
+tests unchanged** — run, not assumed — and takes the count 39 → 21 and the CRITICALs 9 → 6.
+
+**Decide when starting it:** 3.5.x or 4.x. The remaining 21 need a newer patch line than
+3.5.14 — `tomcat-embed-core` 10.1.55+, `spring-data-commons` 3.5.12, `micrometer-core`
+1.15.12, the PostgreSQL driver 42.7.12, Spring Framework 6.2.19 — so the realistic targets
+are the current 3.5.x (3.5.16 at the time of writing), or 4.x, which is a larger step and
+whose own transitive set has not been measured here. Measure the candidate the same way
+before choosing: change the parent, build, run the suite, re-scan.
+
+Then **regenerate `.trivyignore.yaml` from the new scan** rather than editing it, and shorten
+the expiry to whatever is still genuinely outstanding. A baseline that survives its own
+upgrade unchanged is a baseline nobody looked at.
