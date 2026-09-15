@@ -183,7 +183,7 @@ Worth pairing with the choice of base: a variant without `pebble` removes those 
 Recorded rather than assumed because the cost of being wrong is discovering it at the moment a customer is trying to pay.
 
 ### OI-32 — Production would run in a personal AWS account
-**Severity:** Gap · **Owner:** needs a story · **Raised:** 2026-09-15
+**Severity:** Gap · **Owner:** `FZ-138` · **Raised:** 2026-09-15
 
 The target account is the operator's personal one, dating from 2022-10-23 (`OI-15`). `infra/README.md` already says Terraform must use an IAM role and not account root — advice a personal account cannot take, because there the operator *is* root.
 

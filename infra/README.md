@@ -23,13 +23,37 @@ application encryption key, and CloudWatch logs.
 
 ## Before the first apply
 
+**Which account this applies into is a decision, not a default** (`OI-32`). It is the same
+reasoning that governs the region (see Applying, below), pointed at the account: a Cognito
+user pool cannot be moved between AWS accounts, and the `sub` it issues is stored in
+`users.external_subject`. Before `FZ-046` creates that pool the choice is free; afterwards
+it means a new pool, new subjects, and a forced password reset for every customer.
+
 You need, and Terraform will not create for you:
 
-1. **A domain and a Route 53 hosted zone that already delegates it.** Both certificates
+1. **A dedicated AWS account for production**, inside an AWS Organization — not an account
+   also used for anything else. The Organization and its member accounts cost nothing; only
+   resources are billed. The management account holds billing and no workloads, so
+   `terraform apply` never runs there.
+
+   **Each AWS account needs its own unique root email**, which is worth planning before
+   creating the first one. Plus-addressing works, and all of it lands in one mailbox:
+
+   ```text
+   freezehubio@gmail.com        → Organization management account (billing only)
+   freezehubio+prod@gmail.com   → production — what Terraform applies into
+   ```
+
+   That mailbox can reset the account root, which makes it the strongest credential in the
+   system. It wants MFA before it owns anything.
+
+2. **A domain and a Route 53 hosted zone that already delegates it.** Both certificates
    are DNS-validated through that zone, so an apply hangs without it.
-2. **An IAM user or role for Terraform — not account root.** Root access keys cannot be
+3. **An IAM user or role for Terraform — not account root.** Root access keys cannot be
    scoped, cannot be limited, and cannot be revoked without disrupting everything else.
-3. **A verified SES identity**, if email notifications are wanted. The task role can send;
+   This is also the item a personal account cannot satisfy, because there the operator
+   *is* root — which is the practical reason item 1 comes first.
+4. **A verified SES identity**, if email notifications are wanted. The task role can send;
    SES still has to be out of the sandbox to send anywhere.
 
 ## Applying
