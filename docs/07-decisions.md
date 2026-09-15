@@ -758,3 +758,37 @@ Defaults are 5s to connect and 10s to read — deliberately generous. A slow rec
 ### What this does not cover
 
 The frontend's `fetch` wrapper has the same gap in the other direction and is **not** fixed here (`OI-22`): changing the failure mode of every request in the application is its own story. Stripe is unaffected — its SDK ships bounded defaults of its own.
+
+---
+
+## D-31 — A `429` from the Policy API is a wait, not an answer
+
+**Date:** 2026-09-14 · **Resolves:** `OI-27` · **Implemented by:** `FZ-130`
+
+### Decision
+
+`/api/policy/**` is rate limited on two counters: unauthenticated attempts per source address, and authenticated evaluations **per API key**. `freeze-check.sh` treats a `429` as a wait — it sits out the `Retry-After` and asks again, once, within a 30-second ceiling — rather than as an answer.
+
+### Why
+
+`FZ-130` offered an escape hatch: limit only the failures, and say so, if limiting successful evaluations could not be done safely. Taking it would have left the expensive half unmetered, so the question was what "safely" actually requires.
+
+Two things, it turns out, and neither is the number.
+
+**The key.** This client fails closed by default (`FREEZEHUB_ON_ERROR=block`, `FZ-053`): a `429` does not slow a deployment, it stops it. Counting authenticated calls per *address* would mean one pipeline with a stale credential could fill the bucket for everyone sharing a corporate NAT — FreezeHub blocking deployments for a reason that has nothing to do with a freeze, which is the exact outage it exists to schedule deliberately. Counted per key, a pipeline can only refuse itself.
+
+**The client.** Any limit introduces a refusal that did not exist before, and a gate that fails closed converts it into a stopped delivery. A limit the caller cannot recover from is a limit that eventually causes an incident, so the retry is part of the decision rather than a follow-up to it.
+
+### What else was considered
+
+*Limit only the failed attempts.* Honest, and the story allowed it — but it leaves the endpoint that costs real work protected only against callers who get their credential wrong.
+
+*A large limit on a one-minute window.* 360 a minute and 60 per ten seconds allow the same rate. The long window is worse: it can answer `Retry-After: 54`, and a build held for nearly a minute is a limit people switch off. A short window bounds the penalty instead of the rate.
+
+*Retry inside the API rather than the client.* Nothing to retry — the refusal is the server declining to do work.
+
+### What it costs
+
+- **Two tasks mean twice the limit.** The counters are in memory, per instance. Shared state is out of scope for the MVP (`CLAUDE.md` §4), and the number is a ceiling on abuse rather than a quota anyone is billed against.
+- **`curl --retry` covers 5xx and timeouts too**, not only `429`. One retry before declaring an outage is an improvement for a gate that fails closed, but it does change what a transient `503` costs: roughly a second, and a second request the server may have already acted on.
+- **A pipeline can still be refused** — 60 evaluations in ten seconds from one key is far beyond any real deployment, but it is not infinity. The failure is visible and bounded rather than silent.

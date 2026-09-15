@@ -59,7 +59,7 @@ A resource belonging to another organization returns **`404`, not `403`** — ex
 | `403` | authenticated but not permitted (currently: non-administrator) |
 | `404` | unknown **or** another organization's resource |
 | `409` | state conflict — the resource has moved on; refetch |
-| `429` | too many requests from this caller; `Retry-After` says when (`FZ-087`) |
+| `429` | too many requests from this caller; `Retry-After` says when (`FZ-087`, `FZ-130`) |
 
 Every error is **RFC 9457 Problem Details**, served as `application/problem+json` (`FZ-061`):
 
@@ -178,6 +178,8 @@ Consequence to accept: renaming a catalog entry changes the key a pipeline sends
 `action` is `DEPLOY`; it exists so the contract does not have to change when another action appears.
 
 **POST rather than GET**, despite being a read: a `GET` is cacheable, and a cached `ALLOW` is precisely the wrong thing to serve during a freeze. Proxies must never be able to answer this.
+
+**Rate limited, and on two counters** (`FZ-130`, `D-31`). Requests arriving without a usable key are counted per source address; authenticated evaluations are counted **per API key**, so a pipeline can only ever refuse itself — not every other pipeline behind the same egress address. Defaults are 30 a minute and 60 per ten seconds respectively; both refuse with `429` and a `Retry-After` no larger than the window. `freeze-check.sh` waits that out and asks again rather than failing the build, which is what makes the limit safe on a gate that fails closed.
 
 ### Response
 

@@ -11,6 +11,11 @@
 // Reads <work-dir>/response.json before each reply, so a test changes the scenario by
 // writing a file. Appends every request to <work-dir>/requests.jsonl, so a test can
 // assert what the script actually sent. Writes <work-dir>/port once listening.
+//
+// A scenario may carry `headers`, and a `then` describing what the *next* request gets
+// (FZ-130). That second part is what makes a retry testable at all: "429 once, then 200"
+// cannot be expressed by a stub that answers every request the same way, and a retry is
+// only observable as a change between two answers.
 
 'use strict';
 
@@ -32,7 +37,15 @@ const server = http.createServer((req, res) => {
             JSON.stringify({ url: req.url, headers: req.headers, raw }) + '\n');
 
         const response = JSON.parse(fs.readFileSync(path.join(dir, 'response.json'), 'utf8'));
-        res.writeHead(response.status, { 'Content-Type': 'application/json' });
+
+        // Swapped in before the reply is sent, not after: the caller cannot ask again
+        // until this response ends, so doing it here leaves no window in which a retry
+        // could read the old scenario.
+        if (response.then) {
+            fs.writeFileSync(path.join(dir, 'response.json'), JSON.stringify(response.then));
+        }
+
+        res.writeHead(response.status, { 'Content-Type': 'application/json', ...(response.headers || {}) });
         res.end(typeof response.body === 'string' ? response.body : JSON.stringify(response.body));
     });
 });
