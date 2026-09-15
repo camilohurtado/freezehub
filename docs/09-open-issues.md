@@ -57,7 +57,11 @@ Verified rather than assumed, at the time of writing:
 - `git tag` → empty
 - the repository is private, and under a personal account
 
-So every guideline currently names an image that does not exist, and the README says so. `FZ-099` has the tooling ready and is blocked on two human actions: creating the `freezehubio` organization, and a token with `packages: write` on it.
+So every guideline currently names an image that does not exist, and the README says so.
+
+**Two of those three facts have since changed** (2026-09-15). The `freezehubio` organization exists, this repository was moved into it, and it is now public — so "private, and under a personal account" no longer holds. That move also removed `FZ-099`'s second blocker rather than satisfying it: `GITHUB_TOKEN` could not write to *another* owner's package namespace, and `freezehubio` is no longer another owner, so no `CONNECTOR_PUBLISH_TOKEN` is needed or configured.
+
+**The fact that matters is unchanged.** `ghcr.io/freezehubio/freeze-check:v1` still does not exist, so every guideline still names an image customers cannot pull. This entry stays open until a `workflow_dispatch` publishes one and its package visibility is set to public.
 
 Discoverability — a Marketplace or Catalog listing — is a separate and lesser problem, deferred to `FZ-096`.
 

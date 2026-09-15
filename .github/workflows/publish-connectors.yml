@@ -2,21 +2,22 @@
 #
 # One artifact. The image is the connector: every CI system in connectors/README.md
 # reaches FreezeHub by running it, so publishing this one thing is what makes all of them
-# usable (D-26). There is no second repository, no mirror and no sync — the source stays
-# here, private, and only the image goes out.
+# usable (D-26). There is no second repository, no mirror and no sync.
 #
-# NOTHING HERE HAS BEEN EXECUTED. Two prerequisites, both deliberate human decisions:
+# One prerequisite, and it is already met: the GitHub organization `freezehubio`. The
+# image is named for it because a personal username in a customer's deploy pipeline
+# undercuts a product sold to companies, and renaming later breaks every pipeline using
+# it.
 #
-#   1. A GitHub organization `freezehubio`. The image is named for it because a personal
-#      username in a customer's deploy pipeline undercuts a product sold to companies,
-#      and renaming later breaks every pipeline using it.
+# There was a second — a CONNECTOR_PUBLISH_TOKEN with `packages: write` — and moving the
+# repository into the organization removed it. GITHUB_TOKEN could not write to another
+# owner's package namespace, and `freezehubio` is no longer another owner. The built-in
+# token is minted per run and expires with the job, so this is a better credential than
+# the personal access token it replaces, not merely a cheaper one.
 #
-#   2. A secret CONNECTOR_PUBLISH_TOKEN with `packages: write` on that organization.
-#      GITHUB_TOKEN cannot write to another owner's package namespace.
-#
-# The package's visibility is set on the package itself, independently of this
-# repository — which is what lets a public image ship from a private source tree. It must
-# be set to public once, after the first push, or customers get "denied" on pull.
+# The package's visibility is set on the package itself, independently of this repository,
+# and a newly published package is private. It must be set to public once, after the first
+# push, or customers get "denied" on pull.
 #
 # Manual rather than on-tag: publishing changes what runs inside customers' pipelines,
 # the same reasoning that makes deploy.yml manual.
@@ -35,6 +36,9 @@ on:
 
 permissions:
   contents: read
+  # Publishing to ghcr.io/freezehubio needs this, and the repository now lives in that
+  # organization, so GITHUB_TOKEN carries it. Nothing else in this workflow writes.
+  packages: write
 
 concurrency:
   group: publish-connector-image
@@ -71,7 +75,7 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.CONNECTOR_PUBLISH_TOKEN }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       # Both architectures: CI runners are mostly amd64, self-hosted and Apple hardware
       # are arm64, and a gate a developer cannot run on their laptop is one they cannot
