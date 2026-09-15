@@ -2284,3 +2284,41 @@ findings at HIGH or above**.
 removes, so `.trivyignore.yaml` is regenerated here: the 40 Java entries are gone and only
 the 8 base-image ones (`OI-30`) remain. A baseline that does not shrink when the debt is
 paid is one nobody is reading.
+
+### FZ-138 — Who Owns Production
+**Status:** TODO · **Owns:** `OI-32` · **Blocked on:** two human actions
+
+`infra/README.md` told you to use an IAM role rather than account root and never said which
+account any of it belongs in. The target today is the operator's personal AWS account, where
+that instruction cannot be followed at all, because there the operator *is* root.
+
+**The argument is `FZ-135`'s, pointed at the account instead of the region.** The
+infrastructure is portable and costs nothing to redirect — there is no account id anywhere
+in `infra/`, `locals.tf` reads `aws_caller_identity`, and the only use is making the
+frontend bucket name unique. What is not portable is identity: a Cognito user pool cannot
+be moved between accounts, and `users.external_subject` stores the `sub` it issues. Before
+`FZ-046` this is free; after the first real user it is a forced password reset for everyone.
+
+**Done in this story:** `infra/README.md` § *Before the first apply* now names the account
+layout, the one-unique-root-email-per-account constraint, and the plus-addressed convention
+that satisfies it. That last part is worth writing down rather than discovering: spend the
+plain address on production and the management account needs a second mailbox.
+
+**Blocked on two human actions**, in the shape `FZ-099` uses:
+
+1. **An AWS Organization**, with the existing account as management, holding billing and no
+   workloads.
+2. **A production member account** created under it, with root secured by MFA and no access
+   keys, and an IAM role for Terraform to assume.
+
+Worth checking while doing it: whether a newly created member account is free-tier eligible.
+`OI-15` records that the current account's expired in 2023, and 750 hours of `db.t4g.micro`
+and an ALB would cover a large share of the beta year.
+
+**Not done here, deliberately:** nothing is applied and no account is created. This story
+makes the decision legible and leaves it where `D-23` leaves provisioning — with an operator
+who has production access, which is the point of the change.
+
+**`OI-32` arrives with `FZ-137`** (PR #42) and is not in this branch, which was cut from
+`master` rather than from an unmerged story. Its **Owner** line still says *needs a story*
+and should read `FZ-138` once both land.
