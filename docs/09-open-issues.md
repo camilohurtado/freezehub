@@ -158,19 +158,6 @@ The specific hazard is that **Cognito issues ID tokens and access tokens from th
 
 `FZ-125` wrote the rules into `06-security.md` § Token validation rules. This entry stays open until something enforces them, with a test that watches each rejected shape fail.
 
-### OI-30 — The Dockerfiles follow floating tags, so what ships changes without a commit
-**Severity:** Gap · **Owner:** needs a story · **Found in:** `FZ-127`
-
-`backend/Dockerfile` builds `FROM eclipse-temurin:21-jdk` and runs `FROM eclipse-temurin:21-jre`; `connectors/Dockerfile` uses `alpine:3.20`. All three are tags, and a tag moves.
-
-This was not noticed until the scanner was switched on, and then it was noticed immediately: a local scan of `eclipse-temurin:21-jre` found nothing, and the same scan in CI found eight HIGH. The difference was not the scanner — it was the image. The locally cached pull was Ubuntu 24.04; the tag now resolves to **Ubuntu 26.04**, which ships `/usr/bin/pebble`, a Go binary whose standard library carries those eight.
-
-So the base of the deployed application changed distribution release under the project, silently, with no commit, no review and no way to tell from the repository which one a given build used.
-
-**The fix is to pin by digest** — `FROM eclipse-temurin:21-jre@sha256:…` — so that what ships is in the repository, an upgrade is a commit somebody approves, and the scanner's verdict is about a known artifact. Renovate or Dependabot can then propose digest bumps as ordinary pull requests.
-
-Worth pairing with the choice of base: a variant without `pebble` removes those eight findings outright rather than baselining them.
-
 ### OI-31 — Whether Stripe can be used from Colombia at all is unverified
 **Severity:** Decision · **Owner:** needs a story · **Raised:** 2026-09-15
 
@@ -199,6 +186,7 @@ The fix is an AWS Organization with the existing account as management and a new
 
 | Issue | Found in | Resolved by |
 |---|---|---|
+| **The Dockerfiles followed floating tags, so what shipped changed without a commit** — `eclipse-temurin:21-jre` moved from Ubuntu 24.04 to 26.04 under the project, which is how eight HIGH findings appeared in CI while a local scan of the same tag was clean | `FZ-127` | `FZ-139` — all three `FROM` lines pinned by digest, both backend stages moved to the variant that does not ship `/usr/bin/pebble`, and the scanner now reads the refs out of the Dockerfiles. The baseline is empty |
 | **Rate limiting covered only the unauthenticated endpoints** — nothing limited failed API-key attempts, the Stripe webhook, or authenticated traffic, leaving `/api/policy/**` unmetered: the endpoint whose unavailability blocks every customer's deployments, because the connector fails closed | `FZ-125` | `FZ-130` — four limits, the authenticated one counted per API key so that the defence cannot become the outage, and a client that sits out a `429` rather than failing the build (`D-31`) |
 | **The dependency tree carried 39 known HIGH/CRITICAL vulnerabilities** — Spring Boot 3.3.4, with seven CRITICALs in the HTTP connector alone. Found the day a scanner was first pointed at it | `FZ-127` | `FZ-136` — Spring Boot 4.1.1 and Tomcat pinned to 11.0.25: 39 to 0, with 468 tests unchanged |
 | **Nothing scanned dependencies or images** — three workflows and no scanner of any kind, so nothing in the repository knew whether a dependency had a published vulnerability | `FZ-125` | `FZ-127` — Trivy over the Maven tree, the npm tree and both base images, gated at HIGH, with a dated baseline. It immediately found `OI-29` |

@@ -2285,6 +2285,58 @@ removes, so `.trivyignore.yaml` is regenerated here: the 40 Java entries are gon
 the 8 base-image ones (`OI-30`) remain. A baseline that does not shrink when the debt is
 paid is one nobody is reading.
 
+### FZ-139 — Pin the Base Images by Digest
+**Status:** DONE · **Owns:** `OI-30`
+
+`FZ-127` switched the scanner on and `OI-30` was what it found second: all three `FROM`
+lines in this repository name a tag, and a tag moves. It was not a hypothesis — a local
+scan of `eclipse-temurin:21-jre` found nothing while the same scan in CI found eight HIGH,
+because the tag had gone from Ubuntu 24.04 to 26.04 in between. The base of the deployed
+application changed distribution release with no commit, no review, and no way to tell from
+the repository which one a given build used.
+
+**Both halves of the fix, because pinning alone would have frozen the bad one.** Every base
+was measured by digest before anything was chosen:
+
+| Base | Resolves to | HIGH+ |
+|---|---|---|
+| `eclipse-temurin:21-jre` — what shipped | Ubuntu 26.04 | **8** (`/usr/bin/pebble`, Go stdlib) |
+| `eclipse-temurin:21-jre-noble` | Ubuntu 24.04 | **0** |
+| `eclipse-temurin:21-jre-alpine` | Alpine 3.24.1 | 5 (openssl, expat) |
+| `eclipse-temurin:21-jdk` — the build stage | Ubuntu 26.04 | 8 |
+| `eclipse-temurin:21-jdk-noble` | Ubuntu 24.04 | **0** |
+| `alpine:3.20` — the connector | Alpine 3.20 | **0** |
+
+So both stages move to `-noble` and all three `FROM` lines carry a digest. **The baseline is
+now empty** — `.trivyignore.yaml` went 39 → 8 → 0 across `FZ-127`, `FZ-136` and this story,
+and the last eight are gone rather than suppressed, which is what `OI-30` said choosing the
+variant would do.
+
+**The scanner now reads the Dockerfiles.** `verify.yml` named the base images itself, which
+was survivable while they were tags and a liability the moment they became digests: two
+copies of a digest disagree eventually, and a scan passing against a base the build no
+longer uses is worse than no scan, because it reads as evidence. The workflow extracts the
+`FROM` line instead — the runtime stage, since only the jar leaves the build stage.
+
+**What a pin costs, and why it is still right.** A digest does not pick up the base's own
+security patches. The answer is not to avoid pinning but to make staleness loud: CI scans
+exactly these digests on every run, so the build fails the day one of them acquires a
+finding, and the bump is a commit somebody approves. Ubuntu 24.04 is the previous LTS,
+supported to 2029; the intent is to move forward when the newer image stops carrying
+pebble, not to sit on it.
+
+**Not pinned, deliberately:** `apk add --no-cache curl jq` in the connector image still
+resolves against Alpine's repository at build time, so two builds of the same base digest
+can differ. Pinning package versions holds until Alpine drops one and then every build
+fails — a silent change traded for a loud outage inside customers' pipelines. Also left
+alone: `docker-compose.yml`'s `postgres:16` and `axllent/mailpit:latest`, which are local
+development and ship to nobody.
+
+Verified by running: both images build from the pinned digests, the backend image starts
+against a real PostgreSQL and answers `/actuator/health` with `UP`, the connector image
+passes its own smoke test, and a scan of all three pinned bases plus both built images
+returns **0 findings at HIGH or above** with an empty ignore file.
+
 ## Going to Market
 
 Not a milestone: one story, and it is separate from `Milestone 15` because it is not security

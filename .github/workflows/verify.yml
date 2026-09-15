@@ -245,13 +245,30 @@ jobs:
           skip-dirs: frontend/node_modules
           trivyignores: .trivyignore.yaml
 
-      # The base images the Dockerfiles start FROM. Both were clean when this was written,
-      # which is the point of checking rather than assuming.
+      # The base images the Dockerfiles start FROM — read out of the Dockerfiles rather
+      # than written again here (FZ-139). They are pinned by digest now, and a digest
+      # copied into two files is a digest that will disagree with itself: the scan would
+      # keep passing against a base the build stopped using, which is a worse failure than
+      # no scan because it reads as evidence.
+      #
+      # The runtime stage, not the build stage: only the jar leaves the build stage, so
+      # what ships is this one plus the application's own dependencies, scanned above.
+      - name: Resolve the base images from the Dockerfiles
+        id: bases
+        run: |
+          backend=$(awk '$1 == "FROM" && $NF == "runtime" { print $2 }' backend/Dockerfile)
+          connector=$(awk '$1 == "FROM" { print $2; exit }' connectors/Dockerfile)
+          test -n "$backend" && test -n "$connector" || {
+            echo "could not read a FROM line; refusing to scan nothing" >&2; exit 1; }
+          echo "backend=$backend" >> "$GITHUB_OUTPUT"
+          echo "connector=$connector" >> "$GITHUB_OUTPUT"
+          echo "scanning $backend and $connector"
+
       - name: Scan the backend base image
         uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
         with:
           scan-type: image
-          image-ref: eclipse-temurin:21-jre
+          image-ref: ${{ steps.bases.outputs.backend }}
           scanners: vuln
           severity: HIGH,CRITICAL
           exit-code: '1'
@@ -261,7 +278,7 @@ jobs:
         uses: aquasecurity/trivy-action@a9c7b0f06e461e9d4b4d1711f154ee024b8d7ab8 # v0.36.0
         with:
           scan-type: image
-          image-ref: alpine:3.20
+          image-ref: ${{ steps.bases.outputs.connector }}
           scanners: vuln
           severity: HIGH,CRITICAL
           exit-code: '1'
