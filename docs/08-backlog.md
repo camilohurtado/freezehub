@@ -2285,6 +2285,56 @@ removes, so `.trivyignore.yaml` is regenerated here: the 40 Java entries are gon
 the 8 base-image ones (`OI-30`) remain. A baseline that does not shrink when the debt is
 paid is one nobody is reading.
 
+## Going to Market
+
+Not a milestone: one story, and it is separate from `Milestone 15` because it is not security
+work. Every story it sequences already exists elsewhere; what this adds is the order and the
+reason.
+
+### FZ-137 — Validation Plan
+**Status:** DONE · **Owns:** `OI-31`, `OI-32`
+
+Specification only, no code: `docs/13-validation.md`.
+
+The question behind it was "what infrastructure and company setup does launching need?", and
+the useful answer turned out to be **how little** — so the document is mostly a list of what
+is deliberately not built, with the trigger that would change each.
+
+**What the review changed about sequencing.** `FZ-046` is the hard blocker and is easy to
+miss, because `FZ-086` is DONE and provisioning appears to work: its own entry records that
+outside the `local` profile no Cognito user is created and no invitation is sent, so a
+deployment made today is a running system nobody outside the developer's laptop can enter.
+Billing, signup and a company are all downstream of it and none is on the path.
+
+**`FZ-135` is what actually comes first, and it is blocked on a question that now has a
+name.** That story leaves the region to the operator as "a commercial judgement about who
+the product is sold to"; `13-validation.md` §4 is that judgement — local customers validate
+the product, foreign ones validate the price, and they are not the same sample. Answering §4
+unblocks `FZ-135`, which unblocks `FZ-046`.
+
+**The validation metric is not signups.** It is whether a pipeline keeps calling the Policy
+API, because every other claim this product makes depends on that happening (`D-14`, `D-20`,
+`D-24`). Nothing needs building to measure it: `FZ-113` already put **Pipelines integrated**
+on the dashboard and `FZ-062` registers `freezehub.policy.evaluations`.
+
+**`FZ-099` is on the critical path, which it was not before.** `OI-13` says every guideline
+names an image that does not exist, so a design partner must hand-roll the integration from
+`examples/` — and asking someone to hand-roll the thing being validated measures the wrong
+thing. It is blocked on creating the GitHub organization, which is free.
+
+**Two findings, both raised rather than fixed.** `OI-31`: `FZ-084` is DONE and assumes a
+Stripe account that can take payments, and whether a Colombian business can hold one has
+never been checked. `OI-32`: production would run in a personal AWS account, and a Cognito
+user pool cannot be moved between accounts — the same argument `FZ-135` makes about region,
+pointed at the account instead.
+
+Neither blocks validation, which invoices by hand. Both are cheap now and expensive after
+`FZ-046`.
+
+**No change to `08-backlog.md`'s Immediate Execution Order**, which describes the original
+bootstrap sequence and is history rather than a live schedule. The path lives in the new
+document.
+
 ### FZ-138 — Who Owns Production
 **Status:** TODO · **Owns:** `OI-32` · **Blocked on:** two human actions
 
@@ -2319,6 +2369,6 @@ and an ALB would cover a large share of the beta year.
 makes the decision legible and leaves it where `D-23` leaves provisioning — with an operator
 who has production access, which is the point of the change.
 
-**`OI-32` arrives with `FZ-137`** (PR #42) and is not in this branch, which was cut from
-`master` rather than from an unmerged story. Its **Owner** line still says *needs a story*
-and should read `FZ-138` once both land.
+**`OI-32` arrived with `FZ-137`** (PR #42), which landed first; this branch was cut from
+`master` before it. Merging `master` in brought the entry, and its **Owner** now reads
+`FZ-138` rather than *needs a story*.

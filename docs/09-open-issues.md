@@ -171,6 +171,30 @@ So the base of the deployed application changed distribution release under the p
 
 Worth pairing with the choice of base: a variant without `pebble` removes those eight findings outright rather than baselining them.
 
+### OI-31 — Whether Stripe can be used from Colombia at all is unverified
+**Severity:** Decision · **Owner:** needs a story · **Raised:** 2026-09-15
+
+`FZ-084` is DONE and the whole commercial model rests on it: Checkout, the Customer Portal, and a signature-verified webhook that is the only thing allowed to change entitlement. Every one of those assumes a Stripe account that can accept payments.
+
+**Stripe's merchant support is country-bound, and the operator is in Colombia.** Whether a Colombian business can hold a Stripe account that takes payments has never been checked. If it cannot, `FZ-084` is not wrong — it is unreachable, and the options are a merchant-of-record (Paddle, Lemon Squeezy, which also absorb US sales tax and EU VAT) or a US entity holding a US Stripe account.
+
+**It does not block validation**, which invoices by hand (`docs/13-validation.md` §3), and that is the only reason this is a Decision rather than a Defect. It blocks the first self-serve payment, and it shapes the entity decision, so the answer is worth an hour long before either is needed.
+
+Recorded rather than assumed because the cost of being wrong is discovering it at the moment a customer is trying to pay.
+
+### OI-32 — Production would run in a personal AWS account
+**Severity:** Gap · **Owner:** `FZ-138` · **Raised:** 2026-09-15
+
+The target account is the operator's personal one, dating from 2022-10-23 (`OI-15`). `infra/README.md` already says Terraform must use an IAM role and not account root — advice a personal account cannot take, because there the operator *is* root.
+
+**The infrastructure itself is account-portable and costs nothing to redirect.** There is no account id anywhere in `infra/`; `locals.tf` reads `aws_caller_identity` and the only use is making the frontend bucket name unique. Pointing the whole stack at another account is a credentials change plus re-running `bootstrap/`.
+
+**What is not portable is identity, and it is the same argument `FZ-135` makes about region.** A Cognito user pool cannot be moved between accounts, and `users.external_subject` stores the `sub` it issues. Before `FZ-046` creates that pool this move is free; after the first real user it is a new pool, new subjects, and a forced password reset for every customer.
+
+What it costs to leave alone: a security questionnaire asks whether production is isolated, who holds root, and whether MFA is enforced, and the honest answers are no, the operator, and maybe. An unrelated suspension of the personal account takes production with it. And `D-23` already requires "an operator with production access", which here can only ever be one person.
+
+The fix is an AWS Organization with the existing account as management and a new member account for production — free, and worth checking for free-tier eligibility, since `OI-15` records that the current account's expired in 2023.
+
 ## Resolved
 
 | Issue | Found in | Resolved by |
