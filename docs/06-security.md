@@ -139,6 +139,29 @@ Every other authenticated action is available to any user within their own organ
 2. That `organization_id` is attached to the request's security context and is the only source of truth for scoping queries and writes.
 3. Application/service code must filter every tenant-owned read and write by this resolved `organization_id`. A client-supplied organization identifier appearing anywhere in a request is not authorization and must not be used as one (Governing Principle 2, `01-domain.md` invariant 4).
 
+## Rate Limiting
+
+**Extended by `FZ-130`, resolving `OI-27`.** `FZ-087` limited the endpoints that exist without a credential; everything else was unmetered, including the one endpoint the product can least afford to lose.
+
+Four limits, each keyed by whoever is actually responsible for the traffic:
+
+| What | Counted per | Default | Why that key |
+|---|---|---|---|
+| `/api/signup`, `/api/demo-requests`, `/api/dev/token` | source address | 10 / minute | there is no credential to count against |
+| `/api/webhooks/stripe/**` | source address | 120 / minute | same, and Stripe bursts — a new subscription arrives as several events |
+| `/api/policy/**`, no usable API key | source address | 30 / minute | the attempt costs a hash and a lookup, and nothing else stops it repeating |
+| `/api/policy/**`, authenticated | **API key** | 60 / 10 seconds | the key is the pipeline; an address is a shared office |
+
+Set under `freezehub.rate-limit.*` — `unauthenticated`, `stripe-webhook`, `policy.failures`, `policy.per-key`, each taking `requests` and `window`. Numbers that can only be changed by a release are numbers nobody changes.
+
+**The key matters more than the number on the Policy API.** `freeze-check.sh` fails closed by default (`FREEZEHUB_ON_ERROR=block`, `FZ-053`), so a `429` does not slow a deployment down, it stops it. Counting authenticated evaluations per *address* would mean one stale credential behind a corporate NAT could fill the bucket for every pipeline sharing that egress IP — the defence causing the outage the product exists to schedule. Per key, a pipeline can only refuse itself. `PolicyRateLimitTest` exercises exactly that: the failures are exhausted from an address, and a valid key from the same address still deploys.
+
+**The window is short rather than the limit large.** 60 in 10 seconds and 360 in a minute allow the same rate, but a ten-second window can never answer `Retry-After: 54`. The worst a refused pipeline is asked to wait is ten seconds — which `freeze-check.sh` now sits out and retries (`curl --retry`, ceilinged at 30 seconds) instead of failing the build.
+
+**Enforcement lives in two places, because the endpoints are reached differently.** The path-based limits are an interceptor. The Policy API's are a filter inside its security chain: a request whose key does not resolve is refused by the chain's entry point and never reaches the DispatcherServlet, so an interceptor would see only the calls that succeeded and the half with no credential behind it would stay unmetered. Both refuse with `429`, `Retry-After`, and the same Problem Details body as every other refusal (`FZ-061`).
+
+**What this is not.** The counters are in memory and per instance, so two tasks mean twice the effective limit — stated rather than hidden (`CLAUDE.md` §4 keeps distributed caching out of the MVP). It stops one source, or one credential, hammering one endpoint. Abuse spread across many addresses needs a WAF or the load balancer, above the application.
+
 ## Response Headers on the Distribution
 
 **Implemented by `FZ-129`, resolving `OI-26`.** CloudFront serves every response with a Content-Security-Policy, HSTS (one year, subdomains, **not** preloaded — preload is a one-way door), `X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, and a `Permissions-Policy` switching off the browser features the product has no use for.
@@ -189,7 +212,7 @@ One allowance is deliberate and worth stating: `style-src-attr 'unsafe-inline'`.
 
 **Every authentication check needs a test that watches it refuse.** Stated in full under Token validation rules above, and it generalises: this codebase has twice shipped a guard whose test exercised the path production does not use (`FZ-114`, `FZ-121`).
 
-**Rate limiting is an availability control here, not only a credential one.** A 256-bit key is not brute-forcible, so the exposure on `/api/policy/**` is cost and availability rather than compromise — but that endpoint is the one whose unavailability blocks every customer's deployments (`D-21`, `D-24`), which makes it the endpoint least able to afford being hammered.
+**Rate limiting is an availability control here, not only a credential one.** A 256-bit key is not brute-forcible, so the exposure on `/api/policy/**` is cost and availability rather than compromise — but that endpoint is the one whose unavailability blocks every customer's deployments (`D-21`, `D-24`), which makes it the endpoint least able to afford being hammered. **Answered by `FZ-130`** — see Rate Limiting above: the authenticated limit is counted per API key rather than per address, precisely so that this control cannot become that outage.
 
 ## Out of Scope for MVP
 

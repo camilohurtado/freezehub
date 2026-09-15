@@ -50,6 +50,8 @@ The same everywhere, because it is the same program.
 
 An API key reaches `/api/policy/**` and nothing else: it cannot read your restrictions, change your catalog, or issue another key. A leaked CI variable is not an account takeover.
 
+**A rate-limited answer is waited out, not failed.** FreezeHub limits the policy endpoint, and the check honours a `Retry-After` and asks once more — up to 30 seconds, after which it becomes an ordinary "could not be asked" and `FREEZEHUB_ON_ERROR` decides. `FREEZEHUB_TIMEOUT` bounds each attempt, not the wait between them. Nothing needs configuring for this; it is noted because a build that pauses for a few seconds here is working, not stuck.
+
 ---
 
 # Integration guidelines

@@ -2106,7 +2106,7 @@ that is the moment to say so in a header.
 Cheapest item in the milestone, and it should not wait for the rest.
 
 ### FZ-130 — Rate Limiting Beyond the Unauthenticated Endpoints
-**Status:** TODO · **Owns:** `OI-27`
+**Status:** DONE · **Owns:** `OI-27`
 
 Extends `FZ-087`'s limiter, which was deliberately scoped to signup and demo requests.
 
@@ -2125,6 +2125,52 @@ Acceptance:
   be done safely, say so and limit only the failures.
 - The Stripe webhook endpoint is limited; Stripe retries, so a `429` there is safe.
 - Limits are configuration, not constants.
+
+**Built.** Four limits now, not one, each counted against whoever is responsible for the
+traffic:
+
+| What | Counted per | Default |
+|---|---|---|
+| signup, demo requests, dev token | source address | 10 / minute (unchanged, `FZ-087`) |
+| the Stripe webhook | source address | 120 / minute |
+| `/api/policy/**` with no usable key | source address | 30 / minute |
+| `/api/policy/**`, authenticated | **API key** | 60 / 10 seconds |
+
+All four are `freezehub.rate-limit.*` properties — `requests` and `window` each — so a
+number can be changed without a release.
+
+**The successful path is limited, and the acceptance criterion's escape hatch was not
+taken.** What made it safe was not the size of the number but two other things.
+
+*The key.* `freeze-check.sh` fails closed, so a `429` does not slow a deployment, it stops
+it. Counting authenticated evaluations per address would mean one pipeline with a stale
+credential could fill the bucket for every pipeline sharing a corporate NAT — FreezeHub
+blocking deployments for a reason unrelated to any freeze. Per key, a pipeline can only
+refuse itself, and `PolicyRateLimitTest` exhausts the failure budget from an address and
+then deploys with a valid key from that same address to prove it.
+
+*The window.* 60 per ten seconds and 360 per minute allow the same rate, but only the long
+window can answer `Retry-After: 54`. The short one bounds the penalty instead of the rate,
+so the worst a refused pipeline waits is ten seconds — which `freeze-check.sh` now sits out
+(`curl --retry`, honouring `Retry-After`, ceilinged at 30 seconds) rather than failing the
+build. Recorded as `D-31`; the connector change is part of the decision rather than a
+follow-up, because a limit the caller cannot recover from eventually becomes an incident.
+
+**Enforced in two places, because the endpoints are reached differently.** The path limits
+stay an interceptor. The Policy API's are a filter inside its security chain: a request
+whose key does not resolve is refused by the entry point and never reaches the
+DispatcherServlet, so an interceptor would count only the calls that succeeded. Both refuse
+with `429`, `Retry-After`, and the same Problem Details body as every other refusal.
+
+Verified by running: 472 backend tests pass, and the ordering the design depends on was
+checked by breaking it — moving the filter ahead of authentication turns two tests red,
+because every authenticated call then lands in the address bucket. The connector's retry
+was likewise proved against a stub that answers `429` once and `200` next, and against one
+that asks for a wait longer than the ceiling.
+
+**Left alone deliberately:** the counters are still in memory and per instance, so two
+tasks mean twice the limit (`CLAUDE.md` §4 keeps shared state out of the MVP), and abuse
+spread across many addresses still needs a WAF above the application.
 
 ### FZ-135 — Decide the Region Before Anything Is Applied
 **Status:** BLOCKED · **Owns** `OI-20` · **Blocks** `FZ-046`, `FZ-123`

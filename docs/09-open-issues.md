@@ -158,13 +158,6 @@ The specific hazard is that **Cognito issues ID tokens and access tokens from th
 
 `FZ-125` wrote the rules into `06-security.md` § Token validation rules. This entry stays open until something enforces them, with a test that watches each rejected shape fail.
 
-### OI-27 — Rate limiting covers only the unauthenticated endpoints
-**Severity:** Gap · **Owner:** `FZ-130` · **Found in:** `FZ-125`
-
-`FZ-087` limited signup and demo requests, deliberately and correctly — those were the endpoints that existed without a credential. Nothing limits anything else: not failed API-key attempts on `/api/policy/**`, not the Stripe webhook, not authenticated traffic.
-
-A 256-bit key is not brute-forcible, so this is availability and cost rather than credential compromise. That is the reason it matters here rather than a reason it does not: `/api/policy/**` is the endpoint whose unavailability blocks every customer's deployments, because `freeze-check.sh` fails closed (`D-21`, `D-24`). It is the least affordable endpoint in the product to leave unmetered.
-
 ### OI-30 — The Dockerfiles follow floating tags, so what ships changes without a commit
 **Severity:** Gap · **Owner:** needs a story · **Found in:** `FZ-127`
 
@@ -206,6 +199,7 @@ The fix is an AWS Organization with the existing account as management and a new
 
 | Issue | Found in | Resolved by |
 |---|---|---|
+| **Rate limiting covered only the unauthenticated endpoints** — nothing limited failed API-key attempts, the Stripe webhook, or authenticated traffic, leaving `/api/policy/**` unmetered: the endpoint whose unavailability blocks every customer's deployments, because the connector fails closed | `FZ-125` | `FZ-130` — four limits, the authenticated one counted per API key so that the defence cannot become the outage, and a client that sits out a `429` rather than failing the build (`D-31`) |
 | **The dependency tree carried 39 known HIGH/CRITICAL vulnerabilities** — Spring Boot 3.3.4, with seven CRITICALs in the HTTP connector alone. Found the day a scanner was first pointed at it | `FZ-127` | `FZ-136` — Spring Boot 4.1.1 and Tomcat pinned to 11.0.25: 39 to 0, with 468 tests unchanged |
 | **Nothing scanned dependencies or images** — three workflows and no scanner of any kind, so nothing in the repository knew whether a dependency had a published vulnerability | `FZ-125` | `FZ-127` — Trivy over the Maven tree, the npm tree and both base images, gated at HIGH, with a dated baseline. It immediately found `OI-29` |
 | **No response-headers policy on the distribution** — no CSP, HSTS, `X-Content-Type-Options`, `Referrer-Policy` or `Permissions-Policy`, while the frontend holds its bearer token in `sessionStorage`, which makes a script injection how that token leaves | `FZ-125` | `FZ-129` — derived from what the application loads, and rehearsed against the real bundle before any apply |
