@@ -1316,6 +1316,10 @@ Acceptance:
 
 Then one thing that is easy to miss: **GHCR package visibility is set on the package, not inherited from the repository**, and a newly published package is private. It must be set to public after the first push or customers get `denied` on pull.
 
+**The actions were bumped off Node 20 first.** The dry run warned that `checkout@v4`, `build-push-action@v6` and both `docker/setup-*@v3` actions target a deprecated runtime and were being forced onto Node 24. They are now `checkout@v7`, `setup-qemu@v4`, `setup-buildx@v4`, `login-action@v4` and `build-push-action@v7` — versions read from each action's latest release rather than guessed, and verified by a second dry run before anything was published. Doing it in this order means the image was never published by a workflow that needed changing straight afterwards.
+
+Only this workflow was bumped. `deploy.yml` and `verify.yml` carry the same deprecated actions and are not this story's to change — `verify.yml` in particular runs the suite, so bumping `setup-java` and `setup-node` there deserves its own run to prove it (`OI-33`).
+
 **What remains is one `workflow_dispatch`** with a version. It stays a human action because it publishes to a real registry under a name customers will pin — the same reasoning that makes `deploy.yml` manual. Until it runs, every guideline in `connectors/README.md` names an image that does not exist, and the README says so.
 
 ### FZ-096 — GitHub App and Required Checks

@@ -199,6 +199,20 @@ What it costs to leave alone: a security questionnaire asks whether production i
 
 The fix is an AWS Organization with the existing account as management and a new member account for production — free, and worth checking for free-tier eligibility, since `OI-15` records that the current account's expired in 2023.
 
+### OI-33 — `deploy.yml` and `verify.yml` still run actions targeting Node 20
+**Severity:** Gap · **Owner:** needs a story · **Found in:** `FZ-099`
+
+GitHub has deprecated the Node 20 runtime and is force-running actions that target it on Node 24. `FZ-099` bumped the actions in `publish-connectors.yml` because that was the workflow it was already changing and could verify with a dry run. The other two were left alone:
+
+- `deploy.yml` — `checkout@v4`, `setup-node@v4`, `setup-qemu-action@v3`, `setup-buildx-action@v3`, `build-push-action@v6`
+- `verify.yml` — `checkout@v4` (five times), `setup-java@v4`, `setup-node@v4`
+
+Not urgent, because forcing onto a newer runtime is what GitHub is doing rather than failing the run. It becomes urgent on whatever date that forcing stops.
+
+**`verify.yml` is the one that wants care.** It runs the whole suite against Testcontainers, so bumping `setup-java` and `setup-node` there is a change that has to be proved by a green run rather than by reading the diff — which is exactly why it was not folded into a story about publishing an image.
+
+Worth pairing with `OI-30`, which is the same question asked about Dockerfiles: what this repository pins, and how tightly. Actions here use floating major tags by the file's existing convention; SHA-pinning is the hardened alternative and is a decision rather than a bump.
+
 ## Resolved
 
 | Issue | Found in | Resolved by |
