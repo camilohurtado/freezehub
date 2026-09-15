@@ -1,6 +1,10 @@
 package com.freezhub.shared.security;
 
 import com.freezhub.apikey.ApiKeyService;
+import com.freezhub.shared.ratelimit.PolicyRateLimitFilter;
+import com.freezhub.shared.ratelimit.PolicyRateLimiters;
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
@@ -10,6 +14,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.servlet.HandlerExceptionResolver;
 
 /**
  * The machine-facing chain: {@code /api/policy/**}, authenticated by API key only
@@ -27,13 +32,22 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
  * <p><strong>No CORS.</strong> Every other chain enables it; this one must not. An API key
  * has no business being sent from a browser, and refusing cross-origin preflight means a
  * page cannot be written that asks a visitor's browser to spend one.
+ *
+ * <p><strong>Rate limited here rather than by the interceptor the other endpoints use</strong>
+ * (`FZ-130`): a request whose key does not resolve is refused by the entry point below and
+ * never reaches an interceptor, so counting it has to happen in the chain.
  */
 @Configuration
 public class ApiKeySecurityConfig {
 
     @Bean
     @Order(2)
-    SecurityFilterChain apiKeyFilterChain(HttpSecurity http, ApiKeyService apiKeyService) throws Exception {
+    SecurityFilterChain apiKeyFilterChain(
+            HttpSecurity http,
+            ApiKeyService apiKeyService,
+            ObjectProvider<PolicyRateLimiters> policyRateLimiters,
+            @Qualifier("handlerExceptionResolver") ObjectProvider<HandlerExceptionResolver> exceptionResolver)
+            throws Exception {
         http
                 .securityMatcher("/api/policy/**")
                 .csrf(csrf -> csrf.disable())
@@ -48,6 +62,17 @@ public class ApiKeySecurityConfig {
                 // would run API key resolution on the human API too.
                 .addFilterBefore(new ApiKeyAuthenticationFilter(apiKeyService),
                         UsernamePasswordAuthenticationFilter.class);
+
+        // Absent when freezehub.rate-limit.enabled is false — the whole suite runs that
+        // way, because MockMvc reports every request as coming from 127.0.0.1 and tests
+        // sharing a context would drain each other's budget.
+        PolicyRateLimiters limiters = policyRateLimiters.getIfAvailable();
+        if (limiters != null) {
+            // After the key filter, so the limit knows whether a key resolved and can
+            // count an authenticated caller against its own key rather than its address.
+            http.addFilterAfter(new PolicyRateLimitFilter(limiters, exceptionResolver.getObject()),
+                    ApiKeyAuthenticationFilter.class);
+        }
 
         return http.build();
     }

@@ -55,8 +55,10 @@ const BLOCK_UNREGISTERED = {
 const workDir = fs.mkdtempSync(path.join(os.tmpdir(), "freeze-check-test-"));
 const requestLog = path.join(workDir, "requests.jsonl");
 
-function respondWith(status, body) {
-    fs.writeFileSync(path.join(workDir, "response.json"), JSON.stringify({ status, body }));
+// `extra` carries the parts of a scenario that are not the ordinary answer: `headers`,
+// and `then` for what the *next* request gets (FZ-130).
+function respondWith(status, body, extra = {}) {
+    fs.writeFileSync(path.join(workDir, "response.json"), JSON.stringify({ status, body, ...extra }));
 }
 
 function requests() {
@@ -188,6 +190,29 @@ exits('a server error exits 0 when explicitly asked to fail open', 0,
 exits('an unreachable FreezeHub exits 2 by default', 2, { url: UNREACHABLE });
 exits('an unreachable FreezeHub exits 0 when explicitly asked to fail open', 0,
     { url: UNREACHABLE, env: { FREEZEHUB_ON_ERROR: 'allow' } });
+
+// --- the rate limit (FZ-130) ----------------------------------------------------------
+// The Policy API is now limited, and this script fails closed. A 429 that was simply
+// reported would therefore stop a deployment that nothing is wrong with — the defence
+// causing the outage it is meant to prevent. So a 429 is waited out, once, within a
+// ceiling on how long a build may be held.
+
+forgetRequests();
+respondWith(429, { title: 'Too Many Requests' },
+    { headers: { 'Retry-After': '1' }, then: { status: 200, body: ALLOW } });
+exits('a 429 is waited out and retried rather than failing the deployment', 0);
+check('the retry is a second request, not a re-read of the first answer',
+    requests().length === 2, `${requests().length} request(s)`);
+
+// The ceiling is the half that keeps this honest: a limiter can ask for any wait it
+// likes, and "retry until it works" would hand a stranger the ability to hang a build.
+// Beyond 30 seconds the answer goes back to being an ordinary "could not be asked".
+forgetRequests();
+respondWith(429, { title: 'Too Many Requests' },
+    { headers: { 'Retry-After': '600' }, then: { status: 200, body: ALLOW } });
+exits('a wait longer than the ceiling is refused rather than sat out', 2);
+check('and it is refused without waiting — one request, no retry',
+    requests().length === 1, `${requests().length} request(s)`);
 
 // --- what it sends --------------------------------------------------------------------
 respondWith(200, ALLOW);

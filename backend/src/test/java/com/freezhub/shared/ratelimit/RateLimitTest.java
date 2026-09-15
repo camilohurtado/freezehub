@@ -27,6 +27,10 @@ import org.springframework.test.web.servlet.MockMvc;
 /**
  * The limit as a caller experiences it (FZ-087).
  *
+ * <p>Covers the two limits applied by path: the unauthenticated endpoints, and the Stripe
+ * webhook since {@code FZ-130}. The Policy API is limited inside its security chain rather
+ * than by an interceptor, and is covered by {@code PolicyRateLimitTest}.
+ *
  * <p>Applied to {@code /api/dev/token} because it is the only unauthenticated endpoint
  * that exists yet — {@code /api/signup} and {@code /api/demo-requests} arrive with
  * {@code FZ-082} and {@code FZ-083}, and this story deliberately precedes them
@@ -39,9 +43,15 @@ import org.springframework.test.web.servlet.MockMvc;
 @Import(ContainersConfig.class)
 @TestPropertySource(properties = {
         "freezehub.rate-limit.enabled=true",
-        "freezehub.rate-limit.requests=3",
-        "freezehub.rate-limit.window=1m",
-        "freezehub.rate-limit.paths=/api/dev/token"
+        "freezehub.rate-limit.unauthenticated.requests=3",
+        "freezehub.rate-limit.unauthenticated.window=1m",
+        "freezehub.rate-limit.unauthenticated.paths=/api/dev/token",
+        // Its own budget, because it protects something else: Stripe bursts, and a number
+        // that suits a signup form would refuse a customer's first subscription.
+        "freezehub.rate-limit.stripe-webhook.requests=3",
+        "freezehub.rate-limit.stripe-webhook.window=1m",
+        "freezehub.stripe.secret-key=sk_test_not_a_real_key",
+        "freezehub.stripe.webhook-secret=whsec_test_secret"
 })
 class RateLimitTest {
 
@@ -129,11 +139,48 @@ class RateLimitTest {
 
     @Test
     void doesNotTouchEndpointsOutsideItsPaths() throws Exception {
-        // The limit is configured for /api/dev/token alone. An authenticated API already
-        // requires a credential that can be revoked, which is a better answer than a
-        // counter, and limiting one would throttle a customer's own pipeline.
+        // This limit is configured for /api/dev/token alone, and its budget is three. Ten
+        // requests to an endpoint it does not cover are ten 200s: the paths are a list, not
+        // a suggestion. (Since FZ-130 other endpoints have limits of their own — they are
+        // separate counters, which is what this proves.)
         for (int i = 0; i < 10; i++) {
             mockMvc.perform(get("/actuator/health")).andExpect(status().isOk());
         }
+    }
+
+    /**
+     * The Stripe webhook has a budget of its own (FZ-130).
+     *
+     * <p>Sent with a signature that cannot verify, so each request is refused — which is
+     * the point. Verification is the work being protected: anyone can make FreezeHub do it,
+     * because the endpoint has no credential in front of it by design.
+     *
+     * <p>Safe to enforce here in a way it is almost nowhere else, because Stripe retries a
+     * non-2xx for up to three days. A refused delivery is delayed, not lost.
+     */
+    @Test
+    void theStripeWebhookIsLimitedSeparately() throws Exception {
+        for (int i = 0; i < 3; i++) {
+            postStripeEvent("203.0.113.30").andExpect(status().isUnauthorized());
+        }
+
+        postStripeEvent("203.0.113.30")
+                .andExpect(status().isTooManyRequests())
+                .andExpect(header().exists("Retry-After"));
+
+        // A different source still gets through: the counter is per caller, so one sender
+        // hammering the endpoint cannot stop everybody else's subscriptions updating.
+        postStripeEvent("203.0.113.31").andExpect(status().isUnauthorized());
+    }
+
+    private org.springframework.test.web.servlet.ResultActions postStripeEvent(String from) throws Exception {
+        return mockMvc.perform(post("/api/webhooks/stripe")
+                .contentType(MediaType.APPLICATION_JSON)
+                .header("Stripe-Signature", "t=1,v1=not-a-valid-signature")
+                .content("{\"id\":\"evt_test\",\"type\":\"customer.subscription.updated\"}")
+                .with(raw -> {
+                    raw.setRemoteAddr(from);
+                    return raw;
+                }));
     }
 }

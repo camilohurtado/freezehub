@@ -87,6 +87,17 @@ echo "freeze-check: asking FreezeHub about $FREEZEHUB_APPLICATION -> $FREEZEHUB_
 # --max-time matters more than it looks: without it, "fail closed" would really
 # mean "hang until the job times out", which is worse than either choice above.
 #
+# --retry is there because FreezeHub rate limits this endpoint (FZ-130). A 429
+# lands in the "could not be asked" branch below, which by default blocks the
+# deployment — so without a retry, protecting the API would occasionally break
+# the pipelines it exists to serve. curl honours a Retry-After header on a 429,
+# and --retry-max-time 30 is the ceiling on how long that may hold a build: a
+# longer wait than that is refused rather than sat out.
+#
+# It covers 5xx and timeouts too, which curl treats as the same class of
+# transient failure. That is deliberate — one retry before declaring an outage —
+# but it does change what a 503 costs, not only a 429.
+#
 # The key is passed as an argument and is therefore visible in `ps` on a shared
 # runner. Where that matters, feed it to curl on stdin instead:
 #   printf 'header = "X-API-Key: %s"\n' "$FREEZEHUB_API_KEY" | curl --config - ...
@@ -94,6 +105,7 @@ set +e
 status=$(curl --silent --show-error \
     --output "$body" --write-out '%{http_code}' \
     --connect-timeout 5 --max-time "$FREEZEHUB_TIMEOUT" \
+    --retry 1 --retry-max-time 30 \
     --request POST "$FREEZEHUB_URL/api/policy/evaluate" \
     --header "X-API-Key: $FREEZEHUB_API_KEY" \
     --header 'Content-Type: application/json' \
