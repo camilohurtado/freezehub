@@ -185,7 +185,7 @@ No container runtime? Run the script directly — it is POSIX shell and needs on
 
 [`action.yml`](./action.yml) and [`templates/freeze-check.yml`](./templates/freeze-check.yml) are a real GitHub Action and a real GitLab CI/CD component, and both are covered by the test suite.
 
-**They are not installable today**, and the docs above deliberately do not offer them. `uses:` and `component:` resolve against a source repository the customer can read, and this one is private. Publishing them would mean a second, public repository to keep in step — machinery worth building when a Marketplace listing is worth having, and not before (`FZ-096` covers that question, `D-26` the reasoning).
+**They resolve now, and are still not offered.** Until this repository moved into the `freezehubio` organization and became public, `uses:` and `component:` could not resolve against it at all — that was the reason given here, and it has gone. What stands in its place is `D-26`: the image is the connector, so publishing one artifact makes every guideline work at once, while a per-ecosystem package is a second thing to keep in step for one ecosystem's benefit. A Marketplace or Catalog listing is a separate and lesser question (`FZ-096`).
 
 They are kept because they cost nothing to keep, they stay honest by being tested, and they are ready the day that changes.
 

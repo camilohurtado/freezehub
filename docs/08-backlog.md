@@ -1304,18 +1304,19 @@ Acceptance:
 - The reference implementations stay tested, and the documentation **does not offer them as installable** — they are not, while the repository is private.
 
 ### FZ-099 — Publish the Connector Image
-**Status:** TODO · **Owner of** `OI-13` · **Deliberately last**
+**Status:** TODO · **Owner of** `OI-13` · **Blocked on one dispatch**
 
 `.github/workflows/publish-connectors.yml` builds `linux/amd64` and `linux/arm64`, runs the connector tests first, tags the exact version and moves `v1`, and has a dry-run mode. It refuses a version that is not `vN.N.N`, and there is no `latest` tag — a moving `latest` in a deploy gate is how a pipeline changes behaviour on a day nobody touched it.
 
-**Not executed, and cannot be.** Two prerequisites, both human decisions rather than a workflow's to make:
+**Prerequisite 1 is met.** The `freezehubio` organization exists and this repository was moved into it. The image is named for the organization because a personal username in a customer's deploy pipeline undercuts a product sold to companies, and renaming later breaks every pipeline using it.
 
-1. A GitHub organization **`freezehubio`**. The image is named for it because a personal username in a customer's deploy pipeline undercuts a product sold to companies — and renaming later breaks every pipeline using it.
-2. A secret **`CONNECTOR_PUBLISH_TOKEN`** with `packages: write` on that organization. `GITHUB_TOKEN` cannot write to another owner's package namespace.
+**Prerequisite 2 was removed rather than satisfied, by the same move.** It read: *a secret `CONNECTOR_PUBLISH_TOKEN` with `packages: write`, because `GITHUB_TOKEN` cannot write to another owner's package namespace.* That was true while the repository sat under a personal account. `freezehubio` is no longer another owner, so the workflow declares `packages: write` in its `permissions:` block and authenticates with the built-in `GITHUB_TOKEN`. **No secret is configured for this workflow, and none is needed.**
 
-Then one thing that is easy to miss: **GHCR package visibility is set on the package, not inherited from the repository.** It must be set to public after the first push or customers get `denied` on pull. That property is also what lets a public image ship from a private source tree at all.
+**That is a better credential, not merely a cheaper one.** A personal access token is long-lived, has to be stored and rotated, outlives whoever created it, and grants what its scopes say wherever it is pasted. `GITHUB_TOKEN` is minted for one run, bounded by the `permissions:` block in the file, and expires with the job.
 
-Until this runs, every guideline in `connectors/README.md` names an image that does not exist, and the README says so.
+Then one thing that is easy to miss: **GHCR package visibility is set on the package, not inherited from the repository**, and a newly published package is private. It must be set to public after the first push or customers get `denied` on pull.
+
+**What remains is one `workflow_dispatch`** with a version. It stays a human action because it publishes to a real registry under a name customers will pin — the same reasoning that makes `deploy.yml` manual. Until it runs, every guideline in `connectors/README.md` names an image that does not exist, and the README says so.
 
 ### FZ-096 — GitHub App and Required Checks
 **Status:** DEFERRED · **Decision required before scheduling**
