@@ -2198,23 +2198,43 @@ Without that rehearsal the first evidence either way would have been a customer 
 a chart of flat bars.
 
 ### FZ-136 — Upgrade the Platform Off Spring Boot 3.3.4
-**Status:** TODO · **Owns:** `OI-29` · **Blocks:** the `.trivyignore.yaml` expiry on 2026-10-13
+**Status:** DONE · **Owns:** `OI-29`
 
-`FZ-127` switched the scanner on and measured what the tree actually carries: **39 findings
-at HIGH or above, 9 of them CRITICAL**, all of it in the Java dependencies. The npm tree and
-both base images are clean.
+`FZ-127` switched the scanner on and measured 39 HIGH-or-above findings in the backend's
+dependency tree, 9 of them CRITICAL. **Decided (operator's call): the 4.x line, not 3.5.x.**
 
-**The work is already measured, which is most of what makes a version bump a story rather
-than a gamble.** Spring Boot **3.5.14** builds with no source changes and passes all **468
-tests unchanged** — run, not assumed — and takes the count 39 → 21 and the CRITICALs 9 → 6.
+**Spring Boot 3.3.4 → 4.1.1, plus Tomcat pinned to 11.0.25. The scan goes 39 → 0.**
 
-**Decide when starting it:** 3.5.x or 4.x. The remaining 21 need a newer patch line than
-3.5.14 — `tomcat-embed-core` 10.1.55+, `spring-data-commons` 3.5.12, `micrometer-core`
-1.15.12, the PostgreSQL driver 42.7.12, Spring Framework 6.2.19 — so the realistic targets
-are the current 3.5.x (3.5.16 at the time of writing), or 4.x, which is a larger step and
-whose own transitive set has not been measured here. Measure the candidate the same way
-before choosing: change the parent, build, run the suite, re-scan.
+Boot 4 is a major version and it moved five things this application depended on. None of it
+was guessed — each was located in the actual jars before anything was edited:
 
-Then **regenerate `.trivyignore.yaml` from the new scan** rather than editing it, and shorten
-the expiry to whatever is still genuinely outstanding. A baseline that survives its own
-upgrade unchanged is a baseline nobody looked at.
+| What moved | Where it went |
+|---|---|
+| **Jackson 2 → 3** | `com.fasterxml.jackson.{core,databind}` → `tools.jackson.*`, across 24 files. Annotations stayed put. `JsonProcessingException` became the unchecked `JacksonException`, and Java-time support is built in, so `JavaTimeModule` is gone |
+| `SerializationFeature.WRITE_DATES_AS_TIMESTAMPS` | `DateTimeFeature`, set on an immutable mapper's builder |
+| `ClientHttpRequestFactories` / `RestClientCustomizer` | `ClientHttpRequestFactoryBuilder` + `HttpClientSettings`, and `org.springframework.boot.restclient` — a module the web starter no longer pulls |
+| `@AutoConfigureMockMvc`, `@DataJpaTest`, `@AutoConfigureTestDatabase` | per-technology test modules (`spring-boot-webmvc-test`, `-data-jpa-test`, `-jdbc-test`) |
+| `TestRestTemplate` | **removed.** The one test using it now drives the running server with `RestClient`, using `exchange` rather than `retrieve` because the statuses under assertion are exactly the ones `retrieve` would throw on |
+
+Testcontainers also had to move to 2.x, whose modules are renamed (`testcontainers-postgresql`,
+`testcontainers-junit-jupiter`), because Boot 4 no longer manages its versions.
+
+**The failure worth recording**, because it is the one a test suite catches and a reviewer
+would not: with everything compiling and the upgrade apparently done, **342 of 468 tests
+errored with `relation "organization" does not exist`**. Boot 4 moved Liquibase's
+auto-configuration into `spring-boot-liquibase`, and `liquibase-core` on its own no longer
+runs the changelog at startup. The schema was simply never created. One dependency fixed
+all 342.
+
+**Tomcat is pinned ahead of Boot's own default.** 4.1.1 brings 11.0.24, which still carries
+three CRITICALs; 11.0.25 has them fixed. Pinned in `<tomcat.version>` rather than waited
+for, because the alternative was shipping them or suppressing them.
+
+Verified: **468 tests pass**, the application **starts** against an empty database and
+Liquibase applies all 27 changesets, `/actuator/health` is UP, and the scan returns **0
+findings at HIGH or above**.
+
+**The baseline shrank with it.** `FZ-127` landed first and baselined the 39 findings this
+removes, so `.trivyignore.yaml` is regenerated here: the 40 Java entries are gone and only
+the 8 base-image ones (`OI-30`) remain. A baseline that does not shrink when the debt is
+paid is one nobody is reading.

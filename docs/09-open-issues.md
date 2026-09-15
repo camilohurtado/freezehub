@@ -165,19 +165,6 @@ The specific hazard is that **Cognito issues ID tokens and access tokens from th
 
 A 256-bit key is not brute-forcible, so this is availability and cost rather than credential compromise. That is the reason it matters here rather than a reason it does not: `/api/policy/**` is the endpoint whose unavailability blocks every customer's deployments, because `freeze-check.sh` fails closed (`D-21`, `D-24`). It is the least affordable endpoint in the product to leave unmetered.
 
-### OI-29 — The dependency tree carries 39 known HIGH/CRITICAL vulnerabilities
-**Severity:** Defect · **Owner:** `FZ-136` · **Found in:** `FZ-127`
-
-Switching on the scanner (`FZ-127`) measured what was there. The backend is pinned to **Spring Boot 3.3.4**, and its tree carries **39 findings at HIGH or above, 9 of them CRITICAL** — seven in `tomcat-embed-core` 10.1.30, two in `spring-security-web` 6.3.3, with the rest across `jackson-databind`, `micrometer-core`, the PostgreSQL driver, Spring Framework and Spring Boot itself.
-
-The frontend's npm tree is **clean**, and both base images — `eclipse-temurin:21-jre` and `alpine:3.20` — are **clean**. The whole exposure is the Java dependency tree.
-
-**The fix is measured rather than estimated.** Spring Boot **3.5.14** builds with no source changes and passes all **468 tests unchanged**, and takes the count from 39 to 21 (9 CRITICAL to 6). The remainder need a newer patch line again — `tomcat-embed-core` 10.1.55+, `spring-data-commons` 3.5.12, `micrometer-core` 1.15.12, the driver 42.7.12, Spring Framework 6.2.19 — so the target is the current 3.5.x (3.5.16 at the time of writing) or the 4.x line, which is a larger step.
-
-`FZ-127` did not do the upgrade, deliberately: its own scope says "a CI change, not a platform". What it did instead is make the debt dated — the baseline in `.trivyignore.yaml` expires on **2026-10-13**, after which these stop being suppressed and the build fails on them.
-
-Nothing here is exploitable through a path this product exposes *as far as anybody has checked*, and that clause is the problem: nobody has checked, and seven CRITICALs in the HTTP connector is not a position to defend by reasoning.
-
 ### OI-30 — The Dockerfiles follow floating tags, so what ships changes without a commit
 **Severity:** Gap · **Owner:** needs a story · **Found in:** `FZ-127`
 
@@ -195,6 +182,7 @@ Worth pairing with the choice of base: a variant without `pebble` removes those 
 
 | Issue | Found in | Resolved by |
 |---|---|---|
+| **The dependency tree carried 39 known HIGH/CRITICAL vulnerabilities** — Spring Boot 3.3.4, with seven CRITICALs in the HTTP connector alone. Found the day a scanner was first pointed at it | `FZ-127` | `FZ-136` — Spring Boot 4.1.1 and Tomcat pinned to 11.0.25: 39 to 0, with 468 tests unchanged |
 | **Nothing scanned dependencies or images** — three workflows and no scanner of any kind, so nothing in the repository knew whether a dependency had a published vulnerability | `FZ-125` | `FZ-127` — Trivy over the Maven tree, the npm tree and both base images, gated at HIGH, with a dated baseline. It immediately found `OI-29` |
 | **No response-headers policy on the distribution** — no CSP, HSTS, `X-Content-Type-Options`, `Referrer-Policy` or `Permissions-Policy`, while the frontend holds its bearer token in `sessionStorage`, which makes a script injection how that token leaves | `FZ-125` | `FZ-129` — derived from what the application loads, and rehearsed against the real bundle before any apply |
 | **Restrictions still wore the Industry furniture** — a bordered filter `fieldset` with a legend and the table inside a boxed panel, while Broadsheet takes its structure from the type scale and negative space. The last screen left like it | `FZ-133` | `FZ-134` — chips as the deck draws a multi-select, the system's own unboxed table, and the narrow-screen scroll its comment had always claimed |

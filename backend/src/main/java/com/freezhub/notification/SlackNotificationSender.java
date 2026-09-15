@@ -1,8 +1,8 @@
 package com.freezhub.notification;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 import com.freezhub.integration.Integration;
 import com.freezhub.integration.IntegrationType;
 import com.freezhub.restriction.ChangeRestriction;
@@ -70,7 +70,7 @@ public class SlackNotificationSender implements NotificationSender {
                 throw new NotificationDeliveryException("Slack integration has no webhookUrl configured");
             }
             return url;
-        } catch (com.fasterxml.jackson.core.JsonProcessingException unreadable) {
+        } catch (tools.jackson.core.JacksonException unreadable) {
             throw new NotificationDeliveryException("Slack integration config is not valid JSON");
         }
     }

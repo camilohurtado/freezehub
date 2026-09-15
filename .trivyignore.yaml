@@ -1,150 +1,28 @@
-# Findings that are known, dated, and owned — not waved away (FZ-127, OI-24).
+# Findings that are known, dated, and owned — not waved away (`FZ-127`, `OI-24`).
 #
-# Every entry here is a HIGH or CRITICAL in the backend's dependency tree as it stands on
-# `master` today, with the application pinned to Spring Boot 3.3.4. The scanner fails the
-# build on anything that is *not* in this list, which is what makes it worth having from
-# the day it is switched on rather than after a platform upgrade.
+# **The Java tree is no longer here, and that is the point.** `FZ-127` baselined 39 findings
+# in the backend's dependencies; `FZ-136` upgraded off Spring Boot 3.3.4 and they are gone —
+# a scan of the tree now returns nothing at HIGH or above. A baseline that shrinks when the
+# debt is paid is the only kind worth keeping.
+#
+# What remains is the base image, which is a different owner and a different fix.
 #
 # `expiredAt` is the point of the file. On that date these stop being suppressed and the
 # build starts failing on them, so the list cannot quietly become permanent — which is how
 # a scanner turns into decoration.
 #
-# **Owner: `FZ-136`.** The upgrade is measured, not hoped for: Spring Boot 3.5.14 builds
-# and passes all 468 tests unchanged, and takes this list from 39 findings to 21. The
-# remaining ones need a newer patch line still. None of that is guesswork — it was run.
-#
-# Regenerate after an upgrade rather than editing by hand:
+# Regenerate from a scan rather than editing by hand:
 #   docker run --rm -v "$PWD/backend":/scan -v "$HOME/.m2":/root/.m2 \
 #     aquasec/trivy:latest fs --scanners vuln --severity HIGH,CRITICAL --format json /scan
-vulnerabilities:
-  - id: CVE-2024-38819
-    statement: "org.springframework:spring-webmvc 6.1.13; fixed in 6.1.14"
-    expiredAt: 2026-10-13
-  - id: CVE-2024-38821
-    statement: "org.springframework.security:spring-security-web 6.3.3; fixed in 5.7.13, 5.8.15, 6.2.7, 6.0.13, 6.1.11, 6.3.4"
-    expiredAt: 2026-10-13
-  - id: CVE-2024-50379
-    statement: "org.apache.tomcat.embed:tomcat-embed-core 10.1.30; fixed in 11.0.2, 10.1.34, 9.0.98"
-    expiredAt: 2026-10-13
-  - id: CVE-2024-56337
-    statement: "org.apache.tomcat.embed:tomcat-embed-core 10.1.30; fixed in 11.0.2, 10.1.34, 9.0.98"
-    expiredAt: 2026-10-13
-  - id: CVE-2025-22228
-    statement: "org.springframework.security:spring-security-crypto 6.3.3; fixed in 6.3.8, 6.4.4, 6.2.10, 6.1.14, 6.0.16, 5.8.18, 5.7.16"
-    expiredAt: 2026-10-13
-  - id: CVE-2025-22235
-    statement: "org.springframework.boot:spring-boot 3.3.4; fixed in 3.3.11, 3.4.5"
-    expiredAt: 2026-10-13
-  - id: CVE-2025-24813
-    statement: "org.apache.tomcat.embed:tomcat-embed-core 10.1.30; fixed in 11.0.3, 10.1.35, 9.0.99"
-    expiredAt: 2026-10-13
-  - id: CVE-2025-41249
-    statement: "org.springframework:spring-core 6.1.13; fixed in 6.2.11"
-    expiredAt: 2026-10-13
-  - id: CVE-2025-48988
-    statement: "org.apache.tomcat.embed:tomcat-embed-core 10.1.30; fixed in 11.0.8, 10.1.42, 9.0.106"
-    expiredAt: 2026-10-13
-  - id: CVE-2025-48989
-    statement: "org.apache.tomcat.embed:tomcat-embed-core 10.1.30; fixed in 11.0.10, 10.1.44, 9.0.108"
-    expiredAt: 2026-10-13
-  - id: CVE-2025-49146
-    statement: "org.postgresql:postgresql 42.7.4; fixed in 42.7.7"
-    expiredAt: 2026-10-13
-  - id: CVE-2025-52520
-    statement: "org.apache.tomcat.embed:tomcat-embed-core 10.1.30; fixed in 11.0.9, 10.1.43, 9.0.107"
-    expiredAt: 2026-10-13
-  - id: CVE-2025-53506
-    statement: "org.apache.tomcat.embed:tomcat-embed-core 10.1.30; fixed in 9.0.107, 10.1.43, 11.0.9"
-    expiredAt: 2026-10-13
-  - id: CVE-2025-55752
-    statement: "org.apache.tomcat.embed:tomcat-embed-core 10.1.30; fixed in 11.0.11, 10.1.45, 9.0.109"
-    expiredAt: 2026-10-13
-  - id: CVE-2026-22732
-    statement: "org.springframework.security:spring-security-web 6.3.3; fixed in 6.5.9, 7.0.4"
-    expiredAt: 2026-10-13
-  - id: CVE-2026-22733
-    statement: "org.springframework.boot:spring-boot-starter-actuator 3.3.4; fixed in 4.0.4, 3.5.12"
-    expiredAt: 2026-10-13
-  - id: CVE-2026-24734
-    statement: "org.apache.tomcat.embed:tomcat-embed-core 10.1.30; fixed in 11.0.18, 10.1.52, 9.0.115"
-    expiredAt: 2026-10-13
-  - id: CVE-2026-24880
-    statement: "org.apache.tomcat.embed:tomcat-embed-core 10.1.30; fixed in 9.0.116, 10.1.52, 11.0.20"
-    expiredAt: 2026-10-13
-  - id: CVE-2026-34483
-    statement: "org.apache.tomcat.embed:tomcat-embed-core 10.1.30; fixed in 9.0.116, 10.1.54, 11.0.21"
-    expiredAt: 2026-10-13
-  - id: CVE-2026-34487
-    statement: "org.apache.tomcat.embed:tomcat-embed-core 10.1.30; fixed in 9.0.117, 10.1.54, 11.0.21"
-    expiredAt: 2026-10-13
-  - id: CVE-2026-40973
-    statement: "org.springframework.boot:spring-boot 3.3.4; fixed in 4.0.6, 3.5.14"
-    expiredAt: 2026-10-13
-  - id: CVE-2026-40984
-    statement: "io.micrometer:micrometer-core 1.13.4; fixed in 1.16.6, 1.15.12"
-    expiredAt: 2026-10-13
-  - id: CVE-2026-41284
-    statement: "org.apache.tomcat.embed:tomcat-embed-core 10.1.30; fixed in 9.0.118, 10.1.55, 11.0.22"
-    expiredAt: 2026-10-13
-  - id: CVE-2026-41293
-    statement: "org.apache.tomcat.embed:tomcat-embed-core 10.1.30; fixed in 9.0.118, 10.1.55, 11.0.22"
-    expiredAt: 2026-10-13
-  - id: CVE-2026-41716
-    statement: "org.springframework.data:spring-data-commons 3.3.4; fixed in 4.0.6, 3.5.12"
-    expiredAt: 2026-10-13
-  - id: CVE-2026-41842
-    statement: "org.springframework:spring-webmvc 6.1.13; fixed in 7.0.8, 6.2.19"
-    expiredAt: 2026-10-13
-  - id: CVE-2026-41845
-    statement: "org.springframework:spring-webmvc 6.1.13; fixed in 7.0.8, 6.2.19"
-    expiredAt: 2026-10-13
-  - id: CVE-2026-41850
-    statement: "org.springframework:spring-expression 6.1.13; fixed in 7.0.8, 6.2.19"
-    expiredAt: 2026-10-13
-  - id: CVE-2026-42198
-    statement: "org.postgresql:postgresql 42.7.4; fixed in 42.7.11"
-    expiredAt: 2026-10-13
-  - id: CVE-2026-42498
-    statement: "org.apache.tomcat.embed:tomcat-embed-core 10.1.30; fixed in 9.0.118, 10.1.55, 11.0.22"
-    expiredAt: 2026-10-13
-  - id: CVE-2026-43512
-    statement: "org.apache.tomcat.embed:tomcat-embed-core 10.1.30; fixed in 9.0.118, 10.1.55, 11.0.22"
-    expiredAt: 2026-10-13
-  - id: CVE-2026-43513
-    statement: "org.apache.tomcat.embed:tomcat-embed-core 10.1.30; fixed in 9.0.118, 10.1.55, 11.0.22"
-    expiredAt: 2026-10-13
-  - id: CVE-2026-43515
-    statement: "org.apache.tomcat.embed:tomcat-embed-core 10.1.30; fixed in 9.0.118, 10.1.55, 11.0.22"
-    expiredAt: 2026-10-13
-  - id: CVE-2026-54291
-    statement: "org.postgresql:postgresql 42.7.4; fixed in 42.7.12"
-    expiredAt: 2026-10-13
-  - id: CVE-2026-54512
-    statement: "com.fasterxml.jackson.core:jackson-databind 2.17.2; fixed in 2.18.8, 3.1.4, 2.21.4"
-    expiredAt: 2026-10-13
-  - id: CVE-2026-54513
-    statement: "com.fasterxml.jackson.core:jackson-databind 2.17.2; fixed in 2.18.8, 2.21.4, 3.1.4"
-    expiredAt: 2026-10-13
-  - id: CVE-2026-65182
-    statement: "org.apache.tomcat.embed:tomcat-embed-core 10.1.30; fixed in 11.0.25, 10.1.58, 9.0.121"
-    expiredAt: 2026-10-13
-  - id: CVE-2026-65905
-    statement: "org.apache.tomcat.embed:tomcat-embed-core 10.1.30; fixed in 11.0.25, 10.1.58, 9.0.121"
-    expiredAt: 2026-10-13
-  - id: CVE-2026-68525
-    statement: "org.apache.tomcat.embed:tomcat-embed-core 10.1.30; fixed in 11.0.25, 10.1.58, 9.0.121"
-    expiredAt: 2026-10-13
-  - id: GHSA-r7wm-3cxj-wff9
-    statement: "com.fasterxml.jackson.core:jackson-core 2.17.2; fixed in 2.18.8, 2.21.4"
-    expiredAt: 2026-10-13
 
-# The base image, not the application (FZ-127). `eclipse-temurin:21-jre` ships
-# /usr/bin/pebble — Canonical's service manager — built with Go 1.26.5, whose standard
-# library carries these. FreezeHub's container runs java directly and never invokes pebble,
-# but it is in the image, so it is in the scan, and pretending otherwise is what a baseline
-# is for rather than against.
+# The base image, not the application. `eclipse-temurin:21-jre` ships /usr/bin/pebble —
+# Canonical's service manager — built with Go 1.26.5, whose standard library carries these.
+# FreezeHub's container runs java directly and never invokes pebble, but it is in the image,
+# so it is in the scan, and pretending otherwise is what a baseline is for rather than
+# against.
 #
 # Owned by `OI-30`: the fix is to pin the base by digest and choose one without it.
+vulnerabilities:
   - id: CVE-2026-33818
     statement: "stdlib v1.26.5 in /usr/bin/pebble, from the base image; fixed in 1.26.6"
     expiredAt: 2026-10-13

@@ -7,7 +7,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.3.4</version>
+        <version>4.1.1</version>
         <relativePath/>
     </parent>
 
@@ -19,12 +19,27 @@
 
     <properties>
         <java.version>21</java.version>
+        <!--
+            Ahead of the Boot 4.1.1 default of 11.0.24, which carries three CRITICALs
+            (FZ-136). A patch bump inside 11.0.x, pinned here rather than waited for,
+            because the alternative is shipping them or suppressing them.
+        -->
+        <tomcat.version>11.0.25</tomcat.version>
     </properties>
 
     <dependencies>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+        <!--
+            Spring Boot 4 split RestClient support out of the web starter, so the
+            customizer that carries the outbound timeouts (`FZ-065`, `D-30`) needs this
+            module named explicitly (`FZ-136`). It brings `spring-boot-http-client` with it.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-restclient</artifactId>
         </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -70,6 +85,16 @@
             <groupId>org.liquibase</groupId>
             <artifactId>liquibase-core</artifactId>
         </dependency>
+        <!--
+            Spring Boot 4 moved Liquibase's auto-configuration into its own module, and
+            `liquibase-core` alone no longer runs the changelog at startup (`FZ-136`).
+            Without this the application starts against an empty schema — which is exactly
+            how it failed: 342 tests erroring with `relation "organization" does not exist`.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-liquibase</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
@@ -81,6 +106,29 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
+        <!--
+            Spring Boot 4 moved MockMvc's auto-configuration out of `spring-boot-starter-test`
+            into its own module (`FZ-136`). Every `@SpringBootTest` that drives HTTP needs it.
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-webmvc-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!--
+            `@DataJpaTest` and `@AutoConfigureTestDatabase` moved into per-technology test
+            modules in Spring Boot 4 (`FZ-136`).
+        -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-data-jpa-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-jdbc-test</artifactId>
+            <scope>test</scope>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-testcontainers</artifactId>
@@ -88,15 +136,33 @@
         </dependency>
         <dependency>
             <groupId>org.testcontainers</groupId>
-            <artifactId>junit-jupiter</artifactId>
+            <artifactId>testcontainers-junit-jupiter</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.testcontainers</groupId>
-            <artifactId>postgresql</artifactId>
+            <artifactId>testcontainers-postgresql</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>
+
+    <!--
+        Spring Boot 4 no longer manages Testcontainers versions, so the two test
+        dependencies above lost theirs and the POM stopped resolving (FZ-136). The BOM is
+        imported here rather than a version pinned on each dependency, so the modules stay
+        in step with each other the way the Boot parent used to keep them.
+    -->
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.testcontainers</groupId>
+                <artifactId>testcontainers-bom</artifactId>
+                <version>2.0.5</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 
     <build>
         <plugins>

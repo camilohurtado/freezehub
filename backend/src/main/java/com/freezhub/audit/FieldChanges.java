@@ -1,7 +1,7 @@
 package com.freezhub.audit;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -51,7 +51,7 @@ public final class FieldChanges {
         }
         try {
             return MAPPER.writeValueAsString(changes);
-        } catch (JsonProcessingException impossible) {
+        } catch (JacksonException impossible) {
             // Only Strings, numbers and collections of them ever reach here.
             throw new IllegalStateException("Could not serialise audit details", impossible);
         }

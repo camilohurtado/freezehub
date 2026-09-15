@@ -1,7 +1,7 @@
 package com.freezhub.audit;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -36,7 +36,7 @@ public final class AuditDetails {
         }
         try {
             return MAPPER.writeValueAsString(values);
-        } catch (JsonProcessingException impossible) {
+        } catch (JacksonException impossible) {
             throw new IllegalStateException("Could not serialise audit details", impossible);
         }
     }

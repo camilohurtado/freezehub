@@ -1,8 +1,8 @@
 package com.freezhub.notification;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import com.freezhub.integration.Integration;
 import com.freezhub.integration.IntegrationType;
 import com.freezhub.restriction.ChangeRestriction;
@@ -79,7 +79,7 @@ public class EmailNotificationSender implements NotificationSender {
             List<String> addresses = new ArrayList<>();
             recipients.forEach(recipient -> addresses.add(recipient.asText()));
             return addresses;
-        } catch (JsonProcessingException unreadable) {
+        } catch (JacksonException unreadable) {
             throw new NotificationDeliveryException("Email integration config is not valid JSON");
         }
     }
