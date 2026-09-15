@@ -3,8 +3,26 @@
 # Multi-stage so the result carries a JRE and a jar, not a JDK, Maven and the whole
 # dependency cache — and so `docker build backend/` works on a laptop exactly as it does
 # in CI, with no "build the jar first" step to forget.
+#
+# **Both stages are pinned by digest** (`FZ-139`, `OI-30`). A tag moves: `21-jre` changed
+# from Ubuntu 24.04 to 26.04 under this project with no commit and no review, and the way
+# anyone found out was a local scan finding nothing while the same scan in CI found eight
+# HIGH. A digest means the base is in the repository, an upgrade is a commit somebody
+# approved, and a scan is a verdict on the artifact that actually ships.
+#
+# The cost is stated rather than hidden: a pinned digest does not pick up the base's own
+# security patches. `verify.yml` scans exactly these digests on every run, so the build
+# fails when one of them acquires a finding — which is what turns the pin from a freeze
+# into a decision somebody has to make.
+#
+# To bump either, resolve the new digest and paste it:
+#   docker buildx imagetools inspect eclipse-temurin:21-jre-noble --format '{{.Manifest.Digest}}'
 
-FROM eclipse-temurin:21-jdk AS build
+# `-noble` (Ubuntu 24.04) and not the bare tag: 26.04 ships /usr/bin/pebble, a Go binary
+# whose standard library carries the eight findings `FZ-127` had to baseline. Choosing the
+# variant removes them instead of suppressing them. This stage never ships — only the jar
+# is copied out — but it builds what does, so it is pinned too.
+FROM eclipse-temurin:21-jdk-noble@sha256:2fc8306f51cd8c1582b972213f3115300074084ec4f9060448454f04ecbd941b AS build
 
 WORKDIR /build
 
@@ -22,7 +40,10 @@ COPY src/ src/
 RUN ./mvnw --batch-mode --no-transfer-progress clean package -DskipTests
 
 
-FROM eclipse-temurin:21-jre AS runtime
+# The base that actually ships. Same distribution as the build stage on purpose: one glibc,
+# one set of CA certificates, one thing to reason about when something behaves differently
+# in the image than it did in the build.
+FROM eclipse-temurin:21-jre-noble@sha256:d35199d74a3b2dff1bfb435d9adde4ef974e74a7d2a4fcb3079063c55926edb5 AS runtime
 
 # Not root. A container that does not need to write anywhere should not be able to.
 RUN groupadd --system freezehub && useradd --system --gid freezehub freezehub

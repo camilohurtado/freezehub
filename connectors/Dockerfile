@@ -11,11 +11,22 @@
 #              -e FREEZEHUB_APPLICATION=payments-api -e FREEZEHUB_ENVIRONMENT=production \
 #              freeze-check
 
-FROM alpine:3.20
+# Pinned by digest, not by the minor tag (`FZ-139`, `OI-30`). `3.20` was already a
+# deliberate choice over `latest`, and it is still a tag: it moves with every patch
+# release. This image runs inside customers' pipelines, so "what is in it" should be a
+# fact in the repository rather than whatever the registry served that afternoon.
+#
+#   docker buildx imagetools inspect alpine:3.20 --format '{{.Manifest.Digest}}'
+FROM alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc
 
-# Everything the gate needs and nothing else. Pinning the Alpine minor rather than
-# tracking `latest` so a customer's pipeline does not change underneath them on a
-# Tuesday — the whole point of this image is being boring.
+# Everything the gate needs and nothing else.
+#
+# **This layer is not pinned, and saying so is the honest version.** `apk add` resolves
+# curl and jq against the repository at build time, so two builds of the same digest can
+# still differ. Pinning `curl=8.x-r0` would fix that until Alpine drops the package
+# version, at which point every build fails — trading a silent change for a loud outage in
+# a deploy gate. The base is what a scan reads and what a reviewer can check, so the base
+# is what is pinned.
 RUN apk add --no-cache curl jq
 
 # Not root. The gate reads environment variables and makes one HTTP call; it has no
