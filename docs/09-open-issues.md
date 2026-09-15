@@ -149,15 +149,6 @@ durable one and left to `FZ-123`: a security group or an egress proxy, so that t
 does not depend on the application resolving a name correctly. The residual gap in the
 meantime is a DNS rebind between FreezeHub's resolution and the client's own.
 
-### OI-24 — Nothing scans dependencies or images
-**Severity:** Gap · **Owner:** `FZ-127` · **Found in:** `FZ-125`
-
-There are three workflows — `verify.yml`, `deploy.yml`, `publish-connectors.yml` — and none of them scans anything. No Dependabot configuration, no CodeQL, no image scanner, no dependency checker. Nothing in the repository knows whether a dependency has a published vulnerability.
-
-The base image is not in `pom.xml`, so a dependency scan alone would not cover it; the image needs scanning too.
-
-Worth stating plainly because of what this product is: FreezeHub asks customers to put it on the path of every deployment they make. The first security questionnaire will ask this question, and there is currently no answer.
-
 ### OI-25 — Token validation for a deployed environment is unspecified
 **Severity:** Decision · **Owner:** `FZ-128` · **Found in:** `FZ-125`
 
@@ -174,10 +165,37 @@ The specific hazard is that **Cognito issues ID tokens and access tokens from th
 
 A 256-bit key is not brute-forcible, so this is availability and cost rather than credential compromise. That is the reason it matters here rather than a reason it does not: `/api/policy/**` is the endpoint whose unavailability blocks every customer's deployments, because `freeze-check.sh` fails closed (`D-21`, `D-24`). It is the least affordable endpoint in the product to leave unmetered.
 
+### OI-29 — The dependency tree carries 39 known HIGH/CRITICAL vulnerabilities
+**Severity:** Defect · **Owner:** `FZ-136` · **Found in:** `FZ-127`
+
+Switching on the scanner (`FZ-127`) measured what was there. The backend is pinned to **Spring Boot 3.3.4**, and its tree carries **39 findings at HIGH or above, 9 of them CRITICAL** — seven in `tomcat-embed-core` 10.1.30, two in `spring-security-web` 6.3.3, with the rest across `jackson-databind`, `micrometer-core`, the PostgreSQL driver, Spring Framework and Spring Boot itself.
+
+The frontend's npm tree is **clean**, and both base images — `eclipse-temurin:21-jre` and `alpine:3.20` — are **clean**. The whole exposure is the Java dependency tree.
+
+**The fix is measured rather than estimated.** Spring Boot **3.5.14** builds with no source changes and passes all **468 tests unchanged**, and takes the count from 39 to 21 (9 CRITICAL to 6). The remainder need a newer patch line again — `tomcat-embed-core` 10.1.55+, `spring-data-commons` 3.5.12, `micrometer-core` 1.15.12, the driver 42.7.12, Spring Framework 6.2.19 — so the target is the current 3.5.x (3.5.16 at the time of writing) or the 4.x line, which is a larger step.
+
+`FZ-127` did not do the upgrade, deliberately: its own scope says "a CI change, not a platform". What it did instead is make the debt dated — the baseline in `.trivyignore.yaml` expires on **2026-10-13**, after which these stop being suppressed and the build fails on them.
+
+Nothing here is exploitable through a path this product exposes *as far as anybody has checked*, and that clause is the problem: nobody has checked, and seven CRITICALs in the HTTP connector is not a position to defend by reasoning.
+
+### OI-30 — The Dockerfiles follow floating tags, so what ships changes without a commit
+**Severity:** Gap · **Owner:** needs a story · **Found in:** `FZ-127`
+
+`backend/Dockerfile` builds `FROM eclipse-temurin:21-jdk` and runs `FROM eclipse-temurin:21-jre`; `connectors/Dockerfile` uses `alpine:3.20`. All three are tags, and a tag moves.
+
+This was not noticed until the scanner was switched on, and then it was noticed immediately: a local scan of `eclipse-temurin:21-jre` found nothing, and the same scan in CI found eight HIGH. The difference was not the scanner — it was the image. The locally cached pull was Ubuntu 24.04; the tag now resolves to **Ubuntu 26.04**, which ships `/usr/bin/pebble`, a Go binary whose standard library carries those eight.
+
+So the base of the deployed application changed distribution release under the project, silently, with no commit, no review and no way to tell from the repository which one a given build used.
+
+**The fix is to pin by digest** — `FROM eclipse-temurin:21-jre@sha256:…` — so that what ships is in the repository, an upgrade is a commit somebody approves, and the scanner's verdict is about a known artifact. Renovate or Dependabot can then propose digest bumps as ordinary pull requests.
+
+Worth pairing with the choice of base: a variant without `pebble` removes those eight findings outright rather than baselining them.
+
 ## Resolved
 
 | Issue | Found in | Resolved by |
 |---|---|---|
+| **Nothing scanned dependencies or images** — three workflows and no scanner of any kind, so nothing in the repository knew whether a dependency had a published vulnerability | `FZ-125` | `FZ-127` — Trivy over the Maven tree, the npm tree and both base images, gated at HIGH, with a dated baseline. It immediately found `OI-29` |
 | **No response-headers policy on the distribution** — no CSP, HSTS, `X-Content-Type-Options`, `Referrer-Policy` or `Permissions-Policy`, while the frontend holds its bearer token in `sessionStorage`, which makes a script injection how that token leaves | `FZ-125` | `FZ-129` — derived from what the application loads, and rehearsed against the real bundle before any apply |
 | **Restrictions still wore the Industry furniture** — a bordered filter `fieldset` with a legend and the table inside a boxed panel, while Broadsheet takes its structure from the type scale and negative space. The last screen left like it | `FZ-133` | `FZ-134` — chips as the deck draws a multi-select, the system's own unboxed table, and the narrow-screen scroll its comment had always claimed |
 | **Layout spacing did not use the design system's scale**, so the system's density was unreachable by changing tokens — and it turned out to be two screens that were never re-pitched rather than the whole application | `FZ-101` | `FZ-133` — 159 token uses, 0 rem literals, px furniture deliberately untouched |
