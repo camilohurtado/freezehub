@@ -1,0 +1,49 @@
+# Findings that are known, dated, and owned — not waved away (`FZ-127`, `OI-24`).
+#
+# **The Java tree is no longer here, and that is the point.** `FZ-127` baselined 39 findings
+# in the backend's dependencies; `FZ-136` upgraded off Spring Boot 3.3.4 and they are gone —
+# a scan of the tree now returns nothing at HIGH or above. A baseline that shrinks when the
+# debt is paid is the only kind worth keeping.
+#
+# What remains is the base image, which is a different owner and a different fix.
+#
+# `expiredAt` is the point of the file. On that date these stop being suppressed and the
+# build starts failing on them, so the list cannot quietly become permanent — which is how
+# a scanner turns into decoration.
+#
+# Regenerate from a scan rather than editing by hand:
+#   docker run --rm -v "$PWD/backend":/scan -v "$HOME/.m2":/root/.m2 \
+#     aquasec/trivy:latest fs --scanners vuln --severity HIGH,CRITICAL --format json /scan
+
+# The base image, not the application. `eclipse-temurin:21-jre` ships /usr/bin/pebble —
+# Canonical's service manager — built with Go 1.26.5, whose standard library carries these.
+# FreezeHub's container runs java directly and never invokes pebble, but it is in the image,
+# so it is in the scan, and pretending otherwise is what a baseline is for rather than
+# against.
+#
+# Owned by `OI-30`: the fix is to pin the base by digest and choose one without it.
+vulnerabilities:
+  - id: CVE-2026-33818
+    statement: "stdlib v1.26.5 in /usr/bin/pebble, from the base image; fixed in 1.26.6"
+    expiredAt: 2026-10-13
+  - id: CVE-2026-39821
+    statement: "stdlib v1.26.5 in /usr/bin/pebble, from the base image; fixed in 1.26.6"
+    expiredAt: 2026-10-13
+  - id: CVE-2026-46600
+    statement: "stdlib v1.26.5 in /usr/bin/pebble, from the base image; fixed in 1.26.6"
+    expiredAt: 2026-10-13
+  - id: CVE-2026-56853
+    statement: "stdlib v1.26.5 in /usr/bin/pebble, from the base image; fixed in 1.26.6"
+    expiredAt: 2026-10-13
+  - id: CVE-2026-56858
+    statement: "stdlib v1.26.5 in /usr/bin/pebble, from the base image; fixed in 1.26.6"
+    expiredAt: 2026-10-13
+  - id: CVE-2026-56859
+    statement: "stdlib v1.26.5 in /usr/bin/pebble, from the base image; fixed in 1.26.6"
+    expiredAt: 2026-10-13
+  - id: CVE-2026-56860
+    statement: "stdlib v1.26.5 in /usr/bin/pebble, from the base image; fixed in 1.26.6"
+    expiredAt: 2026-10-13
+  - id: CVE-2026-56862
+    statement: "stdlib v1.26.5 in /usr/bin/pebble, from the base image; fixed in 1.26.6"
+    expiredAt: 2026-10-13

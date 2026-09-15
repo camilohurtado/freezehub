@@ -2037,7 +2037,7 @@ Whether the boundary is additionally enforced in the network — a security grou
 through a proxy — is `FZ-123`'s to decide, and is the more durable half of the fix.
 
 ### FZ-127 — Dependency and Image Scanning
-**Status:** TODO · **Owns:** `OI-24`
+**Status:** DONE · **Owns:** `OI-24` · **Found:** `OI-29`, `OI-30`
 
 Acceptance:
 
@@ -2051,6 +2051,30 @@ Acceptance:
 
 Prefer what is already available in the toolchain over a new service. This is a CI change,
 not a platform.
+
+**Built (`FZ-127`).** A `security` job in `verify.yml` runs Trivy over all three trees this
+repository ships — the Maven tree, the npm tree, and both base images — gated at
+`HIGH,CRITICAL`, which is written in the workflow rather than left to a default. One tool
+rather than three, which is what "prefer what is already available" bought.
+
+Two things it taught, both worth keeping:
+
+- **The Maven scan needs a populated `~/.m2`.** Without one, Trivy resolves every POM over
+  the network and Maven Central answers `429 Too Many Requests` with a half-hour block. Not
+  hypothetical — it happened while this was being written, which is why the job runs
+  `dependency:go-offline` first.
+- **The base images are scanned by name, not by building the application image.** The
+  shipped image is base + jar, and both halves are covered — the jar's dependencies by the
+  Maven scan, the base by the image scans. Building it here would cost a full Maven build
+  inside Docker to learn the same two things.
+
+**The suppression file is dated and owned.** Everything HIGH-and-above in the tree today is
+listed in `.trivyignore.yaml` with `expiredAt: 2026-10-13` and `FZ-136` named as the owner,
+so the gate blocks anything *new* from the moment it is switched on, and blocks these too
+once the date passes. That is the difference between a baseline and a blanket.
+
+**Both halves were verified.** With the baseline the scan is clean and exits 0; remove one
+entry — `CVE-2025-24813`, a tomcat CRITICAL — and it exits 1 and names it.
 
 ### FZ-128 — Enforce the Token Validation Rules
 **Status:** TODO · **Owns:** `OI-25` · **Sequenced with:** `FZ-046`
@@ -2210,9 +2234,7 @@ Verified: **468 tests pass**, the application **starts** against an empty databa
 Liquibase applies all 27 changesets, `/actuator/health` is UP, and the scan returns **0
 findings at HIGH or above**.
 
-**Merge order matters.** `FZ-127`'s `.trivyignore.yaml` baselines the 39 findings this
-removes. Once both are on `master`, regenerate it: the 40 Java entries are dead, and only
-the 8 base-image ones (`OI-30`) should remain.
-
-`OI-29` is raised on `FZ-127`'s branch rather than on `master`, so it is closed there or in
-whichever of the two lands second — not here, where the entry does not yet exist.
+**The baseline shrank with it.** `FZ-127` landed first and baselined the 39 findings this
+removes, so `.trivyignore.yaml` is regenerated here: the 40 Java entries are gone and only
+the 8 base-image ones (`OI-30`) remain. A baseline that does not shrink when the debt is
+paid is one nobody is reading.
